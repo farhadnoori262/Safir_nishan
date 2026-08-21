@@ -1,0 +1,4 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- این دسترسی صرفاً برای ارتباط ابزار فلاتر با برنامه در حالت دباگ و تست است -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+</manifest>

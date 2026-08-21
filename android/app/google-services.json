@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "983174537944",
+    "project_id": "afghantaxi-de039",
+    "storage_bucket": "afghantaxi-de039.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:983174537944:android:0d55f0197cc68224822dad",
+        "android_client_info": {
+          "package_name": "com.farhad.safir"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAIhThndROGopXK4gmvg7hju4eimqwopPI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:983174537944:android:f60928fad3c446fa822dad",
+        "android_client_info": {
+          "package_name": "com.farhad.safir_driver"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAIhThndROGopXK4gmvg7hju4eimqwopPI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,18 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.farhad.safir"> <!-- نام پکیج اختصاصی سفیر راننده -->
+
+    <!-- دسترسی اتصال به اینترنت -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    
+    <!-- دسترسی‌های مربوط به موقعیت مکانی (جی‌پی‌اس) برای مسیریابی و یافتن مسافر -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+
+    <!-- دسترسی ارسال نوتیفیکیشن برای دریافت درخواست‌های سفر در اندروید ۱۳ به بالا -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+
+    <!-- دسترسی بیدار نگه داشتن پردازنده جهت پخش صدای هشدار سفر جدید -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+</manifest>
