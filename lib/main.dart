@@ -84,14 +84,14 @@ class MyApp extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.all(20),
             child: Text(
-              'خطا در بارگذاری برنامه:
+  'خطا در بارگذاری برنامه:
 ${details.exception}',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.red,
-                fontSize: 13,
-              ),
+  textAlign: TextAlign.center,
+  style: const TextStyle(
+    color: Colors.red,
+    fontSize: 13,
             ),
+           ),
           ),
         ),
       );
