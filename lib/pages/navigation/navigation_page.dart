@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
-
+import '../../models/place_search_result.dart';
+import '../../widgets/navigation/destination_search_sheet.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
@@ -12,13 +13,11 @@ import '../../controllers/navigation_controller.dart';
 import '../../utils/app_colors.dart';
 
 class NavigationPage extends StatefulWidget {
-  final LatLng start;
-  final LatLng destination;
+  final LatLng currentLocation;
 
   const NavigationPage({
     super.key,
-    required this.start,
-    required this.destination,
+    required this.currentLocation,
   });
 
   @override
@@ -49,6 +48,17 @@ class _NavigationPageState extends State<NavigationPage> {
   bool _isProgrammaticCameraMove = false;
 
   int _lastRouteVersion = 0;
+  PlaceSearchResult? _selectedPlace;
+LatLng? _selectedDestination;
+
+LatLng get _startLocation =>
+    Provider.of<NavigationController>(
+      context,
+      listen: false,
+    ).rawDriverLocation ??
+    widget.currentLocation;
+
+bool get _hasDestination => _selectedDestination != null;
 
   void _onMapCreated(MapLibreMapController controller) {
     _mapController = controller;
@@ -386,11 +396,18 @@ class _NavigationPageState extends State<NavigationPage> {
     final navigationController =
         Provider.of<NavigationController>(context, listen: false);
 
-    final routePoints = await navigationController.startNavigation(
-      widget.start,
-      widget.destination,
-      context.locale.languageCode,
-    );
+    final destination = _selectedDestination;
+
+if (destination == null) {
+  _navigationStarted = false;
+  return;
+}
+
+final routePoints = await navigationController.startNavigation(
+  _startLocation,
+  destination,
+  context.locale.languageCode,
+);
 
     if (!mounted ||
         _mapController == null ||
@@ -457,7 +474,7 @@ class _NavigationPageState extends State<NavigationPage> {
 
     _destinationSymbol = await _mapController!.addSymbol(
       SymbolOptions(
-        geometry: widget.destination,
+        geometry: _selectedDestination!,
         iconImage: _destinationIconName,
         iconSize: 0.68,
       ),
@@ -771,7 +788,7 @@ class _NavigationPageState extends State<NavigationPage> {
     await _mapController!.animateCamera(
       CameraUpdate.newCameraPosition(
         CameraPosition(
-          target: widget.start,
+          target: _startLocation,
           zoom: 17.0,
           tilt: 35.0,
         ),
@@ -787,8 +804,8 @@ class _NavigationPageState extends State<NavigationPage> {
         Provider.of<NavigationController>(context, listen: false);
 
     final location =
-        navigationController.snappedDriverLocation ??
-            widget.start;
+    navigationController.snappedDriverLocation ??
+        _startLocation;
 
     setState(() {
       _cameraFollowing = true;
