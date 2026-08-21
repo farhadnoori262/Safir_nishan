@@ -158,7 +158,7 @@ class _DestinationSearchPageState
 
     _drawDestinationPin(
       canvas,
-      const Size(
+       Size(
         width.toDouble(),
         height.toDouble(),
       ),
@@ -196,7 +196,7 @@ class _DestinationSearchPageState
 
     _drawCurrentLocation(
       canvas,
-      const Size(
+       Size(
         width.toDouble(),
         height.toDouble(),
       ),
