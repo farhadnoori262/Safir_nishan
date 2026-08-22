@@ -444,7 +444,7 @@ class _DestinationSearchPageState
       context,
       MaterialPageRoute(
         builder: (_) => NavigationPage(
-          start: currentLocation,
+          currentLocation: currentLocation,
           destination: destination,
         ),
       ),
