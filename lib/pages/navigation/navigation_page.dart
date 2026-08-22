@@ -454,7 +454,7 @@ final routePoints = await navigationController.startNavigation(
     await _drawRouteDecorations(navigationController);
 
     await _updateDriverMarker(
-      widget.start,
+      widget.currentLocation,
       heading: navigationController.driverRouteBearing,
       moveCamera: true,
     );
@@ -949,7 +949,7 @@ final routePoints = await navigationController.startNavigation(
             },
             styleString: 'assets/map/style.json',
             initialCameraPosition: CameraPosition(
-              target: widget.start,
+              target: widget.currentLocation,
               zoom: 16.0,
             ),
             myLocationEnabled: false,
