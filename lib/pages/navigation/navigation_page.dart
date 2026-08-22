@@ -1013,88 +1013,94 @@ final routePoints = await navigationController.startNavigation(
             ),
           ),
           Consumer<NavigationController>(
-            builder: (context, controller, child) {
-              if (!controller.isNavigating) {
-                return const SizedBox.shrink();
-              }
+  builder: (context, controller, child) {
+    if (!controller.isNavigating) {
+      return const SizedBox.shrink();
+    }
 
-              return Positioned(
-                top: 20,
-                left: 16,
-                right: 16,
-                child: SafeArea(
-                  child: Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: SafirColors.primary,
-                      borderRadius: BorderRadius.circular(18),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Colors.black26,
-                          blurRadius: 10,
-                          offset: Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          controller.currentTurnIcon,
-                          color: Colors.white,
-                          size: 34,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '${controller.distanceToNextTurn} ${'meters'.tr()}',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              Text(
-                                controller.navigationInstruction,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: controller.toggleVoice,
-                          icon: Icon(
-                            controller.isVoiceEnabled
-                                ? Icons.volume_up_rounded
-                                : Icons.volume_off_rounded,
-                            color: Colors.white,
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: _stopNavigation,
-                          icon: const Icon(
-                            Icons.close_rounded,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            },
+    return Positioned(
+      top: 20,
+      left: 16,
+      right: 16,
+      child: SafeArea(
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: SafirColors.primary,
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.black26,
+                blurRadius: 10,
+                offset: Offset(0, 4),
+              ),
+            ],
           ),
-        ],
+          child: Row(
+            children: [
+              Icon(
+                controller.currentTurnIcon,
+                color: Colors.white,
+                size: 34,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${controller.distanceToNextTurn} ${'meters'.tr()}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      controller.navigationInstruction,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                onPressed: controller.toggleVoice,
+                icon: Icon(
+                  controller.isVoiceEnabled
+                      ? Icons.volume_up_rounded
+                      : Icons.volume_off_rounded,
+                  color: Colors.white,
+                ),
+              ),
+              IconButton(
+                onPressed: _stopNavigation,
+                icon: const Icon(
+                  Icons.close_rounded,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
-  }
+  },
+),
+
+if (!_navigationStarted)
+  DestinationSearchSheet(
+    selectedPlace: _selectedPlace,
+    onPlaceSelected: _onPlaceSelected,
+    onConfirmDestination: _confirmDestination,
+  ),
+],
+),
+);
+}
 }
 
 enum _TurnDirection {
