@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 
 import '../../controllers/navigation_controller.dart';
 import '../../models/place_search_result.dart';
+import '../../services/place_search_service.dart';
 import '../../utils/app_colors.dart';
 import '../../widgets/navigation/destination_search_sheet.dart';
 
@@ -588,17 +589,34 @@ class _NavigationPageState extends State<NavigationPage>
   }
 
   Future<void> _selectDestinationFromMap(
-    LatLng coordinates,
-  ) async {
-    final place = PlaceSearchResult(
-      title: 'مقصد انتخاب‌شده',
-      address: 'نقطه انتخاب‌شده روی نقشه',
-      latitude: coordinates.latitude,
-      longitude: coordinates.longitude,
-    );
+  LatLng coordinates,
+) async {
+  final temporaryPlace = PlaceSearchResult(
+    title: 'در حال دریافت آدرس...',
+    address: 'لطفاً چند لحظه صبر کنید.',
+    latitude: coordinates.latitude,
+    longitude: coordinates.longitude,
+  );
 
-    await _onPlaceSelected(place);
+  await _onPlaceSelected(temporaryPlace);
+
+  final placeSearchService = PlaceSearchService();
+
+  final realPlace = await placeSearchService.reverseGeocode(
+    coordinates.latitude,
+    coordinates.longitude,
+    languageCode: context.locale.languageCode,
+  );
+
+  if (!mounted || realPlace == null) {
+    if (mounted) {
+      _showMessage('آدرس این نقطه پیدا نشد؛ مقصد همچنان قابل استفاده است.');
+    }
+    return;
   }
+
+  await _onPlaceSelected(realPlace);
+}
 
   Future<void> _showSelectedDestinationMarker({
     required bool moveCamera,
