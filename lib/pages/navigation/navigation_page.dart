@@ -1,8 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
-import '../../models/place_search_result.dart';
-import '../../widgets/navigation/destination_search_sheet.dart';
+
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
@@ -10,57 +9,80 @@ import 'package:maplibre_gl/maplibre_gl.dart';
 import 'package:provider/provider.dart';
 
 import '../../controllers/navigation_controller.dart';
+import '../../models/place_search_result.dart';
 import '../../utils/app_colors.dart';
+import '../../widgets/navigation/destination_search_sheet.dart';
 
 class NavigationPage extends StatefulWidget {
-  final LatLng currentLocation;
-  final LatLng destination;
+  final LatLng? currentLocation;
 
   const NavigationPage({
     super.key,
-    required this.currentLocation,
-    required this.destination,
+    this.currentLocation,
   });
 
   @override
   State<NavigationPage> createState() => _NavigationPageState();
 }
 
-class _NavigationPageState extends State<NavigationPage> {
+class _NavigationPageState extends State<NavigationPage>
+    with SingleTickerProviderStateMixin {
   static const String _driverIconName = 'safir-driver-arrow';
   static const String _destinationIconName = 'safir-destination-pin';
+  static const String _currentLocationIconName =
+      'safir-current-location-pulse';
   static const String _leftTurnIconName = 'safir-turn-left';
   static const String _rightTurnIconName = 'safir-turn-right';
   static const String _straightIconName = 'safir-turn-straight';
   static const String _uTurnIconName = 'safir-turn-uturn';
 
+  static const LatLng _fallbackLocation = LatLng(34.5553, 69.2075);
+
   MapLibreMapController? _mapController;
   StreamSubscription<Position>? _positionStream;
 
   Symbol? _driverSymbol;
+  Symbol? _currentLocationSymbol;
   Symbol? _destinationSymbol;
+
   final List<Symbol> _turnSymbols = [];
 
+  PlaceSearchResult? _selectedPlace;
+  LatLng? _selectedDestination;
+  LatLng? _currentLocation;
+
+  late final AnimationController _pulseController;
+
   bool _mapStyleReady = false;
+  bool _iconsAdded = false;
   bool _navigationStarted = false;
   bool _controllerListenerAdded = false;
-  bool _iconsAdded = false;
-  bool _cameraFollowing = true;
+  bool _cameraFollowing = false;
   bool _isUpdatingMap = false;
   bool _isProgrammaticCameraMove = false;
+  bool _isLoadingLocation = true;
 
   int _lastRouteVersion = 0;
-  PlaceSearchResult? _selectedPlace;
-LatLng? _selectedDestination;
 
-LatLng get _startLocation =>
-    Provider.of<NavigationController>(
-      context,
-      listen: false,
-    ).rawDriverLocation ??
-    widget.currentLocation;
+  LatLng get _startLocation => _currentLocation ??
+      widget.currentLocation ??
+      _fallbackLocation;
 
-bool get _hasDestination => _selectedDestination != null;
+  @override
+  void initState() {
+    super.initState();
+
+    _currentLocation = widget.currentLocation;
+
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat();
+
+    _pulseController.addListener(_updateCurrentLocationPulse);
+
+    _startLocationTracking();
+  }
 
   void _onMapCreated(MapLibreMapController controller) {
     _mapController = controller;
@@ -80,11 +102,110 @@ bool get _hasDestination => _selectedDestination != null;
     }
 
     await _addMapImages();
-    await _updateDriverMarker(
-  _startLocation,
-  heading: 0,
-  moveCamera: false,
-);
+    await _showCurrentLocationMarker(moveCamera: false);
+
+    if (_selectedDestination != null) {
+      await _showSelectedDestinationMarker(moveCamera: false);
+    }
+  }
+
+  Future<void> _startLocationTracking() async {
+    try {
+      final serviceEnabled =
+          await Geolocator.isLocationServiceEnabled();
+
+      if (!serviceEnabled) {
+        _showMessage('لطفاً موقعیت مکانی گوشی را روشن کنید.');
+        return;
+      }
+
+      var permission = await Geolocator.checkPermission();
+
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        _showMessage('اجازهٔ دسترسی به موقعیت مکانی داده نشد.');
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.bestForNavigation,
+      );
+
+      await _handleLocationUpdate(position);
+
+      await _positionStream?.cancel();
+
+      _positionStream = Geolocator.getPositionStream(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.bestForNavigation,
+          distanceFilter: 2,
+        ),
+      ).listen(
+        (position) async {
+          await _handleLocationUpdate(position);
+        },
+      );
+    } catch (_) {
+      _showMessage('دریافت موقعیت فعلی امکان‌پذیر نشد.');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingLocation = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _handleLocationUpdate(Position position) async {
+    if (!mounted || _isUpdatingMap) return;
+
+    _isUpdatingMap = true;
+
+    try {
+      final rawLocation = LatLng(
+        position.latitude,
+        position.longitude,
+      );
+
+      if (mounted) {
+        setState(() {
+          _currentLocation = rawLocation;
+        });
+      }
+
+      final navigationController =
+          Provider.of<NavigationController>(context, listen: false);
+
+      if (_navigationStarted && navigationController.isNavigating) {
+        navigationController.updateDriverPosition(
+          rawLocation,
+          langCode: context.locale.languageCode,
+        );
+
+        final driverLocation =
+            navigationController.snappedDriverLocation ?? rawLocation;
+
+        await _updateDriverMarker(
+          driverLocation,
+          heading: navigationController.driverRouteBearing,
+          moveCamera: _cameraFollowing,
+        );
+      } else {
+        await _showCurrentLocationMarker(moveCamera: false);
+      }
+    } finally {
+      _isUpdatingMap = false;
+    }
+  }
+
+  void _updateCurrentLocationPulse() {
+    if (!_navigationStarted) {
+      _showCurrentLocationMarker(moveCamera: false);
+    }
   }
 
   Future<void> _addMapImages() async {
@@ -98,10 +219,17 @@ bool get _hasDestination => _selectedDestination != null;
     );
 
     await _addCanvasImage(
+      _currentLocationIconName,
+      _drawCurrentLocationPulse,
+      width: 180,
+      height: 180,
+    );
+
+    await _addCanvasImage(
       _destinationIconName,
       _drawDestinationPin,
       width: 100,
-      height: 120,
+      height: 124,
     );
 
     await _addCanvasImage(
@@ -170,6 +298,7 @@ bool get _hasDestination => _selectedDestination != null;
 
     final picture = recorder.endRecording();
     final image = await picture.toImage(width, height);
+
     final bytes = await image.toByteData(
       format: ui.ImageByteFormat.png,
     );
@@ -182,7 +311,56 @@ bool get _hasDestination => _selectedDestination != null;
     );
   }
 
-  void _drawDriverArrow(Canvas canvas, Size size) {
+  void _drawCurrentLocationPulse(
+    Canvas canvas,
+    Size size,
+  ) {
+    final center = Offset(
+      size.width / 2,
+      size.height / 2,
+    );
+
+    final pulseValue = _pulseController.value;
+    final outerRadius = 42 + (pulseValue * 42);
+    final outerOpacity = (0.25 * (1 - pulseValue)).clamp(0.0, 0.25);
+
+    canvas.drawCircle(
+      center,
+      outerRadius,
+      Paint()
+        ..color = SafirColors.primary.withOpacity(outerOpacity),
+    );
+
+    canvas.drawCircle(
+      center,
+      43,
+      Paint()
+        ..color = SafirColors.primary.withOpacity(0.16),
+    );
+
+    canvas.drawCircle(
+      center,
+      29,
+      Paint()..color = Colors.white,
+    );
+
+    canvas.drawCircle(
+      center,
+      22,
+      Paint()..color = SafirColors.primary,
+    );
+
+    canvas.drawCircle(
+      center,
+      7,
+      Paint()..color = Colors.white,
+    );
+  }
+
+  void _drawDriverArrow(
+    Canvas canvas,
+    Size size,
+  ) {
     final center = Offset(
       size.width / 2,
       size.height / 2,
@@ -233,25 +411,28 @@ bool get _hasDestination => _selectedDestination != null;
     );
   }
 
-  void _drawDestinationPin(Canvas canvas, Size size) {
+  void _drawDestinationPin(
+    Canvas canvas,
+    Size size,
+  ) {
     final centerX = size.width / 2;
-    final pinBottom = size.height - 8.0;
+    final pinBottom = size.height - 7.0;
 
     final path = Path()
       ..moveTo(centerX, pinBottom)
       ..cubicTo(
         12,
-        size.height - 42,
+        size.height - 43,
         10,
-        22,
+        23,
         centerX,
         8,
       )
       ..cubicTo(
         size.width - 10,
-        22,
+        23,
         size.width - 12,
-        size.height - 42,
+        size.height - 43,
         centerX,
         pinBottom,
       )
@@ -272,25 +453,26 @@ bool get _hasDestination => _selectedDestination != null;
     final borderPaint = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 7;
+      ..strokeWidth = 7
+      ..strokeJoin = StrokeJoin.round;
 
     canvas.drawPath(path, borderPaint);
 
     canvas.drawPath(
       path,
-      Paint()..color = const Color(0xFFE84242),
+      Paint()..color = const Color(0xFFE84C4C),
     );
 
     canvas.drawCircle(
       Offset(centerX, 43),
-      13,
+      14,
       Paint()..color = Colors.white,
     );
 
     canvas.drawCircle(
       Offset(centerX, 43),
       7,
-      Paint()..color = const Color(0xFFE84242),
+      Paint()..color = const Color(0xFFE84C4C),
     );
   }
 
@@ -388,86 +570,195 @@ bool get _hasDestination => _selectedDestination != null;
       Paint()..color = const Color(0xFF168A61),
     );
   }
-  Future<void> _onPlaceSelected(PlaceSearchResult place) async {
-  final destination = LatLng(place.latitude, place.longitude);
 
-  setState(() {
-    _selectedPlace = place;
-    _selectedDestination = destination;
-  });
+  Future<void> _onPlaceSelected(
+    PlaceSearchResult place,
+  ) async {
+    if (!mounted) return;
 
-  if (_mapController == null) return;
+    setState(() {
+      _selectedPlace = place;
+      _selectedDestination = LatLng(
+        place.latitude,
+        place.longitude,
+      );
+    });
 
-  await _mapController!.animateCamera(
-    CameraUpdate.newCameraPosition(
-      CameraPosition(
-        target: destination,
-        zoom: 16.5,
-      ),
-    ),
-    duration: const Duration(milliseconds: 450),
-  );
-}
-
-Future<void> _confirmDestination() async {
-  if (_selectedDestination == null || _navigationStarted) {
-    return;
+    await _showSelectedDestinationMarker(moveCamera: true);
   }
 
-  await _startNavigation();
-  await _startLiveDriverTracking();
-}
+  Future<void> _selectDestinationFromMap(
+    LatLng coordinates,
+  ) async {
+    final place = PlaceSearchResult(
+      title: 'مقصد انتخاب‌شده',
+      address: 'نقطه انتخاب‌شده روی نقشه',
+      latitude: coordinates.latitude,
+      longitude: coordinates.longitude,
+    );
 
-  Future<void> _startNavigation() async {
+    await _onPlaceSelected(place);
+  }
+
+  Future<void> _showSelectedDestinationMarker({
+    required bool moveCamera,
+  }) async {
     if (!_mapStyleReady ||
-        _navigationStarted ||
-        _mapController == null) {
+        !_iconsAdded ||
+        _mapController == null ||
+        _selectedDestination == null) {
       return;
     }
 
-    _navigationStarted = true;
+    final options = SymbolOptions(
+      geometry: _selectedDestination!,
+      iconImage: _destinationIconName,
+      iconSize: 0.70,
+    );
+
+    if (_destinationSymbol == null) {
+      _destinationSymbol = await _mapController!.addSymbol(options);
+    } else {
+      await _mapController!.updateSymbol(
+        _destinationSymbol!,
+        options,
+      );
+    }
+
+    await _mapController!.setSymbolIconAllowOverlap(true);
+    await _mapController!.setSymbolIconIgnorePlacement(true);
+
+    if (!moveCamera) return;
+
+    _isProgrammaticCameraMove = true;
+
+    try {
+      await _mapController!.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(
+            target: _selectedDestination!,
+            zoom: 16.5,
+          ),
+        ),
+        duration: const Duration(milliseconds: 550),
+      );
+    } finally {
+      Future.delayed(
+        const Duration(milliseconds: 700),
+        () {
+          if (mounted) {
+            _isProgrammaticCameraMove = false;
+          }
+        },
+      );
+    }
+  }
+
+  Future<void> _showCurrentLocationMarker({
+    required bool moveCamera,
+  }) async {
+    if (!_mapStyleReady ||
+        !_iconsAdded ||
+        _mapController == null ||
+        _currentLocation == null ||
+        _navigationStarted) {
+      return;
+    }
+
+    final options = SymbolOptions(
+      geometry: _currentLocation!,
+      iconImage: _currentLocationIconName,
+      iconSize: 0.72,
+    );
+
+    if (_currentLocationSymbol == null) {
+      _currentLocationSymbol =
+          await _mapController!.addSymbol(options);
+    } else {
+      await _mapController!.updateSymbol(
+        _currentLocationSymbol!,
+        options,
+      );
+    }
+
+    await _mapController!.setSymbolIconAllowOverlap(true);
+    await _mapController!.setSymbolIconIgnorePlacement(true);
+
+    if (!moveCamera) return;
+
+    await _moveCameraToLocation(
+      _currentLocation!,
+      zoom: 16.5,
+      tilt: 35.0,
+    );
+  }
+
+  Future<void> _confirmDestination() async {
+    final destination = _selectedDestination;
+
+    if (destination == null) {
+      _showMessage('ابتدا مقصد را انتخاب کنید.');
+      return;
+    }
+
+    if (_navigationStarted) return;
+
+    await _startNavigation();
+  }
+
+  Future<void> _startNavigation() async {
+    if (!_mapStyleReady ||
+        _mapController == null ||
+        _selectedDestination == null ||
+        _navigationStarted) {
+      return;
+    }
+
+    setState(() {
+      _navigationStarted = true;
+      _cameraFollowing = true;
+    });
 
     final navigationController =
         Provider.of<NavigationController>(context, listen: false);
 
-    final destination = _selectedDestination;
+    final routePoints = await navigationController.startNavigation(
+      _startLocation,
+      _selectedDestination!,
+      context.locale.languageCode,
+    );
 
-if (destination == null) {
-  _navigationStarted = false;
-  return;
-}
+    if (!mounted || _mapController == null || routePoints.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _navigationStarted = false;
+          _cameraFollowing = false;
+        });
+      }
 
-final routePoints = await navigationController.startNavigation(
-  _startLocation,
-  destination,
-  context.locale.languageCode,
-);
-
-    if (!mounted ||
-        _mapController == null ||
-        routePoints.isEmpty) {
-      _navigationStarted = false;
+      _showMessage('مسیر قابل دریافت نیست. اتصال اینترنت را بررسی کنید.');
       return;
     }
 
     _lastRouteVersion = navigationController.routeVersion;
 
+    if (_currentLocationSymbol != null) {
+      await _mapController!.removeSymbol(_currentLocationSymbol!);
+      _currentLocationSymbol = null;
+    }
+
     await _drawRoute(routePoints);
     await _drawRouteDecorations(navigationController);
 
     await _updateDriverMarker(
-      widget.currentLocation,
+      navigationController.snappedDriverLocation ?? _startLocation,
       heading: navigationController.driverRouteBearing,
       moveCamera: true,
     );
   }
 
   Future<void> _drawRoute(List<LatLng> points) async {
-    if (!mounted ||
-        _mapController == null ||
-        points.length < 2) {
-      return;
-    }
+    if (_mapController == null || points.length < 2) return;
 
     await _mapController!.clearLines();
 
@@ -502,17 +793,21 @@ final routePoints = await navigationController.startNavigation(
   Future<void> _drawRouteDecorations(
     NavigationController navigationController,
   ) async {
-    if (_mapController == null) return;
+    if (_mapController == null || _selectedDestination == null) {
+      return;
+    }
 
-    await _clearRouteDecorations();
+    await _clearRouteDecorations(keepDestination: true);
 
-    _destinationSymbol = await _mapController!.addSymbol(
-      SymbolOptions(
-        geometry: _selectedDestination!,
-        iconImage: _destinationIconName,
-        iconSize: 0.68,
-      ),
-    );
+    if (_destinationSymbol == null) {
+      _destinationSymbol = await _mapController!.addSymbol(
+        SymbolOptions(
+          geometry: _selectedDestination!,
+          iconImage: _destinationIconName,
+          iconSize: 0.70,
+        ),
+      );
+    }
 
     await _mapController!.setSymbolIconAllowOverlap(true);
     await _mapController!.setSymbolIconIgnorePlacement(true);
@@ -547,12 +842,15 @@ final routePoints = await navigationController.startNavigation(
       case 'slight left':
       case 'sharp left':
         return _leftTurnIconName;
+
       case 'right':
       case 'slight right':
       case 'sharp right':
         return _rightTurnIconName;
+
       case 'uturn':
         return _uTurnIconName;
+
       default:
         return _straightIconName;
     }
@@ -562,7 +860,7 @@ final routePoints = await navigationController.startNavigation(
     LatLng location,
     List<LatLng> points,
   ) {
-    if (points.length < 2) return 0;
+    if (points.length < 2) return 0.0;
 
     var closestIndex = 0;
     var closestDistance = double.infinity;
@@ -583,9 +881,8 @@ final routePoints = await navigationController.startNavigation(
       }
     }
 
-    final previousIndex = closestIndex > 0
-        ? closestIndex - 1
-        : closestIndex;
+    final previousIndex =
+        closestIndex > 0 ? closestIndex - 1 : closestIndex;
 
     final nextIndex = closestIndex < points.length - 1
         ? closestIndex + 1
@@ -594,16 +891,13 @@ final routePoints = await navigationController.startNavigation(
     final start = points[previousIndex];
     final end = points[nextIndex];
 
-    final startLatitude =
-        start.latitude * math.pi / 180.0;
+    final startLatitude = start.latitude * math.pi / 180.0;
     final endLatitude = end.latitude * math.pi / 180.0;
-    final longitudeDifference =
-        (end.longitude - start.longitude) *
-            math.pi /
-            180.0;
 
-    final y = math.sin(longitudeDifference) *
-        math.cos(endLatitude);
+    final longitudeDifference =
+        (end.longitude - start.longitude) * math.pi / 180.0;
+
+    final y = math.sin(longitudeDifference) * math.cos(endLatitude);
 
     final x =
         (math.cos(startLatitude) * math.sin(endLatitude)) -
@@ -616,7 +910,9 @@ final routePoints = await navigationController.startNavigation(
     return (heading + 360.0) % 360.0;
   }
 
-  Future<void> _clearRouteDecorations() async {
+  Future<void> _clearRouteDecorations({
+    bool keepDestination = false,
+  }) async {
     if (_mapController == null) return;
 
     for (final symbol in _turnSymbols) {
@@ -625,10 +921,8 @@ final routePoints = await navigationController.startNavigation(
 
     _turnSymbols.clear();
 
-    if (_destinationSymbol != null) {
-      await _mapController!.removeSymbol(
-        _destinationSymbol!,
-      );
+    if (!keepDestination && _destinationSymbol != null) {
+      await _mapController!.removeSymbol(_destinationSymbol!);
       _destinationSymbol = null;
     }
   }
@@ -636,7 +930,8 @@ final routePoints = await navigationController.startNavigation(
   void _navigationControllerChanged() {
     if (!mounted ||
         !_mapStyleReady ||
-        _mapController == null) {
+        _mapController == null ||
+        !_navigationStarted) {
       return;
     }
 
@@ -653,62 +948,8 @@ final routePoints = await navigationController.startNavigation(
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted || _mapController == null) return;
 
-      await _drawRoute(
-        navigationController.currentRoutePoints,
-      );
-
+      await _drawRoute(navigationController.currentRoutePoints);
       await _drawRouteDecorations(navigationController);
-    });
-  }
-
-  Future<void> _startLiveDriverTracking() async {
-    if (!_mapStyleReady || _mapController == null) return;
-
-    await _positionStream?.cancel();
-
-    _positionStream = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.bestForNavigation,
-        distanceFilter: 2,
-      ),
-    ).listen((Position position) async {
-      if (!mounted ||
-          _mapController == null ||
-          _isUpdatingMap) {
-        return;
-      }
-
-      _isUpdatingMap = true;
-
-      try {
-        final rawLocation = LatLng(
-          position.latitude,
-          position.longitude,
-        );
-
-        final navigationController =
-            Provider.of<NavigationController>(
-          context,
-          listen: false,
-        );
-
-        navigationController.updateDriverPosition(
-          rawLocation,
-          langCode: context.locale.languageCode,
-        );
-
-        final driverLocation =
-            navigationController.snappedDriverLocation ??
-                rawLocation;
-
-        await _updateDriverMarker(
-          driverLocation,
-          heading: navigationController.driverRouteBearing,
-          moveCamera: _cameraFollowing,
-        );
-      } finally {
-        _isUpdatingMap = false;
-      }
     });
   }
 
@@ -717,9 +958,7 @@ final routePoints = await navigationController.startNavigation(
     required double heading,
     required bool moveCamera,
   }) async {
-    if (!mounted ||
-        _mapController == null ||
-        !_iconsAdded) {
+    if (!_mapStyleReady || !_iconsAdded || _mapController == null) {
       return;
     }
 
@@ -732,15 +971,15 @@ final routePoints = await navigationController.startNavigation(
 
     if (_driverSymbol == null) {
       _driverSymbol = await _mapController!.addSymbol(options);
-
-      await _mapController!.setSymbolIconAllowOverlap(true);
-      await _mapController!.setSymbolIconIgnorePlacement(true);
     } else {
       await _mapController!.updateSymbol(
         _driverSymbol!,
         options,
       );
     }
+
+    await _mapController!.setSymbolIconAllowOverlap(true);
+    await _mapController!.setSymbolIconIgnorePlacement(true);
 
     if (!moveCamera) return;
 
@@ -768,13 +1007,43 @@ final routePoints = await navigationController.startNavigation(
             tilt: 50.0,
           ),
         ),
-        duration: const Duration(
-          milliseconds: 650,
-        ),
+        duration: const Duration(milliseconds: 650),
       );
     } finally {
       Future.delayed(
         const Duration(milliseconds: 800),
+        () {
+          if (mounted) {
+            _isProgrammaticCameraMove = false;
+          }
+        },
+      );
+    }
+  }
+
+  Future<void> _moveCameraToLocation(
+    LatLng location, {
+    required double zoom,
+    required double tilt,
+  }) async {
+    if (_mapController == null) return;
+
+    _isProgrammaticCameraMove = true;
+
+    try {
+      await _mapController!.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(
+            target: location,
+            zoom: zoom,
+            tilt: tilt,
+          ),
+        ),
+        duration: const Duration(milliseconds: 600),
+      );
+    } finally {
+      Future.delayed(
+        const Duration(milliseconds: 750),
         () {
           if (mounted) {
             _isProgrammaticCameraMove = false;
@@ -806,30 +1075,19 @@ final routePoints = await navigationController.startNavigation(
         right: 54.0,
         bottom: 180.0,
       ),
-      duration: const Duration(
-        milliseconds: 700,
-      ),
+      duration: const Duration(milliseconds: 700),
     );
   }
 
   Future<void> _goToStart() async {
-    if (_mapController == null) return;
-
     setState(() {
       _cameraFollowing = false;
     });
 
-    await _mapController!.animateCamera(
-      CameraUpdate.newCameraPosition(
-        CameraPosition(
-          target: _startLocation,
-          zoom: 17.0,
-          tilt: 35.0,
-        ),
-      ),
-      duration: const Duration(
-        milliseconds: 600,
-      ),
+    await _moveCameraToLocation(
+      _startLocation,
+      zoom: 17.0,
+      tilt: 35.0,
     );
   }
 
@@ -838,8 +1096,7 @@ final routePoints = await navigationController.startNavigation(
         Provider.of<NavigationController>(context, listen: false);
 
     final location =
-    navigationController.snappedDriverLocation ??
-        _startLocation;
+        navigationController.snappedDriverLocation ?? _startLocation;
 
     setState(() {
       _cameraFollowing = true;
@@ -888,17 +1145,8 @@ final routePoints = await navigationController.startNavigation(
   }
 
   Future<void> _stopNavigation() async {
-    await _positionStream?.cancel();
-
     final navigationController =
         Provider.of<NavigationController>(context, listen: false);
-
-    if (_controllerListenerAdded) {
-      navigationController.removeListener(
-        _navigationControllerChanged,
-      );
-      _controllerListenerAdded = false;
-    }
 
     navigationController.stopNavigation();
 
@@ -907,30 +1155,46 @@ final routePoints = await navigationController.startNavigation(
       await _clearRouteDecorations();
 
       if (_driverSymbol != null) {
-        await _mapController!.removeSymbol(
-          _driverSymbol!,
-        );
+        await _mapController!.removeSymbol(_driverSymbol!);
         _driverSymbol = null;
       }
     }
 
-    if (mounted) {
-      Navigator.pop(context);
-    }
+    if (!mounted) return;
+
+    setState(() {
+      _navigationStarted = false;
+      _cameraFollowing = false;
+      _selectedPlace = null;
+      _selectedDestination = null;
+    });
+
+    await _showCurrentLocationMarker(moveCamera: false);
+  }
+
+  void _showMessage(String message) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   @override
   void dispose() {
+    _pulseController
+      ..removeListener(_updateCurrentLocationPulse)
+      ..dispose();
+
+    _positionStream?.cancel();
+
     final navigationController =
         Provider.of<NavigationController>(context, listen: false);
 
     if (_controllerListenerAdded) {
-      navigationController.removeListener(
-        _navigationControllerChanged,
-      );
+      navigationController.removeListener(_navigationControllerChanged);
     }
 
-    _positionStream?.cancel();
     super.dispose();
   }
 
@@ -942,6 +1206,11 @@ final routePoints = await navigationController.startNavigation(
           MapLibreMap(
             onMapCreated: _onMapCreated,
             onStyleLoadedCallback: _onStyleLoaded,
+            onMapLongClick: (point, coordinates) {
+              if (!_navigationStarted) {
+                _selectDestinationFromMap(coordinates);
+              }
+            },
             onCameraIdle: () {
               if (!_isProgrammaticCameraMove && mounted) {
                 setState(() {
@@ -951,13 +1220,87 @@ final routePoints = await navigationController.startNavigation(
             },
             styleString: 'assets/map/style.json',
             initialCameraPosition: CameraPosition(
-              target: widget.currentLocation,
+              target: _startLocation,
               zoom: 16.0,
             ),
             myLocationEnabled: false,
             trackCameraPosition: true,
           ),
-          if (!_cameraFollowing)
+
+          if (_isLoadingLocation)
+            const Positioned(
+              top: 88,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                child: Center(
+                  child: Card(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      child: Text('در حال دریافت موقعیت شما...'),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+          Positioned(
+            top: 16,
+            left: 16,
+            child: SafeArea(
+              child: Material(
+                color: Colors.white,
+                elevation: 5,
+                shape: const CircleBorder(),
+                child: IconButton(
+                  tooltip: 'بازگشت',
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
+                  icon: const Icon(
+                    Icons.arrow_back_rounded,
+                    color: SafirColors.primary,
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          if (_navigationStarted)
+            Positioned(
+              right: 16,
+              bottom: 110,
+              child: SafeArea(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _MapActionButton(
+                      icon: Icons.alt_route_rounded,
+                      tooltip: 'نمایش کل مسیر',
+                      onPressed: _showFullRoute,
+                    ),
+                    const SizedBox(height: 10),
+                    _MapActionButton(
+                      icon: Icons.home_outlined,
+                      tooltip: 'بازگشت به مبدا',
+                      onPressed: _goToStart,
+                    ),
+                    const SizedBox(height: 10),
+                    _MapActionButton(
+                      icon: Icons.my_location_rounded,
+                      tooltip: 'بازگشت به مسیر',
+                      iconColor: SafirColors.primary,
+                      onPressed: _followDriver,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          if (_navigationStarted && !_cameraFollowing)
             Positioned(
               left: 20,
               right: 20,
@@ -965,19 +1308,13 @@ final routePoints = await navigationController.startNavigation(
               child: SafeArea(
                 child: ElevatedButton.icon(
                   onPressed: _followDriver,
-                  icon: const Icon(
-                    Icons.navigation_rounded,
-                  ),
-                  label: const Text(
-                    'بازگشت به مسیر',
-                  ),
+                  icon: const Icon(Icons.navigation_rounded),
+                  label: const Text('بازگشت به مسیر'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: SafirColors.primary,
                     foregroundColor: Colors.white,
                     elevation: 6,
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 14,
-                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
@@ -985,124 +1322,96 @@ final routePoints = await navigationController.startNavigation(
                 ),
               ),
             ),
-          Positioned(
-            right: 16,
-            bottom: 112,
-            child: SafeArea(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _MapActionButton(
-                    icon: Icons.alt_route_rounded,
-                    tooltip: 'نمایش کل مسیر',
-                    onPressed: _showFullRoute,
-                  ),
-                  const SizedBox(height: 10),
-                  _MapActionButton(
-                    icon: Icons.home_outlined,
-                    tooltip: 'بازگشت به مبدا',
-                    onPressed: _goToStart,
-                  ),
-                  const SizedBox(height: 10),
-                  _MapActionButton(
-                    icon: Icons.my_location_rounded,
-                    tooltip: 'بازگشت به راننده',
-                    iconColor: SafirColors.primary,
-                    onPressed: _followDriver,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          Consumer<NavigationController>(
-  builder: (context, controller, child) {
-    if (!controller.isNavigating) {
-      return const SizedBox.shrink();
-    }
 
-    return Positioned(
-      top: 20,
-      left: 16,
-      right: 16,
-      child: SafeArea(
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: SafirColors.primary,
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: const [
-              BoxShadow(
-                color: Colors.black26,
-                blurRadius: 10,
-                offset: Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Icon(
-                controller.currentTurnIcon,
-                color: Colors.white,
-                size: 34,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${controller.distanceToNextTurn} ${'meters'.tr()}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
+          Consumer<NavigationController>(
+            builder: (context, controller, child) {
+              if (!_navigationStarted || !controller.isNavigating) {
+                return const SizedBox.shrink();
+              }
+
+              return Positioned(
+                top: 18,
+                left: 68,
+                right: 16,
+                child: SafeArea(
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: SafirColors.primary,
+                      borderRadius: BorderRadius.circular(18),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Colors.black26,
+                          blurRadius: 10,
+                          offset: Offset(0, 4),
+                        ),
+                      ],
                     ),
-                    Text(
-                      controller.navigationInstruction,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                      ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          controller.currentTurnIcon,
+                          color: Colors.white,
+                          size: 34,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${controller.distanceToNextTurn} ${'meters'.tr()}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(
+                                controller.navigationInstruction,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: controller.toggleVoice,
+                          icon: Icon(
+                            controller.isVoiceEnabled
+                                ? Icons.volume_up_rounded
+                                : Icons.volume_off_rounded,
+                            color: Colors.white,
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: _stopNavigation,
+                          icon: const Icon(
+                            Icons.close_rounded,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
-              IconButton(
-                onPressed: controller.toggleVoice,
-                icon: Icon(
-                  controller.isVoiceEnabled
-                      ? Icons.volume_up_rounded
-                      : Icons.volume_off_rounded,
-                  color: Colors.white,
-                ),
-              ),
-              IconButton(
-                onPressed: _stopNavigation,
-                icon: const Icon(
-                  Icons.close_rounded,
-                  color: Colors.white,
-                ),
-              ),
-            ],
+              );
+            },
           ),
-        ),
+
+          if (!_navigationStarted)
+            DestinationSearchSheet(
+              selectedPlace: _selectedPlace,
+              onPlaceSelected: _onPlaceSelected,
+              onConfirmDestination: _confirmDestination,
+            ),
+        ],
       ),
     );
-  },
-),
-
-if (!_navigationStarted)
-  DestinationSearchSheet(
-    selectedPlace: _selectedPlace,
-    onPlaceSelected: _onPlaceSelected,
-    onConfirmDestination: _confirmDestination,
-  ),
-],
-),
-);
-}
+  }
 }
 
 enum _TurnDirection {
