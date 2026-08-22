@@ -51,6 +51,7 @@ class _NavigationPageState extends State<NavigationPage>
   PlaceSearchResult? _selectedPlace;
   LatLng? _selectedDestination;
   LatLng? _currentLocation;
+  double _currentAccuracy = 20.0;
 
   late final AnimationController _pulseController;
 
@@ -153,11 +154,7 @@ class _NavigationPageState extends State<NavigationPage>
     } catch (_) {
       _showMessage('دریافت موقعیت فعلی امکان‌پذیر نشد.');
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoadingLocation = false;
-        });
-      }
+      
     }
   }
 
@@ -173,10 +170,11 @@ class _NavigationPageState extends State<NavigationPage>
       );
 
       if (mounted) {
-        setState(() {
-          _currentLocation = rawLocation;
-        });
-      }
+  setState(() {
+    _currentLocation = rawLocation;
+    _currentAccuracy = position.accuracy; // ذخیره شعاع خطا به متر
+  });
+}
 
       final navigationController =
           Provider.of<NavigationController>(context, listen: false);
@@ -313,50 +311,52 @@ class _NavigationPageState extends State<NavigationPage>
   }
 
   void _drawCurrentLocationPulse(
-    Canvas canvas,
-    Size size,
-  ) {
-    final center = Offset(
-      size.width / 2,
-      size.height / 2,
-    );
+  Canvas canvas,
+  Size size,
+) {
+  final center = Offset(
+    size.width / 2,
+    size.height / 2,
+  );
 
-    final pulseValue = _pulseController.value;
-    final outerRadius = 42 + (pulseValue * 42);
-    final outerOpacity = (0.25 * (1 - pulseValue)).clamp(0.0, 0.25);
+  final pulseValue = _pulseController.value; // از 0.0 تا 1.0
 
+  // محاسبه شعاع موج بر اساس میزان خطای جی‌پی‌اس (جمع‌شونده از بزرگ به صفر)
+  final baseAccuracyRadius = _currentAccuracy.clamp(15.0, 60.0);
+  final animatedRadius = baseAccuracyRadius * (1.0 - pulseValue);
+  final outerOpacity = (0.35 * (1.0 - pulseValue)).clamp(0.0, 0.35);
+
+  // دایره بیرونی نشان‌دهنده میزان خطا
+  if (animatedRadius > 5) {
     canvas.drawCircle(
       center,
-      outerRadius,
+      animatedRadius,
       Paint()
-        ..color = SafirColors.primary.withOpacity(outerOpacity),
-    );
-
-    canvas.drawCircle(
-      center,
-      43,
-      Paint()
-        ..color = SafirColors.primary.withOpacity(0.16),
-    );
-
-    canvas.drawCircle(
-      center,
-      29,
-      Paint()..color = Colors.white,
-    );
-
-    canvas.drawCircle(
-      center,
-      22,
-      Paint()..color = SafirColors.primary,
-    );
-
-    canvas.drawCircle(
-      center,
-      7,
-      Paint()..color = Colors.white,
+        ..color = SafirColors.primary.withOpacity(outerOpacity)
+        ..style = PaintingStyle.fill,
     );
   }
+
+  // دایره ثابت زیرین
+  canvas.drawCircle(
+    center,
+    18,
+    Paint()..color = SafirColors.primary.withOpacity(0.20),
+  );
+
+  // نقطه سفید و فیروزه‌ای مرکزی لوکیشن
+  canvas.drawCircle(
+    center,
+    12,
+    Paint()..color = Colors.white,
+  );
+
+  canvas.drawCircle(
+    center,
+    8,
+    Paint()..color = SafirColors.primary,
+  );
+}
 
   void _drawDriverArrow(
     Canvas canvas,
@@ -775,40 +775,34 @@ class _NavigationPageState extends State<NavigationPage>
     );
   }
 
-  Future<void> _drawRoute(List<LatLng> points) async {
+    Future<void> _drawRoute(List<LatLng> points) async {
     if (_mapController == null || points.length < 2) return;
 
     await _mapController!.clearLines();
 
+    // لایه ۱: حاشیه بیرونی مسیر (رنگ تیره و مشخص)
     await _mapController!.addLine(
       LineOptions(
         geometry: points,
-        lineColor: '#07553F',
-        lineWidth: 18.0,
-        lineOpacity: 0.78,
+        lineColor: '#005F73',
+        lineWidth: 14.0,
+        lineOpacity: 0.90,
       ),
     );
 
+    // لایه ۲: مسیر داخلی نیمه‌شفاف (حذف رنگ سوم جهت خوانا بودن اسم خیابان‌ها)
     await _mapController!.addLine(
       LineOptions(
         geometry: points,
-        lineColor: '#10B981',
-        lineWidth: 12.0,
-        lineOpacity: 1.0,
-      ),
-    );
-
-    await _mapController!.addLine(
-      LineOptions(
-        geometry: points,
-        lineColor: '#B8FFE3',
-        lineWidth: 3.5,
-        lineOpacity: 0.95,
+        lineColor: '#00E5FF',
+        lineWidth: 8.0,
+        lineOpacity: 0.60,
       ),
     );
   }
 
-  Future<void> _drawRouteDecorations(
+
+    Future<void> _drawRouteDecorations(
     NavigationController navigationController,
   ) async {
     if (_mapController == null || _selectedDestination == null) {
@@ -838,6 +832,7 @@ class _NavigationPageState extends State<NavigationPage>
       if (step.distance < 18) continue;
       if (index == 0 && step.modifier == 'straight') continue;
 
+      // ۱. نمایش فلش جهت در مسیر
       final symbol = await _mapController!.addSymbol(
         SymbolOptions(
           geometry: step.location,
@@ -851,8 +846,30 @@ class _NavigationPageState extends State<NavigationPage>
       );
 
       _turnSymbols.add(symbol);
+
+      // ۲. نمایش پلاک اسم خیابان/کوچه روی نقطه پیچ
+      final streetName = step.streetName.isNotEmpty
+          ? step.streetName
+          : step.instruction;
+
+      if (streetName.isNotEmpty) {
+        final labelSymbol = await _mapController!.addSymbol(
+          SymbolOptions(
+            geometry: step.location,
+            textField: streetName,
+            textSize: 12.0,
+            textColor: '#FFFFFF',
+            textHaloColor: '#005F73',
+            textHaloWidth: 2.0,
+            textOffset: const Offset(0, -2.0),
+          ),
+        );
+
+        _turnSymbols.add(labelSymbol);
+      }
     }
   }
+
 
   String _turnIconName(String modifier) {
     switch (modifier) {
