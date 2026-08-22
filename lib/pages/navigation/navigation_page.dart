@@ -12,14 +12,20 @@ import '../../models/place_search_result.dart';
 import '../../services/place_search_service.dart';
 import '../../utils/app_colors.dart';
 import '../../widgets/navigation/destination_search_sheet.dart';
-import 'navigation_map_painters.dart'; // <--- ایمپورت فایل جدید
+import 'navigation_map_painters.dart';
 
 class NavigationPage extends StatefulWidget {
   final LatLng? currentLocation;
+  final LatLng? pickupLocation;   // مبدا مسافر (برای راننده)
+  final LatLng? dropoffLocation;  // مقصد مسافر (برای راننده)
+  final bool isDriverTrip;        // آیا سفارشی از سمت پنل راننده ارسال شده؟
 
   const NavigationPage({
     super.key,
     this.currentLocation,
+    this.pickupLocation,
+    this.dropoffLocation,
+    this.isDriverTrip = false,
   });
 
   @override
@@ -67,7 +73,7 @@ class _NavigationPageState extends State<NavigationPage>
   int _lastRouteVersion = 0;
 
   LatLng get _startLocation =>
-      _currentLocation ?? widget.currentLocation ?? _fallbackLocation;
+      widget.pickupLocation ?? _currentLocation ?? widget.currentLocation ?? _fallbackLocation;
 
   @override
   void initState() {
@@ -104,6 +110,27 @@ class _NavigationPageState extends State<NavigationPage>
 
     if (_selectedDestination != null) {
       await _showSelectedDestinationMarker(moveCamera: false);
+    }
+
+    // هوشمندسازی: بررسی و تنظیم اتوماتیک برای راننده
+    _checkAndStartDriverTrip();
+  }
+
+  /// تابع هوشمند بررسی سفر راننده و اجرای اتوماتیک مسیریابی
+  Future<void> _checkAndStartDriverTrip() async {
+    if (widget.isDriverTrip && widget.dropoffLocation != null) {
+      setState(() {
+        _selectedDestination = widget.dropoffLocation;
+        _selectedPlace = PlaceSearchResult(
+          title: 'مقصد مسافر',
+          address: 'مسیریابی هوشمند سفیر',
+          latitude: widget.dropoffLocation!.latitude,
+          longitude: widget.dropoffLocation!.longitude,
+        );
+      });
+
+      await _showSelectedDestinationMarker(moveCamera: true);
+      await _startNavigation();
     }
   }
 
@@ -874,6 +901,50 @@ class _NavigationPageState extends State<NavigationPage>
               ),
             ),
           ),
+
+          // --- دکمه ثبت‌نام راننده روی نقشه (در صورت عدم شروع مسیریابی) ---
+          if (!_navigationStarted)
+            Positioned(
+              top: 16,
+              right: 16,
+              child: SafeArea(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: SafirColors.primary,
+                    foregroundColor: Colors.white,
+                    elevation: 6,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                  ),
+                  onPressed: () {
+                    // مسیر صفحه ثبت‌نام راننده را اینجا صدا بزنید
+                    // Navigator.push(
+                    //   context,
+                    //   MaterialPageRoute(
+                    //     builder: (context) => const DriverRegisterPage(),
+                    //   ),
+                    // );
+                    _showMessage('انتقال به صفحه ثبت‌نام راننده');
+                  },
+                  icon: const Icon(
+                    Icons.person_add_alt_1_rounded,
+                    size: 20,
+                  ),
+                  label: const Text(
+                    'ثبت‌نام راننده',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ),
 
           if (_navigationStarted)
             Positioned(
