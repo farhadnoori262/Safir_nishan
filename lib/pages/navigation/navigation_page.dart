@@ -78,8 +78,11 @@ bool get _hasDestination => _selectedDestination != null;
     }
 
     await _addMapImages();
-    await _startNavigation();
-    await _startLiveDriverTracking();
+    await _updateDriverMarker(
+  _startLocation,
+  heading: 0,
+  moveCamera: false,
+);
   }
 
   Future<void> _addMapImages() async {
