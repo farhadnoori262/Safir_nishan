@@ -5,6 +5,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 
 import 'package:safir_drivers/controllers/navigation_controller.dart';
+import 'package:safir_drivers/pages/navigation/navigation_page.dart'; // مسیر اضافه شده برای صفحه مسیریابی
 import 'package:safir_drivers/pages/splash_screen.dart';
 import 'package:safir_drivers/providers/authentication_provider.dart';
 import 'package:safir_drivers/providers/dashboard_provider.dart';
@@ -13,32 +14,25 @@ import 'package:safir_drivers/providers/trip_provider.dart';
 import 'package:safir_drivers/utils/app_colors.dart';
 import 'package:safir_drivers/utils/lang_helper.dart';
 
-final GlobalKey<NavigatorState> navigatorKey =
-    GlobalKey<NavigatorState>();
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  FlutterError.onError = (
-    FlutterErrorDetails details,
-  ) {
+  FlutterError.onError = (FlutterErrorDetails details) {
     FlutterError.dumpErrorToConsole(details);
   };
 
   try {
     await EasyLocalization.ensureInitialized();
   } catch (error) {
-    debugPrint(
-      'EasyLocalization initialization error: $error',
-    );
+    debugPrint('EasyLocalization initialization error: $error');
   }
 
   try {
     await Firebase.initializeApp();
   } catch (error) {
-    debugPrint(
-      'Firebase initialization error: $error',
-    );
+    debugPrint('Firebase initialization error: $error');
   }
 
   _requestPermissionsSafely();
@@ -64,9 +58,7 @@ Future<void> _requestPermissionsSafely() async {
     await Permission.locationWhenInUse.request();
     await Permission.notification.request();
   } catch (error) {
-    debugPrint(
-      'Permission request error: $error',
-    );
+    debugPrint('Permission request error: $error');
   }
 }
 
@@ -75,9 +67,7 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    ErrorWidget.builder = (
-      FlutterErrorDetails details,
-    ) {
+    ErrorWidget.builder = (FlutterErrorDetails details) {
       return Scaffold(
         backgroundColor: Colors.white,
         body: Center(
@@ -133,7 +123,8 @@ class MyApp extends StatelessWidget {
             seedColor: SafirColors.primary,
           ),
         ),
-        home: const SplashScreen(),
+        // تنظیم صفحه مسیریابی به عنوان صفحه اصلی برنامه سفیر
+        home: const NavigationPage(), 
       ),
     );
   }
