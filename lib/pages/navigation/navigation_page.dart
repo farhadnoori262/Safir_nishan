@@ -14,10 +14,12 @@ import '../../utils/app_colors.dart';
 
 class NavigationPage extends StatefulWidget {
   final LatLng currentLocation;
+  final LatLng destination;
 
   const NavigationPage({
     super.key,
     required this.currentLocation,
+    required this.destination,
   });
 
   @override
