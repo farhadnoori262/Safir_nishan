@@ -383,6 +383,35 @@ bool get _hasDestination => _selectedDestination != null;
       Paint()..color = const Color(0xFF168A61),
     );
   }
+  Future<void> _onPlaceSelected(PlaceSearchResult place) async {
+  final destination = LatLng(place.latitude, place.longitude);
+
+  setState(() {
+    _selectedPlace = place;
+    _selectedDestination = destination;
+  });
+
+  if (_mapController == null) return;
+
+  await _mapController!.animateCamera(
+    CameraUpdate.newCameraPosition(
+      CameraPosition(
+        target: destination,
+        zoom: 16.5,
+      ),
+    ),
+    duration: const Duration(milliseconds: 450),
+  );
+}
+
+Future<void> _confirmDestination() async {
+  if (_selectedDestination == null || _navigationStarted) {
+    return;
+  }
+
+  await _startNavigation();
+  await _startLiveDriverTracking();
+}
 
   Future<void> _startNavigation() async {
     if (!_mapStyleReady ||
