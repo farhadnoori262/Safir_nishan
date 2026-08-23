@@ -1041,7 +1041,7 @@ class _NavigationPageState extends State<NavigationPage>
                         const SizedBox(width: 12),
                         Expanded(
                           child: Column(
-                            crossAxisAlignment: CrossAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 '${controller.distanceToNextTurn} ${'meters'.tr()}',
@@ -1111,7 +1111,7 @@ class _NavigationPageState extends State<NavigationPage>
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Column(
-                              crossAxisAlignment: CrossAlignment.start,
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Row(
@@ -1124,18 +1124,18 @@ class _NavigationPageState extends State<NavigationPage>
                                       ),
                                     ),
                                     Text(
-                                      '${controller.remainingTimeMinutes} دقیقه',
+                                      '${(controller.remainingDuration / 60).ceil()} دقیقه',
                                       style: const TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.bold,
-                                        color: Colors.black80,
+                                        color: Colors.black87,
                                       ),
                                     ),
                                   ],
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  'فاصله: ${controller.remainingDistanceText}',
+                                  'فاصله: ${controller.remainingDistance.toStringAsFixed(0)} متر',
                                   style: const TextStyle(
                                     fontSize: 13,
                                     color: Colors.teal,
