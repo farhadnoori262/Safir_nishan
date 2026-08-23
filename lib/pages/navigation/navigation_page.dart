@@ -16,9 +16,9 @@ import 'navigation_map_painters.dart';
 
 class NavigationPage extends StatefulWidget {
   final LatLng? currentLocation;
-  final LatLng? pickupLocation;   // مبدا مسافر (برای راننده)
-  final LatLng? dropoffLocation;  // مقصد مسافر (برای راننده)
-  final bool isDriverTrip;        // آیا سفارشی از سمت پنل راننده ارسال شده؟
+  final LatLng? pickupLocation;
+  final LatLng? dropoffLocation;
+  final bool isDriverTrip;
 
   const NavigationPage({
     super.key,
@@ -73,11 +73,15 @@ class _NavigationPageState extends State<NavigationPage>
   int _lastRouteVersion = 0;
 
   LatLng get _startLocation =>
-      widget.pickupLocation ?? _currentLocation ?? widget.currentLocation ?? _fallbackLocation;
+      widget.pickupLocation ??
+      _currentLocation ??
+      widget.currentLocation ??
+      _fallbackLocation;
 
   @override
   void initState() {
     super.initState();
+
     _currentLocation = widget.currentLocation;
 
     _pulseController = AnimationController(
@@ -86,6 +90,7 @@ class _NavigationPageState extends State<NavigationPage>
     )..repeat();
 
     _pulseController.addListener(_updateCurrentLocationPulse);
+
     _startLocationTracking();
   }
 
@@ -95,6 +100,7 @@ class _NavigationPageState extends State<NavigationPage>
 
   Future<void> _onStyleLoaded() async {
     if (!mounted) return;
+
     _mapStyleReady = true;
 
     final navigationController =
@@ -112,37 +118,43 @@ class _NavigationPageState extends State<NavigationPage>
       await _showSelectedDestinationMarker(moveCamera: false);
     }
 
-    // هوشمندسازی: بررسی و تنظیم اتوماتیک برای راننده
     _checkAndStartDriverTrip();
   }
 
-  /// تابع هوشمند بررسی سفر راننده و اجرای اتوماتیک مسیریابی
   Future<void> _checkAndStartDriverTrip() async {
-    if (widget.isDriverTrip && widget.dropoffLocation != null) {
-      setState(() {
-        _selectedDestination = widget.dropoffLocation;
-        _selectedPlace = PlaceSearchResult(
-          title: 'مقصد مسافر',
-          address: 'مسیریابی هوشمند سفیر',
-          latitude: widget.dropoffLocation!.latitude,
-          longitude: widget.dropoffLocation!.longitude,
-        );
-      });
-
-      await _showSelectedDestinationMarker(moveCamera: true);
-      await _startNavigation();
+    if (!widget.isDriverTrip || widget.dropoffLocation == null) {
+      return;
     }
+
+    if (_navigationStarted) {
+      return;
+    }
+
+    setState(() {
+      _selectedDestination = widget.dropoffLocation;
+      _selectedPlace = PlaceSearchResult(
+        title: 'مقصد مسافر',
+        address: 'مسیریابی هوشمند سفیر',
+        latitude: widget.dropoffLocation!.latitude,
+        longitude: widget.dropoffLocation!.longitude,
+      );
+    });
+
+    await _showSelectedDestinationMarker(moveCamera: true);
+    await _startNavigation();
   }
 
   Future<void> _startLocationTracking() async {
     try {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+
       if (!serviceEnabled) {
         _showMessage('لطفاً موقعیت مکانی گوشی را روشن کنید.');
         return;
       }
 
       var permission = await Geolocator.checkPermission();
+
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
       }
@@ -158,6 +170,7 @@ class _NavigationPageState extends State<NavigationPage>
       );
 
       await _handleLocationUpdate(position);
+
       await _positionStream?.cancel();
 
       _positionStream = Geolocator.getPositionStream(
@@ -183,10 +196,14 @@ class _NavigationPageState extends State<NavigationPage>
 
   Future<void> _handleLocationUpdate(Position position) async {
     if (!mounted || _isUpdatingMap) return;
+
     _isUpdatingMap = true;
 
     try {
-      final rawLocation = LatLng(position.latitude, position.longitude);
+      final rawLocation = LatLng(
+        position.latitude,
+        position.longitude,
+      );
 
       if (mounted) {
         setState(() {
@@ -309,16 +326,25 @@ class _NavigationPageState extends State<NavigationPage>
     _iconsAdded = true;
   }
 
-  Future<void> _onPlaceSelected(PlaceSearchResult place) async {
+  Future<void> _onPlaceSelected(
+    PlaceSearchResult place,
+  ) async {
     if (!mounted) return;
+
     setState(() {
       _selectedPlace = place;
-      _selectedDestination = LatLng(place.latitude, place.longitude);
+      _selectedDestination = LatLng(
+        place.latitude,
+        place.longitude,
+      );
     });
+
     await _showSelectedDestinationMarker(moveCamera: true);
   }
 
-  Future<void> _selectDestinationFromMap(LatLng coordinates) async {
+  Future<void> _selectDestinationFromMap(
+    LatLng coordinates,
+  ) async {
     final temporaryPlace = PlaceSearchResult(
       title: 'در حال دریافت آدرس...',
       address: 'لطفاً چند لحظه صبر کنید.',
@@ -329,6 +355,7 @@ class _NavigationPageState extends State<NavigationPage>
     await _onPlaceSelected(temporaryPlace);
 
     final placeSearchService = PlaceSearchService();
+
     final realPlace = await placeSearchService.reverseGeocode(
       coordinates.latitude,
       coordinates.longitude,
@@ -345,11 +372,15 @@ class _NavigationPageState extends State<NavigationPage>
     await _onPlaceSelected(realPlace);
   }
 
-  Future<void> _showSelectedDestinationMarker({required bool moveCamera}) async {
+  Future<void> _showSelectedDestinationMarker({
+    required bool moveCamera,
+  }) async {
     if (!_mapStyleReady ||
         !_iconsAdded ||
         _mapController == null ||
-        _selectedDestination == null) return;
+        _selectedDestination == null) {
+      return;
+    }
 
     final options = SymbolOptions(
       geometry: _selectedDestination!,
@@ -360,7 +391,10 @@ class _NavigationPageState extends State<NavigationPage>
     if (_destinationSymbol == null) {
       _destinationSymbol = await _mapController!.addSymbol(options);
     } else {
-      await _mapController!.updateSymbol(_destinationSymbol!, options);
+      await _mapController!.updateSymbol(
+        _destinationSymbol!,
+        options,
+      );
     }
 
     await _mapController!.setSymbolIconAllowOverlap(true);
@@ -369,26 +403,39 @@ class _NavigationPageState extends State<NavigationPage>
     if (!moveCamera) return;
 
     _isProgrammaticCameraMove = true;
+
     try {
       await _mapController!.animateCamera(
         CameraUpdate.newCameraPosition(
-          CameraPosition(target: _selectedDestination!, zoom: 16.5),
+          CameraPosition(
+            target: _selectedDestination!,
+            zoom: 16.5,
+          ),
         ),
         duration: const Duration(milliseconds: 550),
       );
     } finally {
-      Future.delayed(const Duration(milliseconds: 700), () {
-        if (mounted) _isProgrammaticCameraMove = false;
-      });
+      Future.delayed(
+        const Duration(milliseconds: 700),
+        () {
+          if (mounted) {
+            _isProgrammaticCameraMove = false;
+          }
+        },
+      );
     }
   }
 
-  Future<void> _showCurrentLocationMarker({required bool moveCamera}) async {
+  Future<void> _showCurrentLocationMarker({
+    required bool moveCamera,
+  }) async {
     if (!_mapStyleReady ||
         !_iconsAdded ||
         _mapController == null ||
         _currentLocation == null ||
-        _navigationStarted) return;
+        _navigationStarted) {
+      return;
+    }
 
     final options = SymbolOptions(
       geometry: _currentLocation!,
@@ -397,9 +444,13 @@ class _NavigationPageState extends State<NavigationPage>
     );
 
     if (_currentLocationSymbol == null) {
-      _currentLocationSymbol = await _mapController!.addSymbol(options);
+      _currentLocationSymbol =
+          await _mapController!.addSymbol(options);
     } else {
-      await _mapController!.updateSymbol(_currentLocationSymbol!, options);
+      await _mapController!.updateSymbol(
+        _currentLocationSymbol!,
+        options,
+      );
     }
 
     await _mapController!.setSymbolIconAllowOverlap(true);
@@ -407,7 +458,11 @@ class _NavigationPageState extends State<NavigationPage>
 
     if (!moveCamera) return;
 
-    await _moveCameraToLocation(_currentLocation!, zoom: 16.5, tilt: 35.0);
+    await _moveCameraToLocation(
+      _currentLocation!,
+      zoom: 16.5,
+      tilt: 35.0,
+    );
   }
 
   Future<void> _confirmDestination() async {
@@ -415,7 +470,9 @@ class _NavigationPageState extends State<NavigationPage>
       _showMessage('ابتدا مقصد را انتخاب کنید.');
       return;
     }
+
     if (_navigationStarted) return;
+
     await _startNavigation();
   }
 
@@ -423,7 +480,9 @@ class _NavigationPageState extends State<NavigationPage>
     if (!_mapStyleReady ||
         _mapController == null ||
         _selectedDestination == null ||
-        _navigationStarted) return;
+        _navigationStarted) {
+      return;
+    }
 
     setState(() {
       _navigationStarted = true;
@@ -446,6 +505,7 @@ class _NavigationPageState extends State<NavigationPage>
           _cameraFollowing = false;
         });
       }
+
       _showMessage('مسیر قابل دریافت نیست. اتصال اینترنت را بررسی کنید.');
       return;
     }
@@ -471,6 +531,7 @@ class _NavigationPageState extends State<NavigationPage>
     if (_mapController == null || points.length < 2) return;
 
     await _mapController!.clearLines();
+
     await _mapController!.addLine(
       LineOptions(
         geometry: points,
@@ -479,6 +540,7 @@ class _NavigationPageState extends State<NavigationPage>
         lineOpacity: 0.90,
       ),
     );
+
     await _mapController!.addLine(
       LineOptions(
         geometry: points,
@@ -492,7 +554,9 @@ class _NavigationPageState extends State<NavigationPage>
   Future<void> _drawRouteDecorations(
     NavigationController navigationController,
   ) async {
-    if (_mapController == null || _selectedDestination == null) return;
+    if (_mapController == null || _selectedDestination == null) {
+      return;
+    }
 
     await _clearRouteDecorations(keepDestination: true);
 
@@ -531,8 +595,9 @@ class _NavigationPageState extends State<NavigationPage>
 
       _turnSymbols.add(symbol);
 
-      final streetName =
-          step.streetName.isNotEmpty ? step.streetName : step.instruction;
+      final streetName = step.streetName.isNotEmpty
+          ? step.streetName
+          : step.instruction;
 
       if (streetName.isNotEmpty) {
         final labelSymbol = await _mapController!.addSymbol(
@@ -546,6 +611,7 @@ class _NavigationPageState extends State<NavigationPage>
             textOffset: const Offset(0, -2.0),
           ),
         );
+
         _turnSymbols.add(labelSymbol);
       }
     }
@@ -557,18 +623,24 @@ class _NavigationPageState extends State<NavigationPage>
       case 'slight left':
       case 'sharp left':
         return _leftTurnIconName;
+
       case 'right':
       case 'slight right':
       case 'sharp right':
         return _rightTurnIconName;
+
       case 'uturn':
         return _uTurnIconName;
+
       default:
         return _straightIconName;
     }
   }
 
-  double _routeBearingAt(LatLng location, List<LatLng> points) {
+  double _routeBearingAt(
+    LatLng location,
+    List<LatLng> points,
+  ) {
     if (points.length < 2) return 0.0;
 
     var closestIndex = 0;
@@ -576,6 +648,7 @@ class _NavigationPageState extends State<NavigationPage>
 
     for (var index = 0; index < points.length; index++) {
       final point = points[index];
+
       final distance = Geolocator.distanceBetween(
         location.latitude,
         location.longitude,
@@ -589,34 +662,44 @@ class _NavigationPageState extends State<NavigationPage>
       }
     }
 
-    final previousIndex = closestIndex > 0 ? closestIndex - 1 : closestIndex;
-    final nextIndex =
-        closestIndex < points.length - 1 ? closestIndex + 1 : closestIndex;
+    final previousIndex =
+        closestIndex > 0 ? closestIndex - 1 : closestIndex;
+
+    final nextIndex = closestIndex < points.length - 1
+        ? closestIndex + 1
+        : closestIndex;
 
     final start = points[previousIndex];
     final end = points[nextIndex];
 
     final startLatitude = start.latitude * math.pi / 180.0;
     final endLatitude = end.latitude * math.pi / 180.0;
+
     final longitudeDifference =
         (end.longitude - start.longitude) * math.pi / 180.0;
 
     final y = math.sin(longitudeDifference) * math.cos(endLatitude);
-    final x = (math.cos(startLatitude) * math.sin(endLatitude)) -
-        (math.sin(startLatitude) *
-            math.cos(endLatitude) *
-            math.cos(longitudeDifference));
+
+    final x =
+        (math.cos(startLatitude) * math.sin(endLatitude)) -
+            (math.sin(startLatitude) *
+                math.cos(endLatitude) *
+                math.cos(longitudeDifference));
 
     final heading = math.atan2(y, x) * 180.0 / math.pi;
+
     return (heading + 360.0) % 360.0;
   }
 
-  Future<void> _clearRouteDecorations({bool keepDestination = false}) async {
+  Future<void> _clearRouteDecorations({
+    bool keepDestination = false,
+  }) async {
     if (_mapController == null) return;
 
     for (final symbol in _turnSymbols) {
       await _mapController!.removeSymbol(symbol);
     }
+
     _turnSymbols.clear();
 
     if (!keepDestination && _destinationSymbol != null) {
@@ -629,18 +712,23 @@ class _NavigationPageState extends State<NavigationPage>
     if (!mounted ||
         !_mapStyleReady ||
         _mapController == null ||
-        !_navigationStarted) return;
+        !_navigationStarted) {
+      return;
+    }
 
     final navigationController =
         Provider.of<NavigationController>(context, listen: false);
 
     if (navigationController.routeVersion == _lastRouteVersion ||
-        navigationController.currentRoutePoints.isEmpty) return;
+        navigationController.currentRoutePoints.isEmpty) {
+      return;
+    }
 
     _lastRouteVersion = navigationController.routeVersion;
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted || _mapController == null) return;
+
       await _drawRoute(navigationController.currentRoutePoints);
       await _drawRouteDecorations(navigationController);
     });
@@ -651,7 +739,9 @@ class _NavigationPageState extends State<NavigationPage>
     required double heading,
     required bool moveCamera,
   }) async {
-    if (!_mapStyleReady || !_iconsAdded || _mapController == null) return;
+    if (!_mapStyleReady || !_iconsAdded || _mapController == null) {
+      return;
+    }
 
     final options = SymbolOptions(
       geometry: location,
@@ -663,18 +753,29 @@ class _NavigationPageState extends State<NavigationPage>
     if (_driverSymbol == null) {
       _driverSymbol = await _mapController!.addSymbol(options);
     } else {
-      await _mapController!.updateSymbol(_driverSymbol!, options);
+      await _mapController!.updateSymbol(
+        _driverSymbol!,
+        options,
+      );
     }
 
     await _mapController!.setSymbolIconAllowOverlap(true);
     await _mapController!.setSymbolIconIgnorePlacement(true);
 
     if (!moveCamera) return;
-    await _moveCameraToDriver(location, heading: heading);
+
+    await _moveCameraToDriver(
+      location,
+      heading: heading,
+    );
   }
 
-  Future<void> _moveCameraToDriver(LatLng location, {required double heading}) async {
+  Future<void> _moveCameraToDriver(
+    LatLng location, {
+    required double heading,
+  }) async {
     if (_mapController == null) return;
+
     _isProgrammaticCameraMove = true;
 
     try {
@@ -690,9 +791,14 @@ class _NavigationPageState extends State<NavigationPage>
         duration: const Duration(milliseconds: 650),
       );
     } finally {
-      Future.delayed(const Duration(milliseconds: 800), () {
-        if (mounted) _isProgrammaticCameraMove = false;
-      });
+      Future.delayed(
+        const Duration(milliseconds: 800),
+        () {
+          if (mounted) {
+            _isProgrammaticCameraMove = false;
+          }
+        },
+      );
     }
   }
 
@@ -702,31 +808,45 @@ class _NavigationPageState extends State<NavigationPage>
     required double tilt,
   }) async {
     if (_mapController == null) return;
+
     _isProgrammaticCameraMove = true;
 
     try {
       await _mapController!.animateCamera(
         CameraUpdate.newCameraPosition(
-          CameraPosition(target: location, zoom: zoom, tilt: tilt),
+          CameraPosition(
+            target: location,
+            zoom: zoom,
+            tilt: tilt,
+          ),
         ),
         duration: const Duration(milliseconds: 600),
       );
     } finally {
-      Future.delayed(const Duration(milliseconds: 750), () {
-        if (mounted) _isProgrammaticCameraMove = false;
-      });
+      Future.delayed(
+        const Duration(milliseconds: 750),
+        () {
+          if (mounted) {
+            _isProgrammaticCameraMove = false;
+          }
+        },
+      );
     }
   }
 
   Future<void> _showFullRoute() async {
     if (_mapController == null) return;
+
     final navigationController =
         Provider.of<NavigationController>(context, listen: false);
+
     final points = navigationController.currentRoutePoints;
 
     if (points.length < 2) return;
 
-    setState(() => _cameraFollowing = false);
+    setState(() {
+      _cameraFollowing = false;
+    });
 
     await _mapController!.animateCamera(
       CameraUpdate.newLatLngBounds(
@@ -741,17 +861,28 @@ class _NavigationPageState extends State<NavigationPage>
   }
 
   Future<void> _goToStart() async {
-    setState(() => _cameraFollowing = false);
-    await _moveCameraToLocation(_startLocation, zoom: 17.0, tilt: 35.0);
+    setState(() {
+      _cameraFollowing = false;
+    });
+
+    await _moveCameraToLocation(
+      _startLocation,
+      zoom: 17.0,
+      tilt: 35.0,
+    );
   }
 
   Future<void> _followDriver() async {
     final navigationController =
         Provider.of<NavigationController>(context, listen: false);
+
     final location =
         navigationController.snappedDriverLocation ?? _startLocation;
 
-    setState(() => _cameraFollowing = true);
+    setState(() {
+      _cameraFollowing = true;
+    });
+
     await _moveCameraToDriver(
       location,
       heading: navigationController.driverRouteBearing,
@@ -760,6 +891,7 @@ class _NavigationPageState extends State<NavigationPage>
 
   Future<void> _resetToNorth() async {
     if (_mapController == null) return;
+
     await _mapController!.animateCamera(
       CameraUpdate.bearingTo(0.0),
       duration: const Duration(milliseconds: 500),
@@ -815,6 +947,7 @@ class _NavigationPageState extends State<NavigationPage>
 
   void _showMessage(String message) {
     if (!mounted) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
     );
@@ -853,7 +986,9 @@ class _NavigationPageState extends State<NavigationPage>
             },
             onCameraIdle: () {
               if (!_isProgrammaticCameraMove && mounted) {
-                setState(() => _cameraFollowing = false);
+                setState(() {
+                  _cameraFollowing = false;
+                });
               }
             },
             styleString: 'assets/map/style.json',
@@ -874,7 +1009,10 @@ class _NavigationPageState extends State<NavigationPage>
                 child: Center(
                   child: Card(
                     child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
                       child: Text('در حال دریافت موقعیت شما...'),
                     ),
                   ),
@@ -892,7 +1030,9 @@ class _NavigationPageState extends State<NavigationPage>
                 shape: const CircleBorder(),
                 child: IconButton(
                   tooltip: 'بازگشت',
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
                   icon: const Icon(
                     Icons.arrow_back_rounded,
                     color: SafirColors.primary,
@@ -902,7 +1042,6 @@ class _NavigationPageState extends State<NavigationPage>
             ),
           ),
 
-          // --- دکمه ثبت‌نام راننده روی نقشه (در صورت عدم شروع مسیریابی) ---
           if (!_navigationStarted)
             Positioned(
               top: 16,
@@ -922,13 +1061,6 @@ class _NavigationPageState extends State<NavigationPage>
                     ),
                   ),
                   onPressed: () {
-                    // مسیر صفحه ثبت‌نام راننده را اینجا صدا بزنید
-                    // Navigator.push(
-                    //   context,
-                    //   MaterialPageRoute(
-                    //     builder: (context) => const DriverRegisterPage(),
-                    //   ),
-                    // );
                     _showMessage('انتقال به صفحه ثبت‌نام راننده');
                   },
                   icon: const Icon(
@@ -1055,7 +1187,9 @@ class _NavigationPageState extends State<NavigationPage>
                                 controller.navigationInstruction,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(color: Colors.white),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                ),
                               ),
                             ],
                           ),
@@ -1108,42 +1242,45 @@ class _NavigationPageState extends State<NavigationPage>
                           vertical: 14,
                         ),
                         child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Row(
-                                  children: [
-                                    const Text(
-                                      'زمان باقی‌مانده: ',
-                                      style: TextStyle(
-                                        color: Colors.grey,
-                                        fontSize: 13,
-                                      ),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Text(
+                                    'راهنمای مسیر',
+                                    style: TextStyle(
+                                      color: Colors.grey,
+                                      fontSize: 13,
                                     ),
-                                    Text(
-                                      '${(controller.remainingDuration / 60).ceil()} دقیقه',
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.black87,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'فاصله: ${controller.remainingDistance.toStringAsFixed(0)} متر',
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.teal,
-                                    fontWeight: FontWeight.w600,
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${controller.distanceToNextTurn} ${'meters'.tr()}',
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    controller.navigationInstruction.isEmpty
+                                        ? 'مسیر در حال آماده‌سازی است...'
+                                        : controller.navigationInstruction,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.teal,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
+                            const SizedBox(width: 12),
                             ElevatedButton(
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.redAccent,
