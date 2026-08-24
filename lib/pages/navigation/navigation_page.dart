@@ -387,12 +387,10 @@ class _NavigationPageState extends State<NavigationPage>
     }
 
       final options = SymbolOptions(
-    geometry: _selectedDestination!,
-    iconImage: _destinationIconName,
-    iconSize: 0.70,
-    iconAllowOverlap: true,
-    iconIgnorePlacement: true,
-  );
+  geometry: _selectedDestination!,
+  iconImage: _destinationIconName,
+  iconSize: 0.70,
+);
 
 
     if (_destinationSymbol == null) {
@@ -445,12 +443,10 @@ class _NavigationPageState extends State<NavigationPage>
     }
 
         final options = SymbolOptions(
-      geometry: _currentLocation!,
-      iconImage: _currentLocationIconName,
-      iconSize: 0.72,
-      iconAllowOverlap: true,
-      iconIgnorePlacement: true,
-    );
+  geometry: _currentLocation!,
+  iconImage: _currentLocationIconName,
+  iconSize: 0.72,
+);
 
 
     if (_currentLocationSymbol == null) {
@@ -827,13 +823,12 @@ class _NavigationPageState extends State<NavigationPage>
     }
 
         final options = SymbolOptions(
-      geometry: location,
-      iconImage: _driverIconName,
-      iconSize: 0.58,
-      iconRotate: heading,
-      iconAllowOverlap: true,    // این خط
-      iconIgnorePlacement: true, // این خط
-    );
+  geometry: location,
+  iconImage: _driverIconName,
+  iconSize: 0.58,
+  iconRotate: heading,
+);
+
 
 
     if (_driverSymbol == null) {
