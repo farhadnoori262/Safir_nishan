@@ -1111,8 +1111,9 @@ class _NavigationPageState extends State<NavigationPage>
               target: _startLocation,
               zoom: 16.0,
             ),
-            myLocationEnabled: false,
-            trackCameraPosition: true,
+            myLocationEnabled: true,
+            myLocationTrackingMode: MyLocationTrackingMode.tracking,
+           trackCameraPosition: true,
           ),
 
           if (_isLoadingLocation)
