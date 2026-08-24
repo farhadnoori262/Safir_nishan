@@ -783,6 +783,31 @@ class _NavigationPageState extends State<NavigationPage>
       await _drawRouteDecorations(navigationController);
     });
   }
+    LatLng _getOffsetTarget(LatLng driverLoc, double bearing, double distanceInMeters) {
+    const double earthRadius = 6371000.0;
+    final double radBearing = bearing * (math.pi / 180.0);
+    final double latRad = driverLoc.latitude * (math.pi / 180.0);
+    final double lngRad = driverLoc.longitude * (math.pi / 180.0);
+
+    final double angularDistance = distanceInMeters / earthRadius;
+
+    final double targetLatRad = math.asin(
+      math.sin(latRad) * math.cos(angularDistance) +
+          math.cos(latRad) * math.sin(angularDistance) * math.cos(radBearing),
+    );
+
+    final double targetLngRad = lngRad +
+        math.atan2(
+          math.sin(radBearing) * math.sin(angularDistance) * math.cos(latRad),
+          math.cos(angularDistance) - math.sin(latRad) * math.sin(targetLatRad),
+        );
+
+    return LatLng(
+      targetLatRad * (180.0 / math.pi),
+      targetLngRad * (180.0 / math.pi),
+    );
+  }
+
 
   Future<void> _updateDriverMarker(
     LatLng location, {
@@ -821,36 +846,44 @@ class _NavigationPageState extends State<NavigationPage>
   }
 
   Future<void> _moveCameraToDriver(
-    LatLng location, {
-    required double heading,
-  }) async {
-    if (_mapController == null) return;
+  LatLng location, {
+  required double heading,
+}) async {
+  if (_mapController == null) return;
 
-    _isProgrammaticCameraMove = true;
+  _isProgrammaticCameraMove = true;
 
-    try {
-      await _mapController!.animateCamera(
-        CameraUpdate.newCameraPosition(
-          CameraPosition(
-            target: location,
-            zoom: 17.5,
-            bearing: heading,
-            tilt: 50.0,
-          ),
+  try {
+    // محاسبه نقطه جلوتر از ماشین تا آیکون راننده دقیقاً در پایین صفحه بنشیند
+    final LatLng offsetTarget = _getOffsetTarget(location, heading, 55.0);
+
+    await _mapController!.animateCamera(
+      CameraUpdate.newCameraPosition(
+        CameraPosition(
+          target: offsetTarget,
+          zoom: 17.6,
+          bearing: heading,
+          tilt: 58.0, // زاویه دید حرفه‌ای برای دیده شدن مسیر جلو
         ),
-        duration: const Duration(milliseconds: 650),
-      );
-    } finally {
-      Future.delayed(
-        const Duration(milliseconds: 800),
-        () {
-          if (mounted) {
-            _isProgrammaticCameraMove = false;
-          }
-        },
-      );
-    }
+      ),
+      duration: const Duration(milliseconds: 500),
+    );
+
+    // جلوگیری از مخفی شدن مارکرها هنگام زوم یا جابه‌جایی
+    await _mapController!.setSymbolIconAllowOverlap(true);
+    await _mapController!.setSymbolIconIgnorePlacement(true);
+  } finally {
+    Future.delayed(
+      const Duration(milliseconds: 600),
+      () {
+        if (mounted) {
+          _isProgrammaticCameraMove = false;
+        }
+      },
+    );
   }
+}
+
 
   Future<void> _moveCameraToLocation(
     LatLng location, {
