@@ -384,11 +384,14 @@ class _NavigationPageState extends State<NavigationPage>
       return;
     }
 
-    final options = SymbolOptions(
-      geometry: _selectedDestination!,
-      iconImage: _destinationIconName,
-      iconSize: 0.70,
-    );
+      final options = SymbolOptions(
+    geometry: _selectedDestination!,
+    iconImage: _destinationIconName,
+    iconSize: 0.70,
+    iconAllowOverlap: true,
+    iconIgnorePlacement: true,
+  );
+
 
     if (_destinationSymbol == null) {
       _destinationSymbol = await _mapController!.addSymbol(options);
@@ -439,11 +442,14 @@ class _NavigationPageState extends State<NavigationPage>
       return;
     }
 
-    final options = SymbolOptions(
+        final options = SymbolOptions(
       geometry: _currentLocation!,
       iconImage: _currentLocationIconName,
       iconSize: 0.72,
+      iconAllowOverlap: true,
+      iconIgnorePlacement: true,
     );
+
 
     if (_currentLocationSymbol == null) {
       _currentLocationSymbol =
@@ -818,12 +824,15 @@ class _NavigationPageState extends State<NavigationPage>
       return;
     }
 
-    final options = SymbolOptions(
+        final options = SymbolOptions(
       geometry: location,
       iconImage: _driverIconName,
       iconSize: 0.58,
       iconRotate: heading,
+      iconAllowOverlap: true,    // این خط
+      iconIgnorePlacement: true, // این خط
     );
+
 
     if (_driverSymbol == null) {
       _driverSymbol = await _mapController!.addSymbol(options);
