@@ -94,13 +94,28 @@ class _NavigationPageState extends State<NavigationPage>
     )..repeat();
 
     _pulseController.addListener(_updateCurrentLocationPulse);
+    Future.delayed(const Duration(seconds: 3), () {
+  if (mounted && _isLoadingLocation) {
+    setState(() {
+      _isLoadingLocation = false;
+    });
+  }
+});
+
 
     _startLocationTracking();
   }
 
-  void _onMapCreated(MapLibreMapController controller) {
-    _mapController = controller;
-  }
+  void _onMapCreated(MapLibreMapController controller) async {
+  _mapController = controller;
+  
+  // اضافه کردن دو خط زیر برای فعال‌سازی نقطه و مخروط جهت‌نما
+  await controller.updateMyLocationTrackingMode(
+    MyLocationTrackingMode.Tracking,
+  );
+  await controller.updateCompassEnabled(true);
+}
+
 
   Future<void> _onStyleLoaded() async {
     if (!mounted) return;
