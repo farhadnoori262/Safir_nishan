@@ -1070,27 +1070,6 @@ class _NavigationPageState extends State<NavigationPage>
               ),
             ),
 
-          Positioned(
-            top: 16,
-            left: 16,
-            child: SafeArea(
-              child: Material(
-                color: Colors.white,
-                elevation: 5,
-                shape: const CircleBorder(),
-                child: IconButton(
-                  tooltip: 'بازگشت',
-                  onPressed: () {
-                    Navigator.pop(context);
-                  },
-                  icon: const Icon(
-                    Icons.arrow_back_rounded,
-                    color: SafirColors.primary,
-                  ),
-                ),
-              ),
-            ),
-          ),
 
           if (!_navigationStarted)
             Positioned(
