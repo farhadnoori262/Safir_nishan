@@ -149,54 +149,66 @@ class _NavigationPageState extends State<NavigationPage>
   }
 
   Future<void> _startLocationTracking() async {
-    try {
-      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-
-      if (!serviceEnabled) {
-        _showMessage('لطفاً موقعیت مکانی گوشی را روشن کنید.');
-        return;
-      }
-
-      var permission = await Geolocator.checkPermission();
-
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
-        _showMessage('اجازهٔ دسترسی به موقعیت مکانی داده نشد.');
-        return;
-      }
-
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.bestForNavigation,
-      );
-
-      await _handleLocationUpdate(position);
-
-      await _positionStream?.cancel();
-
-      _positionStream = Geolocator.getPositionStream(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.bestForNavigation,
-          distanceFilter: 2,
-        ),
-      ).listen(
-        (position) async {
-          await _handleLocationUpdate(position);
-        },
-      );
-    } catch (_) {
-      _showMessage('دریافت موقعیت فعلی امکان‌پذیر نشد.');
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoadingLocation = false;
-        });
-      }
+  try {
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      _showMessage('لطفاً موقعیت مکانی گوشی را روشن کنید.');
+      if (mounted) setState(() => _isLoadingLocation = false);
+      return;
     }
+
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      _showMessage('اجازهٔ دسترسی به موقعیت مکانی داده نشد.');
+      if (mounted) setState(() => _isLoadingLocation = false);
+      return;
+    }
+
+    // ۱. دریافت سریع اولین نقطه GPS
+    final position = await Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.medium,
+    );
+
+    // ۲. انتقال زوم هوشمند و سریع به نقطه کاربر (مثل گوگل مپ)
+    if (_mapController != null) {
+      await _mapController!.animateCamera(
+        CameraUpdate.newLatLngZoom(
+          LatLng(position.latitude, position.longitude),
+          16.5,
+        ),
+      );
+    }
+
+    await _handleLocationUpdate(position);
+
+    // ۳. مخفی کردن بلافاصله کادر لودینگ
+    if (mounted) {
+      setState(() {
+        _isLoadingLocation = false;
+      });
+    }
+
+    // ۴. شنود زنده موقعیت
+    await _positionStream?.cancel();
+    _positionStream = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.bestForNavigation,
+        distanceFilter: 2,
+      ),
+    ).listen((position) async {
+      await _handleLocationUpdate(position);
+    });
+  } catch (_) {
+    _showMessage('دریافت موقعیت فعلی امکان‌پذیر نشد.');
+    if (mounted) setState(() => _isLoadingLocation = false);
   }
+}
+
 
   Future<void> _handleLocationUpdate(Position position) async {
     if (!mounted || _isUpdatingMap) return;
