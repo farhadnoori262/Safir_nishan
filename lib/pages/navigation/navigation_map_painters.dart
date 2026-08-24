@@ -1,5 +1,6 @@
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 import '../../utils/app_colors.dart';
 
@@ -11,6 +12,9 @@ enum TurnDirection {
 }
 
 class NavigationMapPainters {
+  static ui.Image? _cachedDriverImage;
+  static bool _isLoadingImage = false;
+
   static Future<void> addCanvasImage(
     MapLibreMapController controller,
     String name,
@@ -63,6 +67,34 @@ class NavigationMapPainters {
   }
 
   static void drawDriverArrow(Canvas canvas, Size size) {
+    // اگر تصویر بارگیری شده باشد، آن را قرار می‌دهد
+    if (_cachedDriverImage != null) {
+      final srcRect = Rect.fromLTWH(
+        0,
+        0,
+        _cachedDriverImage!.width.toDouble(),
+        _cachedDriverImage!.height.toDouble(),
+      );
+      final dstRect = Rect.fromLTWH(0, 0, size.width, size.height);
+      canvas.drawImageRect(_cachedDriverImage!, srcRect, dstRect, Paint());
+      return;
+    }
+
+    // لود خودکار تصویر در پس‌زمینه
+    if (!_isLoadingImage) {
+      _isLoadingImage = true;
+      rootBundle.load('assets/images/driver_arrow.png').then((data) {
+        ui.instantiateImageCodec(data.buffer.asUint8List()).then((codec) {
+          codec.getNextFrame().then((frameInfo) {
+            _cachedDriverImage = frameInfo.image;
+          });
+        });
+      }).catchError((_) {
+        _isLoadingImage = false;
+      });
+    }
+
+    // تا زمان لود شدن تصویر جدید، از فلش قبلی استفاده می‌کند
     final center = Offset(size.width / 2, size.height / 2);
     final path = Path()
       ..moveTo(center.dx, 8)
