@@ -8,6 +8,8 @@ import 'package:maplibre_gl/maplibre_gl.dart';
 import 'package:provider/provider.dart';
 
 import '../../controllers/navigation_controller.dart';
+import '../../pages/driverRegistration/register_screen.dart'; // یا مسیر دقیق فایل RegisterScreen
+
 import '../../models/place_search_result.dart';
 import '../../services/place_search_service.dart';
 import '../../utils/app_colors.dart';
