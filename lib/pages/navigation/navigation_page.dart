@@ -108,13 +108,12 @@ class _NavigationPageState extends State<NavigationPage>
 
   void _onMapCreated(MapLibreMapController controller) async {
   _mapController = controller;
-  
-  // اضافه کردن دو خط زیر برای فعال‌سازی نقطه و مخروط جهت‌نما
+
   await controller.updateMyLocationTrackingMode(
-    MyLocationTrackingMode.Tracking,
+    MyLocationTrackingMode.tracking,
   );
-  await controller.updateCompassEnabled(true);
 }
+
 
 
   Future<void> _onStyleLoaded() async {
