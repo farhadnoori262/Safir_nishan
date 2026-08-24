@@ -77,3 +77,4 @@ flutter:
     - assets/translations/
     - assets/map/style.json
     - assets/audio/fa/
+    - assets/images/
