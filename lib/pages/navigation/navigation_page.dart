@@ -48,11 +48,13 @@ class _NavigationPageState extends State<NavigationPage>
   MapLibreMapController? _mapController;
   StreamSubscription<Position>? _positionStream;
 
-  Symbol? _driverSymbol;
+    Symbol? _driverSymbol;
   Symbol? _currentLocationSymbol;
   Symbol? _destinationSymbol;
 
   final List<Symbol> _turnSymbols = [];
+  final List<Line> _turnLines = []; // <-- این خط جدید را اضافه کنید
+
 
   PlaceSearchResult? _selectedPlace;
   LatLng? _selectedDestination;
@@ -551,7 +553,7 @@ class _NavigationPageState extends State<NavigationPage>
     );
   }
 
-  Future<void> _drawRouteDecorations(
+    Future<void> _drawRouteDecorations(
     NavigationController navigationController,
   ) async {
     if (_mapController == null || _selectedDestination == null) {
@@ -573,6 +575,8 @@ class _NavigationPageState extends State<NavigationPage>
     await _mapController!.setSymbolIconAllowOverlap(true);
     await _mapController!.setSymbolIconIgnorePlacement(true);
 
+    final routePoints = navigationController.currentRoutePoints;
+
     for (var index = 0;
         index < navigationController.routeSteps.length;
         index++) {
@@ -581,6 +585,21 @@ class _NavigationPageState extends State<NavigationPage>
       if (step.distance < 18) continue;
       if (index == 0 && step.modifier == 'straight') continue;
 
+      // کشیدن خط سفید عریض روی پیچ خیابان (تعقیب خمیدگی مسیر)
+      final stepSegment = _extractManeuverSegment(step.location, routePoints);
+
+      if (stepSegment.length >= 2) {
+        final maneuverLine = await _mapController!.addLine(
+          LineOptions(
+            geometry: stepSegment,
+            lineColor: '#FFFFFF',
+            lineWidth: 10.0,
+            lineOpacity: 0.95,
+          ),
+        );
+        _turnLines.add(maneuverLine);
+      }
+
       final symbol = await _mapController!.addSymbol(
         SymbolOptions(
           geometry: step.location,
@@ -588,7 +607,7 @@ class _NavigationPageState extends State<NavigationPage>
           iconSize: 0.44,
           iconRotate: _routeBearingAt(
             step.location,
-            navigationController.currentRoutePoints,
+            routePoints,
           ),
         ),
       );
@@ -616,6 +635,32 @@ class _NavigationPageState extends State<NavigationPage>
       }
     }
   }
+    List<LatLng> _extractManeuverSegment(LatLng turnPoint, List<LatLng> points) {
+    if (points.length < 2) return [];
+
+    int closestIndex = 0;
+    double minDistance = double.infinity;
+
+    for (int i = 0; i < points.length; i++) {
+      final dist = Geolocator.distanceBetween(
+        turnPoint.latitude,
+        turnPoint.longitude,
+        points[i].latitude,
+        points[i].longitude,
+      );
+      if (dist < minDistance) {
+        minDistance = dist;
+        closestIndex = i;
+      }
+    }
+
+    final int startIndex = math.max(0, closestIndex - 2);
+    final int endIndex = math.min(points.length - 1, closestIndex + 2);
+
+    return points.sublist(startIndex, endIndex + 1);
+  }
+
+
 
   String _turnIconName(String modifier) {
     switch (modifier) {
@@ -691,7 +736,7 @@ class _NavigationPageState extends State<NavigationPage>
     return (heading + 360.0) % 360.0;
   }
 
-  Future<void> _clearRouteDecorations({
+    Future<void> _clearRouteDecorations({
     bool keepDestination = false,
   }) async {
     if (_mapController == null) return;
@@ -699,14 +744,19 @@ class _NavigationPageState extends State<NavigationPage>
     for (final symbol in _turnSymbols) {
       await _mapController!.removeSymbol(symbol);
     }
-
     _turnSymbols.clear();
+
+    for (final line in _turnLines) {
+      await _mapController!.removeLine(line);
+    }
+    _turnLines.clear();
 
     if (!keepDestination && _destinationSymbol != null) {
       await _mapController!.removeSymbol(_destinationSymbol!);
       _destinationSymbol = null;
     }
   }
+
 
   void _navigationControllerChanged() {
     if (!mounted ||
