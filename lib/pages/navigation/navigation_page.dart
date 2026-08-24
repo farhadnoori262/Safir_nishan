@@ -1134,8 +1134,14 @@ class _NavigationPageState extends State<NavigationPage>
                     ),
                   ),
                   onPressed: () {
-                    _showMessage('انتقال به صفحه ثبت‌نام راننده');
-                  },
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => const RegisterScreen(),
+    ),
+  );
+},
+
                   icon: const Icon(
                     Icons.person_add_alt_1_rounded,
                     size: 20,
