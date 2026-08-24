@@ -1107,21 +1107,21 @@ class _NavigationPageState extends State<NavigationPage>
               ),
             ),
 
-          if (_navigationStarted)
-            Positioned(
-              right: 16,
-              bottom: 140,
-              child: SafeArea(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _MapActionButton(
-                      icon: Icons.navigation_rounded,
-                      tooltip: 'تنظیم به سمت شمال',
-                      iconColor: Colors.redAccent,
-                      onPressed: _resetToNorth,
-                    ),
-                    const SizedBox(height: 10),
+                    Positioned(
+            right: 16,
+            bottom: _navigationStarted ? 140 : 260,
+            child: SafeArea(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _MapActionButton(
+                    icon: Icons.navigation_rounded,
+                    tooltip: 'تنظیم به سمت شمال',
+                    iconColor: Colors.redAccent,
+                    onPressed: _resetToNorth,
+                  ),
+                  const SizedBox(height: 10),
+                  if (_navigationStarted) ...[
                     _MapActionButton(
                       icon: Icons.alt_route_rounded,
                       tooltip: 'نمایش کل مسیر',
@@ -1134,16 +1134,28 @@ class _NavigationPageState extends State<NavigationPage>
                       onPressed: _goToStart,
                     ),
                     const SizedBox(height: 10),
-                    _MapActionButton(
-                      icon: Icons.my_location_rounded,
-                      tooltip: 'بازگشت به مسیر',
-                      iconColor: SafirColors.primary,
-                      onPressed: _followDriver,
-                    ),
                   ],
-                ),
+                  _MapActionButton(
+                    icon: Icons.my_location_rounded,
+                    tooltip: 'موقعیت من',
+                    iconColor: SafirColors.primary,
+                    onPressed: () {
+                      if (_navigationStarted) {
+                        _followDriver();
+                      } else if (_currentLocation != null) {
+                        _moveCameraToLocation(
+                          _currentLocation!,
+                          zoom: 16.5,
+                          tilt: 35.0,
+                        );
+                      }
+                    },
+                  ),
+                ],
               ),
             ),
+          ),
+
 
           if (_navigationStarted && !_cameraFollowing)
             Positioned(
