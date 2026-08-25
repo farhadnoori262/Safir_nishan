@@ -1,7 +1,9 @@
 import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
+
 import '../../utils/app_colors.dart';
 
 enum TurnDirection {
@@ -52,7 +54,7 @@ class NavigationMapPainters {
         center,
         animatedRadius,
         Paint()
-          ..color = SafirColors.primary.withOpacity(outerOpacity)
+          ..color = AppColors.primaryButton.withOpacity(outerOpacity)
           ..style = PaintingStyle.fill,
       );
     }
@@ -60,14 +62,13 @@ class NavigationMapPainters {
     canvas.drawCircle(
       center,
       18,
-      Paint()..color = SafirColors.primary.withOpacity(0.20),
+      Paint()..color = AppColors.primaryButton.withOpacity(0.20),
     );
     canvas.drawCircle(center, 12, Paint()..color = Colors.white);
-    canvas.drawCircle(center, 8, Paint()..color = SafirColors.primary);
+    canvas.drawCircle(center, 8, Paint()..color = AppColors.primaryButton);
   }
 
   static void drawDriverArrow(Canvas canvas, Size size) {
-    // اگر تصویر بارگیری شده باشد، آن را قرار می‌دهد
     if (_cachedDriverImage != null) {
       final srcRect = Rect.fromLTWH(
         0,
@@ -80,7 +81,6 @@ class NavigationMapPainters {
       return;
     }
 
-    // لود خودکار تصویر در پس‌زمینه
     if (!_isLoadingImage) {
       _isLoadingImage = true;
       rootBundle.load('assets/images/driver_arrow.png').then((data) {
@@ -94,7 +94,6 @@ class NavigationMapPainters {
       });
     }
 
-    // تا زمان لود شدن تصویر جدید، از فلش قبلی استفاده می‌کند
     final center = Offset(size.width / 2, size.height / 2);
     final path = Path()
       ..moveTo(center.dx, 8)
@@ -118,7 +117,7 @@ class NavigationMapPainters {
       ..strokeJoin = StrokeJoin.round;
 
     canvas.drawPath(path, borderPaint);
-    canvas.drawPath(path, Paint()..color = SafirColors.primary);
+    canvas.drawPath(path, Paint()..color = AppColors.primaryButton);
   }
 
   static void drawDestinationPin(Canvas canvas, Size size) {
@@ -228,6 +227,6 @@ class NavigationMapPainters {
       ..strokeJoin = StrokeJoin.round;
 
     canvas.drawPath(path, borderPaint);
-    canvas.drawPath(path, Paint()..color = const Color(0xFF168A61));
+    canvas.drawPath(path, Paint()..color = AppColors.primaryBrand);
   }
 }
