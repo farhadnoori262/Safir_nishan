@@ -1,10 +1,12 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:safir_drivers/pages/profileUpdation/driver_main_info.dart'; 
-import 'package:safir_drivers/providers/authentication_provider.dart'; // 👈 اصلاح نام پرووایدر به نسخه اصلی
-import 'package:safir_drivers/providers/registration_provider.dart'; 
-import 'package:safir_drivers/utils/lang_helper.dart'; 
+
+import 'package:safir_drivers/pages/profileUpdation/driver_main_info.dart';
+import 'package:safir_drivers/providers/authentication_provider.dart';
+import 'package:safir_drivers/providers/registration_provider.dart';
+import 'package:safir_drivers/utils/app_colors.dart';
 
 import '../../global/global.dart';
 import '../../widgets/rating_stars.dart';
@@ -20,53 +22,59 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   void initState() {
     super.initState();
-    Provider.of<RegistrationProvider>(context, listen: false)
-        .retrieveCurrentDriverInfo();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        Provider.of<RegistrationProvider>(context, listen: false)
+            .retrieveCurrentDriverInfo();
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    // اصلاح نام کلاس طبق فایل main.dart به AuthenticationProvider
     final authProvider = Provider.of<AuthenticationProvider>(context);
 
     return SafeArea(
       child: Scaffold(
+        backgroundColor: AppColors.background,
         body: SingleChildScrollView(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.start,
             children: [
-              // کارت اطلاعات اصلی راننده
+              // 📌 کارت اطلاعات اصلی راننده
               Center(
                 child: Padding(
-                  padding: const EdgeInsets.only(top: 30, bottom: 15),
+                  padding: const EdgeInsets.only(top: 24, bottom: 16),
                   child: Container(
-                    padding: const EdgeInsets.all(12),
-                    width: MediaQuery.of(context).size.width * 0.93,
+                    padding: const EdgeInsets.all(16),
+                    width: MediaQuery.of(context).size.width * 0.92,
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.black12),
-                      borderRadius: BorderRadius.circular(15),
-                      color: Colors.white,
+                      color: AppColors.cardBackground,
+                      borderRadius: BorderRadius.circular(16),
                       boxShadow: const [
                         BoxShadow(
                           color: Colors.black12,
                           offset: Offset(0, 2),
-                          blurRadius: 6.0,
+                          blurRadius: 8.0,
                         ),
                       ],
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: <Widget>[
-                        // تصویر پروفایل راننده
-                        Container(
-                          width: 85.0,
-                          height: 85.0,
-                          padding: const EdgeInsets.symmetric(horizontal: 5),
+                        // 🖼️ تصویر پروفایل راننده
+                        SizedBox(
+                          width: 80.0,
+                          height: 80.0,
                           child: CachedNetworkImage(
                             imageUrl: driverPhoto,
                             imageBuilder: (context, imageProvider) => Container(
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: AppColors.primaryBrand.withOpacity(0.2),
+                                  width: 2,
+                                ),
                                 image: DecorationImage(
                                   image: imageProvider,
                                   fit: BoxFit.cover,
@@ -76,17 +84,21 @@ class _ProfilePageState extends State<ProfilePage> {
                             placeholder: (context, url) => const Center(
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF145A41)),
+                                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryBrand),
                               ),
                             ),
                             errorWidget: (context, url, error) => CircleAvatar(
                               backgroundColor: Colors.grey.shade200,
-                              child: Icon(Icons.person, size: 45, color: Colors.grey.shade500),
+                              child: Icon(
+                                Icons.person,
+                                size: 42,
+                                color: Colors.grey.shade500,
+                              ),
                             ),
                           ),
                         ),
-                        const SizedBox(width: 10),
-                        // مشخصات متنی راننده
+                        const SizedBox(width: 14),
+                        // 📝 مشخصات متنی راننده
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -94,18 +106,29 @@ class _ProfilePageState extends State<ProfilePage> {
                             children: <Widget>[
                               Text(
                                 "$driverName $driverSecondName",
-                                style: const TextStyle(fontFamily: 'IranYekan', fontSize: 16, fontWeight: FontWeight.bold),
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textPrimary,
+                                ),
                               ),
                               const SizedBox(height: 6),
                               Row(
                                 children: <Widget>[
-                                  const Icon(Icons.phone, size: 14, color: Colors.black54),
+                                  const Icon(
+                                    Icons.phone,
+                                    size: 14,
+                                    color: AppColors.textSecondary,
+                                  ),
                                   const SizedBox(width: 6),
                                   Directionality(
                                     textDirection: TextDirection.ltr,
                                     child: Text(
                                       driverPhone,
-                                      style: const TextStyle(fontSize: 13, color: Colors.black87),
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        color: AppColors.textPrimary,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -114,12 +137,19 @@ class _ProfilePageState extends State<ProfilePage> {
                                 const SizedBox(height: 4),
                                 Row(
                                   children: <Widget>[
-                                    const Icon(Icons.email, size: 14, color: Colors.black54),
+                                    const Icon(
+                                      Icons.email,
+                                      size: 14,
+                                      color: AppColors.textSecondary,
+                                    ),
                                     const SizedBox(width: 6),
                                     Flexible(
                                       child: Text(
                                         driverEmail,
-                                        style: const TextStyle(fontSize: 12, color: Colors.black87),
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: AppColors.textSecondary,
+                                        ),
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
@@ -130,12 +160,19 @@ class _ProfilePageState extends State<ProfilePage> {
                                 const SizedBox(height: 4),
                                 Row(
                                   children: <Widget>[
-                                    const Icon(Icons.location_on, size: 14, color: Colors.black54),
+                                    const Icon(
+                                      Icons.location_on,
+                                      size: 14,
+                                      color: AppColors.textSecondary,
+                                    ),
                                     const SizedBox(width: 6),
                                     Flexible(
                                       child: Text(
                                         address,
-                                        style: const TextStyle(fontFamily: 'IranYekan', fontSize: 12, color: Colors.black87),
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: AppColors.textSecondary,
+                                        ),
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
@@ -152,14 +189,14 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                 ),
               ),
-              
+
               const SizedBox(height: 10),
 
-              // گزینه اطلاعات کاربری
+              // 👤 گزینه اطلاعات کاربری
               _buildProfileMenuOption(
                 context,
                 icon: Icons.account_circle_outlined,
-                title: tr(context, 'profile_menu_account'),
+                title: 'profile_menu_account'.tr(),
                 onTap: () async {
                   await Navigator.push(
                     context,
@@ -169,36 +206,36 @@ class _ProfilePageState extends State<ProfilePage> {
                   );
                 },
               ),
-              
-              const SizedBox(height: 14),
 
-              // گزینه تنظیمات اپلیکیشن
+              const SizedBox(height: 12),
+
+              // ⚙️ گزینه تنظیمات اپلیکیشن
               _buildProfileMenuOption(
                 context,
                 icon: Icons.settings_outlined,
-                title: tr(context, 'profile_menu_settings'),
+                title: 'profile_menu_settings'.tr(),
                 onTap: () {
-                  // صفحه موقت تنظیمات تا بعداً آن را بسازی
-                  _showPlaceholderPage(context, tr(context, 'profile_menu_settings'));
+                  _showPlaceholderPage(context, 'profile_menu_settings'.tr());
                 },
               ),
-              
-              const SizedBox(height: 14),
 
-              // گزینه مرکز پشتیبانی
+              const SizedBox(height: 12),
+
+              // 🎧 گزینه مرکز پشتیبانی
               _buildProfileMenuOption(
                 context,
                 icon: Icons.help_outline,
-                title: tr(context, 'profile_menu_support'),
+                title: 'profile_menu_support'.tr(),
                 onTap: () {
-                  // صفحه موقت پشتیبانی تا بعداً آن را بسازی
-                  _showPlaceholderPage(context, tr(context, 'profile_menu_support'));
+                  _showPlaceholderPage(context, 'profile_menu_support'.tr());
                 },
               ),
+              
+              const SizedBox(height: 80), // فاصله برای جلوگیری از همپوشانی با دکمه خروج
             ],
           ),
         ),
-        // دکمه خروج از حساب
+        // 🚪 دکمه خروج از حساب
         floatingActionButton: FloatingActionButton.extended(
           backgroundColor: Colors.red.shade700,
           onPressed: () async {
@@ -206,28 +243,11 @@ class _ProfilePageState extends State<ProfilePage> {
           },
           icon: const Icon(Icons.logout, color: Colors.white, size: 18),
           label: Text(
-            tr(context, 'profile_logout'),
-            style: const TextStyle(fontFamily: 'IranYekan', color: Colors.white, fontWeight: FontWeight.bold),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // متد کمکی جهت نمایش صفحات موقت پشتیبانی و تنظیمات
-  void _showPlaceholderPage(BuildContext context, String title) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => Scaffold(
-          appBar: AppBar(
-            title: Text(title, style: const TextStyle(fontFamily: 'IranYekan', fontSize: 16)),
-            centerTitle: true,
-          ),
-          body: Center(
-            child: Text(
-              "$title بزودی...",
-              style: const TextStyle(fontFamily: 'IranYekan', fontSize: 18, color: Colors.black54),
+            'profile_logout'.tr(),
+            style: const TextStyle(
+              color: AppColors.buttonText,
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
             ),
           ),
         ),
@@ -235,17 +255,55 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  // متد ساخت منوهای متناسب با جهت زبان
-  Widget _buildProfileMenuOption(BuildContext context, {required IconData icon, required String title, required VoidCallback onTap}) {
+  // 📄 متد کمکی جهت نمایش صفحات موقت
+  void _showPlaceholderPage(BuildContext context, String title) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: AppBar(
+            title: Text(
+              title,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            centerTitle: true,
+            backgroundColor: AppColors.cardBackground,
+            elevation: 1,
+            iconTheme: const IconThemeData(color: AppColors.textPrimary),
+          ),
+          body: Center(
+            child: Text(
+              "$title ${'coming_soon'.tr()}",
+              style: const TextStyle(
+                fontSize: 16,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // 🔹 متد ساخت آیتم‌های منو
+  Widget _buildProfileMenuOption(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
     final isRtl = Directionality.of(context) == TextDirection.rtl;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      width: MediaQuery.of(context).size.width * 0.93,
+      width: MediaQuery.of(context).size.width * 0.92,
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.black12),
-        borderRadius: BorderRadius.circular(12),
-        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        color: AppColors.cardBackground,
         boxShadow: const [
           BoxShadow(
             color: Colors.black12,
@@ -254,19 +312,34 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
         ],
       ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: ListTile(
-          leading: Icon(icon, color: const Color(0xFF145A41)),
-          title: Text(
-            title,
-            style: const TextStyle(fontFamily: 'IranYekan', fontSize: 14, fontWeight: FontWeight.w500),
-          ),
-          trailing: Icon(
-            isRtl ? Icons.arrow_back_ios_new : Icons.arrow_forward_ios, 
-            size: 14, 
-            color: Colors.black38
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Icon(icon, color: AppColors.primaryBrand, size: 24),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+                Icon(
+                  isRtl ? Icons.chevron_left : Icons.chevron_right,
+                  size: 20,
+                  color: AppColors.textSecondary.withOpacity(0.5),
+                ),
+              ],
+            ),
           ),
         ),
       ),
