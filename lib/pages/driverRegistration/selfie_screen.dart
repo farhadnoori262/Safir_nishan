@@ -1,9 +1,12 @@
 import 'dart:io';
+
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
-import 'package:safir_drivers/providers/registration_provider.dart';
-import 'package:safir_drivers/utils/lang_helper.dart'; // 👈 هیلپر زبان سفیر
+
+import '../../providers/registration_provider.dart';
+import '../../utils/app_colors.dart';
 
 class SelfieScreen extends StatefulWidget {
   const SelfieScreen({super.key});
@@ -33,7 +36,7 @@ class _SelfieScreenState extends State<SelfieScreen> {
         });
       }
     } catch (e) {
-      print("خطا در گرفتن عکس سلفی سبک: $e");
+      debugPrint("خطا در گرفتن عکس سلفی سبک: $e");
     }
   }
 
@@ -41,20 +44,30 @@ class _SelfieScreenState extends State<SelfieScreen> {
   Widget build(BuildContext context) {
     return Consumer<RegistrationProvider>(
       builder: (context, registrationProvider, child) => Scaffold(
+        backgroundColor: AppColors.background,
         appBar: AppBar(
           title: Text(
-            tr(context, 'selfie_screen_title'),
-            style: const TextStyle(fontFamily: 'IranYekan', fontSize: 16, fontWeight: FontWeight.bold),
+            'selfie_screen_title'.tr(),
+            style: const TextStyle(
+              fontSize: 16, 
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
           ),
           centerTitle: true,
+          elevation: 0,
+          backgroundColor: AppColors.cardBackground,
           actions: [
             TextButton(
               onPressed: () {
                 Navigator.pop(context);
               },
               child: Text(
-                tr(context, 'close'), 
-                style: const TextStyle(fontFamily: 'IranYekan', color: Colors.black, fontWeight: FontWeight.bold)
+                'close'.tr(), 
+                style: const TextStyle(
+                  color: AppColors.textPrimary, 
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ],
@@ -69,10 +82,10 @@ class _SelfieScreenState extends State<SelfieScreen> {
                 // بخش بارگذاری تصویر سلفی تایید هویت
                 _buildImagePicker(
                   context: context,
-                  label: tr(context, 'selfie_label'),
+                  label: 'selfie_label'.tr(),
                   imageFile: registrationProvider.cnicWithSelfieImage,
                   onPressed: () => _takeLightPhoto(registrationProvider), // استفاده از دوربین بهینه‌شده
-                  description: tr(context, 'selfie_description'),
+                  description: 'selfie_description'.tr(),
                 ),
                 const SizedBox(height: 25),
 
@@ -86,25 +99,25 @@ class _SelfieScreenState extends State<SelfieScreen> {
                             try {
                               Navigator.pop(context, true);
                             } catch (e) {
-                              print("Error while saving data: $e");
+                              debugPrint("Error while saving data: $e");
                             }
                           }
                         : null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: registrationProvider.cnicWithSelfieImage != null
-                          ? const Color(0xFF145A41) // رنگ سبز برند سفیر
+                          ? AppColors.primaryButton
                           : Colors.grey.shade400,
+                      foregroundColor: AppColors.buttonText,
+                      elevation: 0,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                     child: Text(
-                      tr(context, 'confirm_and_save'),
+                      'confirm_and_save'.tr(),
                       style: const TextStyle(
-                        fontFamily: 'IranYekan', 
-                        color: Colors.white, 
                         fontSize: 16, 
-                        fontWeight: FontWeight.bold
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
@@ -126,11 +139,15 @@ class _SelfieScreenState extends State<SelfieScreen> {
   }) {
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.black12),
-        borderRadius: BorderRadius.circular(15),
-        color: Colors.white,
-        boxShadow: const [
-          BoxShadow(color: Colors.black12, offset: Offset(0, 2), blurRadius: 6.0),
+        border: Border.all(color: Colors.grey.shade200),
+        borderRadius: BorderRadius.circular(20),
+        color: AppColors.cardBackground,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04), 
+            offset: const Offset(0, 4), 
+            blurRadius: 12.0,
+          ),
         ],
       ),
       child: Column(
@@ -140,31 +157,46 @@ class _SelfieScreenState extends State<SelfieScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: Text(
               label,
-              style: const TextStyle(fontFamily: 'IranYekan', fontSize: 15, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                fontSize: 15, 
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
             ),
           ),
           const SizedBox(height: 16),
           imageFile != null
-              ? Image.file(File(imageFile.path), height: 200, fit: BoxFit.cover)
+              ? ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.file(
+                    File(imageFile.path), 
+                    height: 200, 
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
+                )
               : Image.asset(
                   'assets/auth/selfie-with-id.png', 
                   height: 200,
-                  errorBuilder: (c, e, s) => Icon(Icons.account_box, size: 150, color: Colors.grey.shade300),
+                  errorBuilder: (c, e, s) => Icon(Icons.account_box, size: 130, color: Colors.grey.shade300),
                 ),
           const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12),
-            height: 40,
+            height: 42,
             decoration: BoxDecoration(
-              border: Border.all(color: const Color(0xFF145A41)),
+              border: Border.all(color: AppColors.primaryBrand),
               borderRadius: BorderRadius.circular(12),
             ),
             child: TextButton.icon(
               onPressed: onPressed,
-              icon: const Icon(Icons.camera_alt, color: Color(0xFF145A41)),
+              icon: const Icon(Icons.camera_alt, color: AppColors.primaryBrand),
               label: Text(
-                tr(context, 'selfie_take_photo'),
-                style: const TextStyle(fontFamily: 'IranYekan', color: Color(0xFF145A41), fontWeight: FontWeight.bold),
+                'selfie_take_photo'.tr(),
+                style: const TextStyle(
+                  color: AppColors.primaryBrand, 
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ),
@@ -174,7 +206,11 @@ class _SelfieScreenState extends State<SelfieScreen> {
             child: Text(
               description,
               textAlign: TextAlign.justify,
-              style: const TextStyle(fontFamily: 'IranYekan', fontSize: 12, color: Colors.black54, height: 1.5),
+              style: const TextStyle(
+                fontSize: 12, 
+                color: AppColors.textSecondary, 
+                height: 1.5,
+              ),
             ),
           ),
           const SizedBox(height: 20),
