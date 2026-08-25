@@ -1,17 +1,18 @@
 import 'dart:async';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:safir_drivers/pages/navigation/navigation_page.dart';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:easy_localization/easy_localization.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:easy_localization/easy_localization.dart';
 
-import 'package:safir_drivers/utils/app_colors.dart';
 import 'package:safir_drivers/controllers/navigation_controller.dart';
+import 'package:safir_drivers/pages/navigation/navigation_page.dart';
 import 'package:safir_drivers/providers/registration_provider.dart'; 
+import 'package:safir_drivers/utils/app_colors.dart';
 import '../../push_notifications/push_notification_system.dart';
 
 class HomePage extends StatefulWidget {
@@ -58,7 +59,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     await mapController!.addLine(
       LineOptions(
         geometry: points,
-        lineColor: "#1B7A57", // رنگ سبز برند سفیر
+        lineColor: "#145A41", // رنگ سبز برند سفیر
         lineWidth: 6.0,
         lineOpacity: 0.85,
       ),
@@ -90,7 +91,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     }
   }
 
-  /// 🧪 تابع شبیه‌سازی حرکت و تست راهنمای صوتی (اصلاح‌شده و بدون خطای عدد فاصله)
+  /// 🧪 تابع شبیه‌سازی حرکت و تست راهنمای صوتی
   void startSimulatedTestDrive(NavigationController navController) async {
     List<LatLng> simulatedPoints = [
       const LatLng(34.5553, 69.2075),
@@ -235,7 +236,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     positionStreamHomePage = Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
         accuracy: LocationAccuracy.bestForNavigation,
-        distanceFilter: 4, // افزایش کمی فاصله فیلتر برای جلوگیری از لرزش نقشه
+        distanceFilter: 4,
       ),
     ).listen((Position position) {
       currentPositionOfDriver = position;
@@ -335,7 +336,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       builder: (BuildContext context) {
         return Container(
           decoration: const BoxDecoration(
-            color: Colors.white,
+            color: AppColors.cardBackground,
             borderRadius: BorderRadius.only(
               topLeft: Radius.circular(28),
               topRight: Radius.circular(28),
@@ -363,13 +364,13 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               const SizedBox(height: 20),
               Container(
                 padding: const EdgeInsets.all(12),
-                decoration: const BoxDecoration(
-                  color: SafirColors.cardBgLight,
+                decoration: BoxDecoration(
+                  color: AppColors.primaryBrand.withOpacity(0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
                   Icons.power_settings_new,
-                  color: SafirColors.primary,
+                  color: AppColors.primaryBrand,
                   size: 32,
                 ),
               ),
@@ -381,7 +382,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 18,
-                  color: Colors.black87,
+                  color: AppColors.textPrimary,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -391,8 +392,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     ? 'change_to_online_desc'.tr()
                     : 'change_to_offline_desc'.tr(),
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.grey.shade600,
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
                   fontSize: 13,
                   height: 1.5,
                 ),
@@ -425,27 +426,20 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                           _saveDriverStatus(false);
                         }
                       },
-                      style: ButtonStyle(
-                        backgroundColor: WidgetStateProperty.resolveWith<Color>((states) {
-                          if (states.contains(WidgetState.pressed)) {
-                            return SafirColors.primaryButtonPressed;
-                          }
-                          return isDriverAvailable ? Colors.red.shade700 : SafirColors.primary;
-                        }),
-                        shape: WidgetStateProperty.all(
-                          RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isDriverAvailable 
+                            ? Colors.red.shade700 
+                            : AppColors.primaryButton,
+                        foregroundColor: AppColors.buttonText,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
                         ),
-                        elevation: WidgetStateProperty.all(0),
-                        padding: WidgetStateProperty.all(
-                          const EdgeInsets.symmetric(vertical: 14),
-                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
                       child: Text(
                         'confirm'.tr(),
                         style: const TextStyle(
-                          color: SafirColors.buttonTextColor, 
                           fontWeight: FontWeight.bold,
                           fontSize: 15,
                         ),
@@ -465,8 +459,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                       ),
                       child: Text(
                         'cancel'.tr(),
-                        style: TextStyle(
-                          color: Colors.grey.shade700,
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -481,23 +475,24 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       },
     );
   }
-    void openNavigationTest() {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => NavigationPage(
-        currentLocation: currentLatLng,
+
+  void openNavigationTest() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => NavigationPage(
+          currentLocation: currentLatLng,
+        ),
       ),
-    ),
-  );
- }
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final navController = Provider.of<NavigationController>(context);
 
     return Scaffold(
-      backgroundColor: SafirColors.cardBgLight,
+      backgroundColor: AppColors.background,
       body: Stack(
         children: [
           // 🗺️ نقشه MapLibre
@@ -545,14 +540,14 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                       width: 32,
                       height: 32,
                       decoration: BoxDecoration(
-                        color: SafirColors.primary,
+                        color: AppColors.primaryBrand,
                         shape: BoxShape.circle,
                         border: Border.all(color: Colors.white, width: 3),
-                        boxShadow: [
+                        boxShadow: const [
                           BoxShadow(
-                            color: Colors.black.withAlpha(64),
+                            color: Colors.black26,
                             blurRadius: 8,
-                            offset: const Offset(0, 4),
+                            offset: Offset(0, 4),
                           ),
                         ],
                       ),
@@ -580,7 +575,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                       width: isMapMoving ? 6 : 8,
                       height: isMapMoving ? 3 : 5,
                       decoration: BoxDecoration(
-                        color: Colors.black.withAlpha(isMapMoving ? 76 : 178),
+                        color: Colors.black.withOpacity(isMapMoving ? 0.3 : 0.7),
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
@@ -600,7 +595,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: SafirColors.primary,
+                    color: AppColors.primaryBrand,
                     borderRadius: BorderRadius.circular(18),
                     boxShadow: const [
                       BoxShadow(
@@ -615,7 +610,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: Colors.white.withAlpha(51),
+                          color: Colors.white.withOpacity(0.2),
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
@@ -693,7 +688,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                       borderRadius: BorderRadius.circular(30),
                       boxShadow: [
                         BoxShadow(
-                          color: (isDriverAvailable ? Colors.red.shade900 : SafirColors.primary).withAlpha(76),
+                          color: (isDriverAvailable ? Colors.red.shade900 : AppColors.primaryBrand).withOpacity(0.3),
                           blurRadius: 16,
                           offset: const Offset(0, 6),
                         ),
@@ -701,22 +696,14 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     ),
                     child: ElevatedButton(
                       onPressed: _showStatusChangeModal,
-                      style: ButtonStyle(
-                        backgroundColor: WidgetStateProperty.resolveWith<Color>((states) {
-                          if (states.contains(WidgetState.pressed)) {
-                            return SafirColors.primaryButtonPressed;
-                          }
-                          return isDriverAvailable ? Colors.red.shade600 : SafirColors.primary;
-                        }),
-                        padding: WidgetStateProperty.all(
-                          const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isDriverAvailable ? Colors.red.shade600 : AppColors.primaryBrand,
+                        foregroundColor: AppColors.buttonText,
+                        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
                         ),
-                        shape: WidgetStateProperty.all(
-                          RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(30),
-                          ),
-                        ),
-                        elevation: WidgetStateProperty.all(0),
+                        elevation: 0,
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -726,7 +713,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                             height: 10,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: isDriverAvailable ? SafirColors.success : Colors.white70,
+                              color: isDriverAvailable ? Colors.greenAccent : Colors.white70,
                             ),
                           ),
                           const SizedBox(width: 10),
@@ -735,7 +722,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                                 ? 'status_offline_btn'.tr() 
                                 : 'status_online_btn'.tr(),
                             style: const TextStyle(
-                              color: SafirColors.buttonTextColor, 
                               fontWeight: FontWeight.bold,
                               fontSize: 16,
                             ),
@@ -749,26 +735,26 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             ),
 
           // 🧭 دکمه تست صفحه مسیریابی
-Positioned(
-  bottom: 90,
-  right: 20,
-  child: FloatingActionButton.extended(
-    heroTag: 'navigation_test_btn',
-    onPressed: openNavigationTest,
-    backgroundColor: SafirColors.primary,
-    icon: const Icon(
-      Icons.navigation,
-      color: Colors.white,
-    ),
-    label: const Text(
-      'مسیریابی',
-      style: TextStyle(
-        color: Colors.white,
-        fontWeight: FontWeight.bold,
-      ),
-    ),
-  ),
-),
+          Positioned(
+            bottom: 90,
+            right: 20,
+            child: FloatingActionButton.extended(
+              heroTag: 'navigation_test_btn',
+              onPressed: openNavigationTest,
+              backgroundColor: AppColors.primaryBrand,
+              icon: const Icon(
+                Icons.navigation,
+                color: Colors.white,
+              ),
+              label: Text(
+                'navigation_test_btn'.tr(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
 
           // 🎯 دکمه GPS
           Positioned(
@@ -777,10 +763,10 @@ Positioned(
             child: FloatingActionButton(
               heroTag: 'recenter_btn',
               onPressed: getCurrentLiveLocationOfDriver,
-              backgroundColor: Colors.white,
+              backgroundColor: AppColors.cardBackground,
               elevation: 4,
               shape: const CircleBorder(),
-              child: const Icon(Icons.my_location, color: SafirColors.primary, size: 26),
+              child: const Icon(Icons.my_location, color: AppColors.primaryBrand, size: 26),
             ),
           ),
         ],
