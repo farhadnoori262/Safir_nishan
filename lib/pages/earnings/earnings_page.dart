@@ -1,7 +1,9 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:safir_drivers/providers/registration_provider.dart';
-import 'package:safir_drivers/utils/lang_helper.dart'; // 👈 هیلپر زبان سفیر
+
+import '../../providers/registration_provider.dart';
+import '../../utils/app_colors.dart';
 
 class EarningsPage extends StatefulWidget {
   const EarningsPage({super.key});
@@ -23,82 +25,112 @@ class _EarningsPageState extends State<EarningsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Scaffold(
-        backgroundColor: const Color(0xFF145A41), // رنگ برند سفیر
-        body: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Center(
-              child: Container(
-                color: const Color(0xFF145A41),
-                width: 300,
-                child: Padding(
-                  padding: const EdgeInsets.all(18.0),
-                  child: Column(
-                    children: [
-                      // تصویر پیش‌فرض درآمد
-                      Image.asset(
-                        "assets/images/totalearnings.png",
-                        width: 120,
-                        errorBuilder: (c, e, s) => const Icon(
-                          Icons.account_balance_wallet,
-                          size: 100,
-                          color: Colors.white70,
-                        ),
-                      ),
-                      const SizedBox(height: 15),
-                      Text(
-                        tr(context, 'total_earnings_title'),
-                        style: const TextStyle(
-                          fontFamily: 'IranYekan',
-                          color: Colors.white70,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Consumer<RegistrationProvider>(
-                        builder: (context, provider, child) {
-                          // بررسی در حال بارگذاری بودن اطلاعات از دیتابیس
-                          if (provider.driverEarnings == null) {
-                            return const CircularProgressIndicator(
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                            );
-                          } else {
-                            return Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.baseline,
-                              textBaseline: TextBaseline.alphabetic,
-                              children: [
-                                Text(
-                                  "${provider.driverEarnings}",
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 32,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(width: 5),
-                                Text(
-                                  tr(context, 'currency_unit'),
-                                  style: const TextStyle(
-                                    fontFamily: 'IranYekan',
-                                    color: Colors.white,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
-                            );
-                          }
-                        },
-                      ),
-                    ],
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: Text(
+          'earnings_screen_title'.tr(),
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        centerTitle: true,
+        backgroundColor: AppColors.cardBackground,
+        elevation: 0,
+      ),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Container(
+            width: double.infinity,
+            maxWidth: 340,
+            padding: const EdgeInsets.symmetric(vertical: 32.0, horizontal: 24.0),
+            decoration: BoxDecoration(
+              color: AppColors.cardBackground,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.grey.shade200),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  offset: const Offset(0, 4),
+                  blurRadius: 12.0,
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // تصویر پیش‌فرض درآمد
+                Image.asset(
+                  "assets/images/totalearnings.png",
+                  width: 120,
+                  height: 120,
+                  errorBuilder: (c, e, s) => Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryBrand.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.account_balance_wallet,
+                      size: 64,
+                      color: AppColors.primaryBrand,
+                    ),
                   ),
                 ),
-              ),
+                const SizedBox(height: 20),
+                Text(
+                  'total_earnings_title'.tr(),
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Consumer<RegistrationProvider>(
+                  builder: (context, provider, child) {
+                    // بررسی در حال بارگذاری بودن اطلاعات از دیتابیس
+                    if (provider.driverEarnings == null) {
+                      return const Padding(
+                        padding: EdgeInsets.all(8.0),
+                        child: CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryBrand),
+                        ),
+                      );
+                    } else {
+                      return Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text(
+                            "${provider.driverEarnings}",
+                            style: const TextStyle(
+                              color: AppColors.primaryBrand,
+                              fontSize: 34,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'currency_unit'.tr(),
+                            style: const TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      );
+                    }
+                  },
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
