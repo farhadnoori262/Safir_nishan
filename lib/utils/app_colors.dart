@@ -1,16 +1,34 @@
 import 'package:flutter/material.dart';
 
-class SafirColors {
-  // رنگ‌های اصلی شما
-  static const Color primaryButton = Color(0xFF1B7A57);
-  static const Color buttonPressed = Color(0xFF0F4A35);
-  static const Color cardBgLight = Color(0xFFEAF6F1);
-  static const Color successColor = Color(0xFF22C55E);
-  static const Color buttonTextColor = Color(0xFFFFFFFF);
-  static const Color brandDark = Color(0xFF145A41);
+class AppColors {
+  AppColors._();
 
-  // 📌 معادل‌ها (جهت رفع خطای Build در HomePage)
-  static const Color primary = primaryButton;
-  static const Color primaryButtonPressed = buttonPressed;
-  static const Color success = successColor;
+  // 🟢 برند و هویت visual
+  static const Color primaryBrand = Color(0xFF1B7A57);
+
+  // 🟩 دکمه اصلی و حالت‌های لمس
+  static const Color primaryButton = Color(0xFF169365);
+  static const Color primaryButtonPressed = Color(0xFF0F4A35);
+  static const Color primaryPressed = Color(0xFF0F4A35);
+  static const Color buttonPressed = Color(0xFF0F4A35);
+
+  // 📦 پس‌زمینه‌ها و کارت‌ها
+  static const Color cardBackground = Color(0xFFEAF6F1);
+  static const Color cardLightBg = Color(0xFFEAF6F1);
+  static const Color cardBgLight = Color(0xFFFFFFFF);
+  static const Color backgroundLight = Color(0xFFF8F9FA);
+  static const Color borderLight = Color(0xFFE0E0E0);
+
+  // ✅ وضعیت‌ها
+  static const Color success = Color(0xFF22C55E);
+  static const Color error = Color(0xFFEF4444);
+
+  // 📝 متن‌ها و آیکون‌ها
+  static const Color buttonText = Color(0xFFFFFFFF);
+  static const Color textPrimary = Color(0xFF212121);
+  static const Color textSecondary = Color(0xFF757575);
+  static const Color iconSecondary = Color(0xFF757575);
+
+  // 📍 نقشه
+  static const Color originBlue = Color(0xFF2563EB);
 }
