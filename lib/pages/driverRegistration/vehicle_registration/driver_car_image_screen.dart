@@ -1,9 +1,12 @@
 import 'dart:io';
+
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
-import 'package:safir_drivers/providers/registration_provider.dart';
-import 'package:safir_drivers/utils/lang_helper.dart'; // 👈 هیلپر زبان سفیر
+
+import '../../providers/registration_provider.dart';
+import '../../utils/app_colors.dart';
 
 class DriverCarImageScreeen extends StatefulWidget {
   const DriverCarImageScreeen({super.key});
@@ -20,20 +23,20 @@ class _DriverCarImageScreeenState extends State<DriverCarImageScreeen> {
     try {
       final XFile? pickedFile = await _picker.pickImage(
         source: ImageSource.camera,
-        maxWidth: 600,       // فشرده‌سازی عرض عکس
-        maxHeight: 600,      // فشرده‌سازی ارتفاع عکس
-        imageQuality: 40,    // کاهش کیفیت به ۴۰٪ برای سبک شدن فوق‌العاده فایل
+        maxWidth: 600, // فشرده‌سازی عرض عکس
+        maxHeight: 600, // فشرده‌سازی ارتفاع عکس
+        imageQuality: 40, // کاهش کیفیت به ۴۰٪ برای سبک شدن فوق‌العاده فایل
       );
 
       if (pickedFile != null) {
         setState(() {
           provider.vehicleImage = pickedFile;
-          // تغییر دادن وضعیت فلگ اضافه شدن عکس در پرووایدر (اگر متغیر متناظری دارد)
-          provider.isVehiclePhotoAdded = true; 
+          // تغییر دادن وضعیت فلگ اضافه شدن عکس در پرووایدر
+          provider.isVehiclePhotoAdded = true;
         });
       }
     } catch (e) {
-      print("Error taking vehicle photo: $e");
+      debugPrint("Error taking vehicle photo: $e");
     }
   }
 
@@ -41,20 +44,29 @@ class _DriverCarImageScreeenState extends State<DriverCarImageScreeen> {
   Widget build(BuildContext context) {
     return Consumer<RegistrationProvider>(
       builder: (context, registrationProvider, child) => Scaffold(
+        backgroundColor: AppColors.background,
         appBar: AppBar(
           title: Text(
-            tr(context, 'vehicle_image_title'),
-            style: const TextStyle(fontFamily: 'IranYekan', fontWeight: FontWeight.bold),
+            'vehicle_image_title'.tr(),
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
           ),
           centerTitle: true,
+          elevation: 0,
+          backgroundColor: AppColors.cardBackground,
           actions: [
             TextButton(
               onPressed: () {
                 Navigator.pop(context);
               },
               child: Text(
-                tr(context, 'close'), 
-                style: const TextStyle(fontFamily: 'IranYekan', color: Colors.black, fontWeight: FontWeight.bold)
+                'close'.tr(),
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ],
@@ -69,7 +81,7 @@ class _DriverCarImageScreeenState extends State<DriverCarImageScreeen> {
                 // بخش انتخاب تصویر موتر/موتورسایکل راننده با دوربین سبک جدید
                 _buildImagePicker(
                   context,
-                  tr(context, 'vehicle_image_hint'),
+                  'vehicle_image_hint'.tr(),
                   registrationProvider.vehicleImage,
                   () => _takeLightCarPhoto(registrationProvider), // فراخوانی دوربین سبک
                 ),
@@ -85,25 +97,25 @@ class _DriverCarImageScreeenState extends State<DriverCarImageScreeen> {
                             try {
                               Navigator.pop(context, true);
                             } catch (e) {
-                              print("Error while saving data: $e");
+                              debugPrint("Error while saving data: $e");
                             }
                           }
                         : null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: registrationProvider.isVehiclePhotoAdded
-                          ? const Color(0xFF145A41) // رنگ سبز اختصاصی سفیر
+                          ? AppColors.primaryButton
                           : Colors.grey.shade400,
+                      foregroundColor: AppColors.buttonText,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(12),
                       ),
+                      elevation: 0,
                     ),
                     child: Text(
-                      tr(context, 'confirm_and_save'),
+                      'confirm_and_save'.tr(),
                       style: const TextStyle(
-                        fontFamily: 'IranYekan', 
-                        color: Colors.white, 
-                        fontSize: 16, 
-                        fontWeight: FontWeight.bold
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
@@ -118,21 +130,21 @@ class _DriverCarImageScreeenState extends State<DriverCarImageScreeen> {
 
   // ویجت سفارشی‌سازی شده برای کادر انتخاب تصویر
   Widget _buildImagePicker(
-    BuildContext context, 
-    String label, 
+    BuildContext context,
+    String label,
     XFile? imageFile,
     VoidCallback onPressed,
   ) {
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.black12),
-        borderRadius: BorderRadius.circular(15),
-        color: Colors.white,
-        boxShadow: const [
+        border: Border.all(color: Colors.grey.shade200),
+        borderRadius: BorderRadius.circular(20),
+        color: AppColors.cardBackground,
+        boxShadow: [
           BoxShadow(
-            color: Colors.black12, 
-            offset: Offset(0, 2), 
-            blurRadius: 6.0
+            color: Colors.black.withOpacity(0.04),
+            offset: const Offset(0, 4),
+            blurRadius: 12.0,
           ),
         ],
       ),
@@ -144,33 +156,47 @@ class _DriverCarImageScreeenState extends State<DriverCarImageScreeen> {
             child: Text(
               label,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontFamily: 'IranYekan', fontSize: 14, color: Colors.black87),
+              style: const TextStyle(
+                fontSize: 14,
+                color: AppColors.textPrimary,
+              ),
             ),
           ),
           const SizedBox(height: 16),
-          
+
           // نمایش عکس گرفته‌شده یا آیکون پیش‌فرض
           imageFile != null
-              ? Image.file(File(imageFile.path), height: 160, fit: BoxFit.cover)
-              : Icon(Icons.directions_car, size: 120, color: Colors.grey.shade400),
-              
-          const SizedBox(height: 16),
+              ? ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.file(
+                    File(imageFile.path),
+                    height: 180,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
+                )
+              : Icon(
+                  Icons.directions_car,
+                  size: 100,
+                  color: Colors.grey.shade300,
+                ),
+
+          const SizedBox(height: 20),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            height: 42,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            height: 44,
             decoration: BoxDecoration(
-              border: Border.all(color: const Color(0xFF145A41)), // مرز سبز سفیر
+              border: Border.all(color: AppColors.primaryBrand),
               borderRadius: BorderRadius.circular(12),
             ),
             child: TextButton.icon(
               onPressed: onPressed,
-              icon: const Icon(Icons.camera_alt, color: Color(0xFF145A41)),
+              icon: const Icon(Icons.camera_alt, color: AppColors.primaryBrand),
               label: Text(
-                tr(context, 'take_photo_camera'),
+                'take_photo_camera'.tr(),
                 style: const TextStyle(
-                  fontFamily: 'IranYekan', 
-                  color: Color(0xFF145A41), 
-                  fontWeight: FontWeight.bold
+                  color: AppColors.primaryBrand,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ),
