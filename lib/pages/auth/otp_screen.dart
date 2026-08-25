@@ -1,16 +1,18 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:pinput/pinput.dart';
 import 'package:provider/provider.dart';
-import 'package:safir_drivers/methods/common_method.dart';
-import 'package:safir_drivers/pages/dashboard.dart';
-import 'package:safir_drivers/pages/driverRegistration/driver_registration.dart';
-import 'package:safir_drivers/providers/auth_provider.dart';
-import 'package:safir_drivers/widgets/blocked_screen.dart';
-import 'package:safir_drivers/utils/lang_helper.dart'; // 👈 هیلپر زبان
+
+import '../../methods/common_method.dart';
+import '../../pages/dashboard.dart';
+import '../../pages/driverRegistration/driver_registration.dart';
+import '../../providers/auth_provider.dart';
+import '../../utils/app_colors.dart';
+import '../../widgets/blocked_screen.dart';
 
 class OTPScreen extends StatefulWidget {
   final String verificationId;
-  const OTPScreen({Key? key, required this.verificationId}) : super(key: key);
+  const OTPScreen({super.key, required this.verificationId});
 
   @override
   State<OTPScreen> createState() => _OTPScreenState();
@@ -33,21 +35,20 @@ class _OTPScreenState extends State<OTPScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    tr(context, 'otp_title'),
+                    'otp_title'.tr(),
                     style: const TextStyle(
-                      fontFamily: 'IranYekan',
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    tr(context, 'otp_subtitle'),
+                    'otp_subtitle'.tr(),
                     textAlign: TextAlign.center,
                     style: const TextStyle(
-                      fontFamily: 'IranYekan',
                       fontSize: 14,
-                      color: Colors.grey,
+                      color: AppColors.textSecondary,
                     ),
                   ),
                   const SizedBox(height: 30),
@@ -60,13 +61,28 @@ class _OTPScreenState extends State<OTPScreen> {
                       width: 50,
                       height: 55,
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(12),
                         color: Colors.grey.shade100,
-                        border: Border.all(color: Colors.grey.shade400),
+                        border: Border.all(color: Colors.grey.shade300),
                       ),
                       textStyle: const TextStyle(
-                        fontSize: 20, 
+                        fontSize: 20,
                         fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    focusedPinTheme: PinTheme(
+                      width: 50,
+                      height: 55,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        color: Colors.white,
+                        border: Border.all(color: AppColors.primaryBrand, width: 2),
+                      ),
+                      textStyle: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                     onCompleted: (value) {
@@ -84,7 +100,7 @@ class _OTPScreenState extends State<OTPScreen> {
                   // نمایش وضعیت در حال بررسی
                   authRepo.isLoading
                       ? const CircularProgressIndicator(
-                          color: Color(0xFF145A41), // رنگ سبز سفیر
+                          color: AppColors.primaryBrand,
                         )
                       : const SizedBox.shrink(),
 
@@ -99,7 +115,7 @@ class _OTPScreenState extends State<OTPScreen> {
                           ),
                           child: const Icon(
                             Icons.done,
-                            color: Colors.white,
+                            color: AppColors.buttonText,
                             size: 30,
                           ),
                         )
@@ -108,10 +124,10 @@ class _OTPScreenState extends State<OTPScreen> {
                   const SizedBox(height: 25),
 
                   Text(
-                    tr(context, 'didnt_receive_code'),
+                    'didnt_receive_code'.tr(),
                     style: const TextStyle(
-                      fontFamily: 'IranYekan',
                       fontSize: 14,
+                      color: AppColors.textPrimary,
                     ),
                   ),
 
@@ -119,25 +135,25 @@ class _OTPScreenState extends State<OTPScreen> {
 
                   // دکمه ارسال مجدد کد دسترسی
                   SizedBox(
-                    width: MediaQuery.of(context).size.width * 0.4,
+                    width: MediaQuery.of(context).size.width * 0.45,
                     height: 45,
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.grey.shade300,
+                        backgroundColor: Colors.grey.shade200,
+                        foregroundColor: AppColors.textPrimary,
                         elevation: 0,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
                       onPressed: () {
                         // ارسال مجدد کد در صورت نیاز
                       },
                       child: Text(
-                        tr(context, 'resend_code'),
+                        'resend_code'.tr(),
                         style: const TextStyle(
-                          fontFamily: 'IranYekan',
                           fontSize: 14,
-                          color: Colors.black87,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
@@ -189,7 +205,7 @@ class _OTPScreenState extends State<OTPScreen> {
             try {
               await authProvider.getUserDataFromFirebaseDatabase();
             } catch (e) {
-              print("خطا در دریافت اطلاعات راننده: $e");
+              debugPrint("خطا در دریافت اطلاعات راننده: $e");
             }
 
             // ۴. بررسی پر بودن مدارک
@@ -206,7 +222,7 @@ class _OTPScreenState extends State<OTPScreen> {
               navigate(isSignedIn: false);
               if (!mounted) return;
               commonMethods.displaySnackBar(
-                "لطفاً مدارک خود را تکمیل کنید",
+                'please_complete_documents'.tr(),
                 context,
               );
             }
@@ -216,7 +232,7 @@ class _OTPScreenState extends State<OTPScreen> {
           }
         } catch (globalError) {
           // 🚀 اگر هر خطای پیش‌بینی نشده‌ای رخ داد، برنامه قفل نشود و مستقیم به صفحه ثبت‌نام برود
-          print("خطای کلی در ورود: $globalError");
+          debugPrint("خطای کلی در ورود: $globalError");
           navigate(isSignedIn: false);
         }
       },
