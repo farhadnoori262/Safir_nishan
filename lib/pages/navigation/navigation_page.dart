@@ -74,6 +74,20 @@ class _NavigationPageState extends State<NavigationPage>
 
   int _lastRouteVersion = 0;
 
+  /// 🌙 متد هوشمند تشخیص حالت تاریک نقشه بر اساس ساعت دستگاه
+  String get _currentMapStyle {
+    final hour = DateTime.now().hour;
+    final isNight = hour >= 19 || hour < 6;
+
+    if (isNight) {
+      // استایل تاریک استاندارد شب
+      return 'https://tiles.stadiamaps.com/styles/alidade_smooth_dark.json';
+    } else {
+      // استایل اختصاصی و رنگی خودتان برای روز
+      return 'assets/map/style.json';
+    }
+  }
+
   LatLng get _startLocation =>
       widget.pickupLocation ??
       _currentLocation ??
@@ -1086,7 +1100,7 @@ class _NavigationPageState extends State<NavigationPage>
                 });
               }
             },
-            styleString: 'assets/map/style.json',
+            styleString: _currentMapStyle, // 👈 متصل به متد هوشمند تم روز/شب
             initialCameraPosition: CameraPosition(
               target: _startLocation,
               zoom: 16.0,
