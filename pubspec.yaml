@@ -73,8 +73,18 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
+  # 👈 معرفی فونت ایران یکان با وزن‌های مختلف
+  fonts:
+    - family: IranYekan
+      fonts:
+        - asset: assets/fonts/iranyekanwebregular.ttf
+          weight: 400
+        - asset: assets/fonts/iranyekanwebbold.ttf
+          weight: 700
+
   assets:
     - assets/translations/
     - assets/map/style.json
     - assets/audio/fa/
     - assets/images/
+    - assets/fonts/ # 👈 اضافه کردن پوشه فونت به بخش assets
