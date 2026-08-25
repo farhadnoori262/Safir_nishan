@@ -1,9 +1,12 @@
 import 'dart:io';
+
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
-import 'package:safir_drivers/providers/registration_provider.dart';
-import 'package:safir_drivers/utils/lang_helper.dart';
+
+import '../../providers/registration_provider.dart';
+import '../../utils/app_colors.dart';
 
 class VehicleRegistrationScreen extends StatefulWidget {
   const VehicleRegistrationScreen({super.key});
@@ -34,7 +37,6 @@ class _VehicleRegistrationScreenState extends State<VehicleRegistrationScreen> {
           } else {
             provider.vehicleRegistrationBackImage = pickedFile;
           }
-          // در صورت وجود متد اعتبارسنجی کلی در پرووایدر، وضعیت فرم را بروزرسانی می‌کند
           if (provider.vehicleRegistrationFrontImage != null && 
               provider.vehicleRegistrationBackImage != null) {
             provider.notifyListeners(); 
@@ -42,7 +44,7 @@ class _VehicleRegistrationScreenState extends State<VehicleRegistrationScreen> {
         });
       }
     } catch (e) {
-      print("Error picking vehicle image: $e");
+      debugPrint("Error picking vehicle image: $e");
     }
   }
 
@@ -50,28 +52,30 @@ class _VehicleRegistrationScreenState extends State<VehicleRegistrationScreen> {
   Widget build(BuildContext context) {
     return Consumer<RegistrationProvider>(
       builder: (context, registrationProvider, child) => Scaffold(
+        backgroundColor: AppColors.background,
         appBar: AppBar(
           title: Text(
-            tr(context, 'vehicle_registration_title'),
+            'vehicle_registration_title'.tr(),
             style: const TextStyle(
-              fontFamily: 'IranYekan', 
               fontSize: 16, 
-              fontWeight: FontWeight.bold
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
             ),
           ),
           centerTitle: true,
+          elevation: 0,
+          backgroundColor: AppColors.cardBackground,
           actions: [
             TextButton(
               onPressed: () {
                 Navigator.pop(context);
               },
               child: Text(
-                tr(context, 'close'), 
+                'close'.tr(), 
                 style: const TextStyle(
-                  fontFamily: 'IranYekan', 
-                  color: Colors.black, 
-                  fontWeight: FontWeight.bold
-                )
+                  color: AppColors.textPrimary, 
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ],
@@ -89,9 +93,9 @@ class _VehicleRegistrationScreenState extends State<VehicleRegistrationScreen> {
                   // بارگذاری تصویر روی کارت موتر
                   _buildImagePicker(
                     context: context,
-                    label: tr(context, 'registration_front_title'),
+                    label: 'registration_front_title'.tr(),
                     imageFile: registrationProvider.vehicleRegistrationFrontImage,
-                    buttonText: tr(context, 'take_photo_front'),
+                    buttonText: 'take_photo_front'.tr(),
                     defaultAssetPath: 'assets/auth/cnic-front.png',
                     onPressed: () => _pickLightImage(true, registrationProvider),
                   ),
@@ -100,9 +104,9 @@ class _VehicleRegistrationScreenState extends State<VehicleRegistrationScreen> {
                   // بارگذاری تصویر پشت کارت موتر
                   _buildImagePicker(
                     context: context,
-                    label: tr(context, 'registration_back_title'),
+                    label: 'registration_back_title'.tr(),
                     imageFile: registrationProvider.vehicleRegistrationBackImage,
-                    buttonText: tr(context, 'take_photo_back'),
+                    buttonText: 'take_photo_back'.tr(),
                     defaultAssetPath: 'assets/auth/cnic-back.png',
                     onPressed: () => _pickLightImage(false, registrationProvider),
                   ),
@@ -120,7 +124,7 @@ class _VehicleRegistrationScreenState extends State<VehicleRegistrationScreen> {
                                 try {
                                   Navigator.pop(context, true);
                                 } catch (e) {
-                                  print("Error while saving data: $e");
+                                  debugPrint("Error while saving data: $e");
                                 }
                               }
                             }
@@ -128,19 +132,19 @@ class _VehicleRegistrationScreenState extends State<VehicleRegistrationScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: registrationProvider.vehicleRegistrationFrontImage != null &&
                                 registrationProvider.vehicleRegistrationBackImage != null
-                            ? const Color(0xFF145A41) // رنگ برند سفیر
+                            ? AppColors.primaryButton
                             : Colors.grey.shade400,
+                        foregroundColor: AppColors.buttonText,
+                        elevation: 0,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
                       child: Text(
-                        tr(context, 'confirm_and_save_final'),
+                        'confirm_and_save_final'.tr(),
                         style: const TextStyle(
-                          fontFamily: 'IranYekan', 
-                          color: Colors.white, 
                           fontSize: 16, 
-                          fontWeight: FontWeight.bold
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
@@ -165,11 +169,15 @@ class _VehicleRegistrationScreenState extends State<VehicleRegistrationScreen> {
   }) {
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.black12),
-        borderRadius: BorderRadius.circular(15),
-        color: Colors.white,
-        boxShadow: const [
-          BoxShadow(color: Colors.black12, offset: Offset(0, 2), blurRadius: 6.0),
+        border: Border.all(color: Colors.grey.shade200),
+        borderRadius: BorderRadius.circular(20),
+        color: AppColors.cardBackground,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04), 
+            offset: const Offset(0, 4), 
+            blurRadius: 12.0,
+          ),
         ],
       ),
       child: Column(
@@ -180,31 +188,46 @@ class _VehicleRegistrationScreenState extends State<VehicleRegistrationScreen> {
             child: Text(
               label,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontFamily: 'IranYekan', fontSize: 13, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                fontSize: 13, 
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
             ),
           ),
           const SizedBox(height: 16),
           imageFile != null
-              ? Image.file(File(imageFile.path), height: 150, fit: BoxFit.cover)
+              ? ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.file(
+                    File(imageFile.path), 
+                    height: 150, 
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
+                )
               : Image.asset(
                   defaultAssetPath, 
                   height: 150,
-                  errorBuilder: (c, e, s) => Icon(Icons.credit_card, size: 120, color: Colors.grey.shade300),
+                  errorBuilder: (c, e, s) => Icon(Icons.credit_card, size: 100, color: Colors.grey.shade300),
                 ),
           const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12),
-            height: 40,
+            height: 42,
             decoration: BoxDecoration(
-              border: Border.all(color: const Color(0xFF145A41)),
+              border: Border.all(color: AppColors.primaryBrand),
               borderRadius: BorderRadius.circular(12),
             ),
             child: TextButton.icon(
               onPressed: onPressed,
-              icon: const Icon(Icons.camera_alt, color: Color(0xFF145A41)),
+              icon: const Icon(Icons.camera_alt, color: AppColors.primaryBrand),
               label: Text(
                 buttonText,
-                style: const TextStyle(fontFamily: 'IranYekan', color: Color(0xFF145A41), fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  color: AppColors.primaryBrand, 
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ),
