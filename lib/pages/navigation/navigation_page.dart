@@ -1086,7 +1086,7 @@ class _NavigationPageState extends State<NavigationPage>
     super.dispose();
   }
 
-  @override
+    @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Stack(
@@ -1113,7 +1113,7 @@ class _NavigationPageState extends State<NavigationPage>
             ),
             myLocationEnabled: true,
             myLocationTrackingMode: MyLocationTrackingMode.tracking,
-           trackCameraPosition: true,
+            trackCameraPosition: true,
           ),
 
           if (_isLoadingLocation)
@@ -1136,7 +1136,6 @@ class _NavigationPageState extends State<NavigationPage>
               ),
             ),
 
-
           if (!_navigationStarted)
             Positioned(
               top: 16,
@@ -1156,14 +1155,13 @@ class _NavigationPageState extends State<NavigationPage>
                     ),
                   ),
                   onPressed: () {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => const RegisterScreen(),
-    ),
-  );
-},
-
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const RegisterScreen(),
+                      ),
+                    );
+                  },
                   icon: const Icon(
                     Icons.person_add_alt_1_rounded,
                     size: 20,
@@ -1179,7 +1177,7 @@ class _NavigationPageState extends State<NavigationPage>
               ),
             ),
 
-                    Positioned(
+          Positioned(
             right: 16,
             bottom: _navigationStarted ? 140 : 260,
             child: SafeArea(
@@ -1211,15 +1209,22 @@ class _NavigationPageState extends State<NavigationPage>
                     icon: Icons.my_location_rounded,
                     tooltip: 'موقعیت من',
                     iconColor: SafirColors.primary,
-                    onPressed: () {
+                    onPressed: () async {
                       if (_navigationStarted) {
                         _followDriver();
-                      } else if (_currentLocation != null) {
-                        _moveCameraToLocation(
-                          _currentLocation!,
-                          zoom: 16.5,
-                          tilt: 35.0,
-                        );
+                      } else {
+                        if (_mapController != null) {
+                          await _mapController!.updateMyLocationTrackingMode(
+                            MyLocationTrackingMode.tracking,
+                          );
+                        }
+                        if (_currentLocation != null) {
+                          _moveCameraToLocation(
+                            _currentLocation!,
+                            zoom: 16.5,
+                            tilt: 35.0,
+                          );
+                        }
                       }
                     },
                   ),
@@ -1227,7 +1232,6 @@ class _NavigationPageState extends State<NavigationPage>
               ),
             ),
           ),
-
 
           if (_navigationStarted && !_cameraFollowing)
             Positioned(
@@ -1435,7 +1439,7 @@ class _NavigationPageState extends State<NavigationPage>
       ),
     );
   }
-}
+
 
 class _MapActionButton extends StatelessWidget {
   final IconData icon;
