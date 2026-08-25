@@ -1,7 +1,9 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:safir_drivers/providers/registration_provider.dart';
-import 'package:safir_drivers/utils/lang_helper.dart';
+
+import '../../providers/registration_provider.dart';
+import '../../utils/app_colors.dart';
 
 class VehicleBasicInfoScreen extends StatefulWidget {
   const VehicleBasicInfoScreen({super.key});
@@ -18,7 +20,7 @@ class _VehicleBasicInfoScreenState extends State<VehicleBasicInfoScreen> {
     const english = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
     const farsi = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
     const arabic = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
-    
+
     for (int i = 0; i < 10; i++) {
       input = input.replaceAll(farsi[i], english[i]);
       input = input.replaceAll(arabic[i], english[i]);
@@ -30,18 +32,27 @@ class _VehicleBasicInfoScreenState extends State<VehicleBasicInfoScreen> {
   Widget build(BuildContext context) {
     return Consumer<RegistrationProvider>(
       builder: (context, registrationProvider, child) => Scaffold(
+        backgroundColor: AppColors.background,
         appBar: AppBar(
           title: Text(
-            tr(context, 'vehicle_info_title'),
-            style: const TextStyle(fontFamily: 'IranYekan', fontWeight: FontWeight.bold),
+            'vehicle_info_title'.tr(),
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
           ),
           centerTitle: true,
+          elevation: 0,
+          backgroundColor: AppColors.cardBackground,
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
               child: Text(
-                tr(context, 'close'),
-                style: const TextStyle(fontFamily: 'IranYekan', color: Colors.black, fontWeight: FontWeight.bold),
+                'close'.tr(),
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ],
@@ -53,7 +64,7 @@ class _VehicleBasicInfoScreenState extends State<VehicleBasicInfoScreen> {
               key: _formKey,
               onChanged: () {
                 registrationProvider.checkVehicleBasicFormValidity();
-              }, 
+              },
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -61,20 +72,21 @@ class _VehicleBasicInfoScreenState extends State<VehicleBasicInfoScreen> {
                   Container(
                     margin: const EdgeInsets.symmetric(vertical: 10),
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.black12),
-                      borderRadius: BorderRadius.circular(15),
-                      color: Colors.white,
-                      boxShadow: const [
+                      border: Border.all(color: Colors.grey.shade200),
+                      borderRadius: BorderRadius.circular(20),
+                      color: AppColors.cardBackground,
+                      boxShadow: [
                         BoxShadow(
-                          color: Colors.black12,
-                          offset: Offset(0, 2),
-                          blurRadius: 6.0,
+                          color: Colors.black.withOpacity(0.04),
+                          offset: const Offset(0, 4),
+                          blurRadius: 12.0,
                         ),
                       ],
                     ),
                     child: Column(
                       children: [
                         CheckboxListTile(
+                          activeColor: AppColors.primaryBrand,
                           title: Row(
                             children: [
                               Image.asset(
@@ -84,7 +96,13 @@ class _VehicleBasicInfoScreenState extends State<VehicleBasicInfoScreen> {
                                 errorBuilder: (c, e, s) => const Icon(Icons.directions_car, size: 40, color: Colors.grey),
                               ),
                               const SizedBox(width: 10),
-                              Text(tr(context, 'vehicle_car'), style: const TextStyle(fontFamily: 'IranYekan', fontSize: 15)),
+                              Text(
+                                'vehicle_car'.tr(),
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
                             ],
                           ),
                           value: registrationProvider.selectedVehicle == "Car",
@@ -96,6 +114,7 @@ class _VehicleBasicInfoScreenState extends State<VehicleBasicInfoScreen> {
                         ),
                         const SizedBox(height: 5),
                         CheckboxListTile(
+                          activeColor: AppColors.primaryBrand,
                           title: Row(
                             children: [
                               Image.asset(
@@ -105,7 +124,13 @@ class _VehicleBasicInfoScreenState extends State<VehicleBasicInfoScreen> {
                                 errorBuilder: (c, e, s) => const Icon(Icons.motorcycle, size: 40, color: Colors.grey),
                               ),
                               const SizedBox(width: 10),
-                              Text(tr(context, 'vehicle_bike'), style: const TextStyle(fontFamily: 'IranYekan', fontSize: 15)),
+                              Text(
+                                'vehicle_bike'.tr(),
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
                             ],
                           ),
                           value: registrationProvider.selectedVehicle == "Bike",
@@ -117,6 +142,7 @@ class _VehicleBasicInfoScreenState extends State<VehicleBasicInfoScreen> {
                         ),
                         const SizedBox(height: 5),
                         CheckboxListTile(
+                          activeColor: AppColors.primaryBrand,
                           title: Row(
                             children: [
                               Image.asset(
@@ -126,7 +152,13 @@ class _VehicleBasicInfoScreenState extends State<VehicleBasicInfoScreen> {
                                 errorBuilder: (c, e, s) => const Icon(Icons.local_taxi, size: 40, color: Colors.grey),
                               ),
                               const SizedBox(width: 10),
-                              Text(tr(context, 'vehicle_auto'), style: const TextStyle(fontFamily: 'IranYekan', fontSize: 15)),
+                              Text(
+                                'vehicle_auto'.tr(),
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
                             ],
                           ),
                           value: registrationProvider.selectedVehicle == "Auto",
@@ -139,20 +171,20 @@ class _VehicleBasicInfoScreenState extends State<VehicleBasicInfoScreen> {
                       ],
                     ),
                   ),
-                  
+
                   const SizedBox(height: 10),
-                  
+
                   // بخش فیلدهای اطلاعات متنی وسیله نقلیه
                   Container(
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.black12),
-                      borderRadius: BorderRadius.circular(15),
-                      color: Colors.white,
-                      boxShadow: const [
+                      border: Border.all(color: Colors.grey.shade200),
+                      borderRadius: BorderRadius.circular(20),
+                      color: AppColors.cardBackground,
+                      boxShadow: [
                         BoxShadow(
-                          color: Colors.black12,
-                          offset: Offset(0, 2),
-                          blurRadius: 6.0,
+                          color: Colors.black.withOpacity(0.04),
+                          offset: const Offset(0, 4),
+                          blurRadius: 12.0,
                         ),
                       ],
                     ),
@@ -162,16 +194,21 @@ class _VehicleBasicInfoScreenState extends State<VehicleBasicInfoScreen> {
                         TextFormField(
                           controller: registrationProvider.brandController,
                           decoration: InputDecoration(
-                            labelText: tr(context, 'label_brand'),
-                            labelStyle: const TextStyle(fontFamily: 'IranYekan', fontSize: 14),
-                            border: const OutlineInputBorder(
-                              borderRadius: BorderRadius.all(Radius.circular(12)),
+                            labelText: 'label_brand'.tr(),
+                            labelStyle: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: const BorderRadius.all(Radius.circular(12)),
+                              borderSide: const BorderSide(color: AppColors.primaryBrand, width: 2),
                             ),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: const BorderRadius.all(Radius.circular(12)),
+                              borderSide: BorderSide(color: Colors.grey.shade300),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                           ),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
-                              return tr(context, 'err_brand_required');
+                              return 'err_brand_required'.tr();
                             }
                             return null;
                           },
@@ -181,16 +218,21 @@ class _VehicleBasicInfoScreenState extends State<VehicleBasicInfoScreen> {
                         TextFormField(
                           controller: registrationProvider.colorController,
                           decoration: InputDecoration(
-                            labelText: tr(context, 'label_color'),
-                            labelStyle: const TextStyle(fontFamily: 'IranYekan', fontSize: 14),
-                            border: const OutlineInputBorder(
-                              borderRadius: BorderRadius.all(Radius.circular(12)),
+                            labelText: 'label_color'.tr(),
+                            labelStyle: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: const BorderRadius.all(Radius.circular(12)),
+                              borderSide: const BorderSide(color: AppColors.primaryBrand, width: 2),
                             ),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: const BorderRadius.all(Radius.circular(12)),
+                              borderSide: BorderSide(color: Colors.grey.shade300),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                           ),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
-                              return tr(context, 'err_color_required');
+                              return 'err_color_required'.tr();
                             }
                             return null;
                           },
@@ -201,16 +243,21 @@ class _VehicleBasicInfoScreenState extends State<VehicleBasicInfoScreen> {
                           controller: registrationProvider.productionYearController,
                           keyboardType: TextInputType.number,
                           decoration: InputDecoration(
-                            labelText: tr(context, 'label_year'),
-                            labelStyle: const TextStyle(fontFamily: 'IranYekan', fontSize: 14),
-                            border: const OutlineInputBorder(
-                              borderRadius: BorderRadius.all(Radius.circular(12)),
+                            labelText: 'label_year'.tr(),
+                            labelStyle: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: const BorderRadius.all(Radius.circular(12)),
+                              borderSide: const BorderSide(color: AppColors.primaryBrand, width: 2),
                             ),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: const BorderRadius.all(Radius.circular(12)),
+                              borderSide: BorderSide(color: Colors.grey.shade300),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                           ),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
-                              return tr(context, 'err_year_required');
+                              return 'err_year_required'.tr();
                             }
                             return null;
                           },
@@ -230,21 +277,26 @@ class _VehicleBasicInfoScreenState extends State<VehicleBasicInfoScreen> {
                         TextFormField(
                           controller: registrationProvider.numberPlateController,
                           decoration: InputDecoration(
-                            labelText: tr(context, 'label_plate'),
-                            labelStyle: const TextStyle(fontFamily: 'IranYekan', fontSize: 14),
-                            border: const OutlineInputBorder(
-                              borderRadius: BorderRadius.all(Radius.circular(12)),
+                            labelText: 'label_plate'.tr(),
+                            labelStyle: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: const BorderRadius.all(Radius.circular(12)),
+                              borderSide: const BorderSide(color: AppColors.primaryBrand, width: 2),
                             ),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: const BorderRadius.all(Radius.circular(12)),
+                              borderSide: BorderSide(color: Colors.grey.shade300),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                           ),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
-                              return tr(context, 'err_plate_required');
+                              return 'err_plate_required'.tr();
                             }
                             return null;
                           },
                           onChanged: (val) {
-                            // تبدیل اعداد پلاک به انگلیسی برای اعتبارسنجی درست در سرور یا پرووایدر
+                            // تبدیل اعداد پلاک به انگلیسی برای اعتبارسنجی درست
                             final converted = _toEnglishNumbers(val);
                             if (converted != val) {
                               registrationProvider.numberPlateController.value = TextEditingValue(
@@ -259,9 +311,9 @@ class _VehicleBasicInfoScreenState extends State<VehicleBasicInfoScreen> {
                       ],
                     ),
                   ),
-                  
+
                   const SizedBox(height: 25),
-                  
+
                   // دکمه ذخیره و بازگشت
                   SizedBox(
                     width: MediaQuery.of(context).size.width,
@@ -271,24 +323,29 @@ class _VehicleBasicInfoScreenState extends State<VehicleBasicInfoScreen> {
                           ? () async {
                               if (_formKey.currentState?.validate() == true) {
                                 try {
-                                    Navigator.pop(context, true);
+                                  Navigator.pop(context, true);
                                 } catch (e) {
-                                  print("Error while saving data: $e");
+                                  debugPrint("Error while saving data: $e");
                                 }
                               }
                             }
                           : null,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: registrationProvider.isVehicleBasicFormValid
-                            ? const Color(0xFF145A41)
+                            ? AppColors.primaryButton
                             : Colors.grey.shade400,
+                        foregroundColor: AppColors.buttonText,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(12),
                         ),
+                        elevation: 0,
                       ),
                       child: Text(
-                        tr(context, 'btn_confirm_register'),
-                        style: const TextStyle(fontFamily: 'IranYekan', color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                        'btn_confirm_register'.tr(),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
