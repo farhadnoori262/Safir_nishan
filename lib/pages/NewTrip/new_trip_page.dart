@@ -1,18 +1,20 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'package:firebase_auth/firebase_auth.dart';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:easy_localization/easy_localization.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:maplibre_gl/maplibre_gl.dart'; // 📌 پکیج جدید نقشه
-import 'package:safir_drivers/methods/common_method.dart';
-import 'package:safir_drivers/methods/map_theme_methods.dart';
-import 'package:safir_drivers/models/trip_details.dart';
-import 'package:safir_drivers/widgets/loading_dialog.dart';
-import 'package:safir_drivers/widgets/payment_dialog.dart';
+import 'package:maplibre_gl/maplibre_gl.dart';
 
 import '../../global/global.dart';
-import '../../utils/lang_helper.dart';
+import '../../methods/common_method.dart';
+import '../../methods/map_theme_methods.dart';
+import '../../models/trip_details.dart';
+import '../../utils/app_colors.dart';
+import '../../widgets/loading_dialog.dart';
+import '../../widgets/payment_dialog.dart';
 
 class NewTripPage extends StatefulWidget {
   final TripDetails? newTripDetailsInfo;
@@ -36,13 +38,7 @@ class _NewTripPageState extends State<NewTripPage> {
 
   String buttonTitleKey = "btn_arrived";
 
-  // 🎨 پالت رنگی رسمی سفیر
-  static const Color brandPrimary = Color(0xFF145A41);
-  static const Color btnPrimary = Color(0xFF1B7A57);
-  static const Color btnArrived = Color(0xFF0F4A35);
-  static const Color btnEndTrip = Color(0xFFD32F2F);
-
-  Color buttonColor = btnPrimary;
+  Color buttonColor = AppColors.primaryButton;
   CommonMethods commonMethods = CommonMethods();
 
   // 📐 محاسبه زاویه چرخش آیکون خودرو (Heading)
@@ -69,7 +65,7 @@ class _NewTripPageState extends State<NewTripPage> {
         barrierDismissible: false,
         context: context,
         builder: (BuildContext context) => LoadingDialog(
-          messageText: tr(context, 'please_wait'),
+          messageText: 'please_wait'.tr(),
         ),
       );
 
@@ -92,7 +88,7 @@ class _NewTripPageState extends State<NewTripPage> {
       if (mapController != null) {
         await mapController!.clearLines();
         await mapController!.addLine(
-          LineOptions(
+          const LineOptions(
             geometry: polylinePointsList,
             lineColor: "#145A41",
             lineWidth: 5.0,
@@ -202,7 +198,7 @@ class _NewTripPageState extends State<NewTripPage> {
       barrierDismissible: false,
       context: context,
       builder: (BuildContext context) => LoadingDialog(
-        messageText: tr(context, 'ending_trip'),
+        messageText: 'ending_trip'.tr(),
       ),
     );
 
@@ -306,7 +302,6 @@ class _NewTripPageState extends State<NewTripPage> {
   }
 
   void _onMapCreated(MapLibreMapController controller) {
-
     mapController = controller;
 
     // رسم مسیر اولیه از مکان راننده به سمت مبدأ مسافر
@@ -355,7 +350,7 @@ class _NewTripPageState extends State<NewTripPage> {
                 bottom: 12,
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: AppColors.cardBackground,
                     borderRadius: BorderRadius.circular(24),
                     boxShadow: [
                       BoxShadow(
@@ -385,13 +380,12 @@ class _NewTripPageState extends State<NewTripPage> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 const Icon(Icons.access_time_rounded,
-                                    size: 16, color: brandPrimary),
+                                    size: 16, color: AppColors.primaryBrand),
                                 const SizedBox(width: 6),
                                 Text(
                                   "$durationText ($distanceText)",
                                   style: const TextStyle(
-                                    fontFamily: 'IranYekan',
-                                    color: brandPrimary,
+                                    color: AppColors.primaryBrand,
                                     fontSize: 14,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -407,14 +401,13 @@ class _NewTripPageState extends State<NewTripPage> {
                         Row(
                           children: [
                             const Icon(Icons.circle,
-                                size: 10, color: brandPrimary),
+                                size: 10, color: AppColors.primaryBrand),
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
                                 widget.newTripDetailsInfo!.pickupAddress ?? "",
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                  fontFamily: 'IranYekan',
                                   fontSize: 13,
                                   color: Colors.grey.shade800,
                                 ),
@@ -435,7 +428,6 @@ class _NewTripPageState extends State<NewTripPage> {
                                 widget.newTripDetailsInfo!.dropOffAddress ?? "",
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                  fontFamily: 'IranYekan',
                                   fontSize: 13,
                                   color: Colors.grey.shade800,
                                 ),
@@ -454,7 +446,7 @@ class _NewTripPageState extends State<NewTripPage> {
                               if (statusOfTrip == "accepted") {
                                 setState(() {
                                   buttonTitleKey = "btn_start_trip";
-                                  buttonColor = btnArrived;
+                                  buttonColor = AppColors.primaryBrand;
                                   statusOfTrip = "arrived";
                                 });
 
@@ -472,7 +464,7 @@ class _NewTripPageState extends State<NewTripPage> {
                               } else if (statusOfTrip == "arrived") {
                                 setState(() {
                                   buttonTitleKey = "btn_end_trip";
-                                  buttonColor = btnEndTrip;
+                                  buttonColor = Colors.redAccent;
                                   statusOfTrip = "ontrip";
                                 });
 
@@ -488,16 +480,15 @@ class _NewTripPageState extends State<NewTripPage> {
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: buttonColor,
-                              foregroundColor: Colors.white,
+                              foregroundColor: AppColors.buttonText,
                               elevation: 0,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(14),
                               ),
                             ),
                             child: Text(
-                              tr(context, buttonTitleKey),
+                              buttonTitleKey.tr(),
                               style: const TextStyle(
-                                fontFamily: 'IranYekan',
                                 fontWeight: FontWeight.bold,
                                 fontSize: 15,
                               ),
