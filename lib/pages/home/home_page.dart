@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:math' as math;
+import 'package:flutter/services.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:easy_localization/easy_localization.dart';
@@ -26,15 +28,108 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   MapLibreMapController? mapController;
 
   Position? currentPositionOfDriver;
-  LatLng currentLatLng = const LatLng(34.5553, 69.2075); // کابل
+  LatLng currentLatLng = const LatLng(34.5553, 69.2075);
   bool isDriverAvailable = false;
   bool isMapMoving = false;
+
+  Symbol? driverSymbol; // 📌 فلش متحرک راننده
+  Symbol? destinationSymbol; // 📌 پین قفل‌شده مقصد
+
+  LatLng? previousLocation;
 
   StreamSubscription<Position>? positionStreamHomePage;
   StreamSubscription<QuerySnapshot>? tripRequestStream;
 
-  void _onMapCreated(MapLibreMapController controller) {
+  void _onMapCreated(MapLibreMapController controller) async {
     mapController = controller;
+    await _loadCustomIcons();
+    _updateDriverMarker(currentLatLng);
+  }
+
+  /// 📌 بارگذاری آیکون‌های Assets در MapLibre
+  Future<void> _loadCustomIcons() async {
+    if (mapController == null) return;
+    try {
+      final ByteData bytes = await rootBundle.load("assets/images/car_icon.png");
+      final Uint8List list = bytes.buffer.asUint8List();
+      await mapController!.addImage("driver-arrow", list);
+    } catch (e) {
+      debugPrint("Error loading icon asset: $e");
+    }
+  }
+
+  /// 📐 محاسبه زاویه حرکت (Bearing) برای چرخش دقیق فلش روی خط سرک
+  double _calculateBearing(LatLng start, LatLng end) {
+    double startLat = start.latitude * (math.pi / 180.0);
+    double startLng = start.longitude * (math.pi / 180.0);
+    double endLat = end.latitude * (math.pi / 180.0);
+    double endLng = end.longitude * (math.pi / 180.0);
+
+    double dLng = endLng - startLng;
+    double y = math.sin(dLng) * math.cos(endLat);
+    double x = math.cos(startLat) * math.sin(endLat) -
+        math.sin(startLat) * math.cos(endLat) * math.cos(dLng);
+
+    double bearing = math.atan2(y, x);
+    bearing = bearing * (180.0 / math.pi);
+    return (bearing + 360.0) % 360.0;
+  }
+
+  /// 📌 به‌روزرسانی یا ایجاد نشانگر متحرک راننده با چرخش دقیق
+  Future<void> _updateDriverMarker(LatLng position) async {
+    if (mapController == null) return;
+
+    double bearing = 0.0;
+    if (previousLocation != null && previousLocation != position) {
+      bearing = _calculateBearing(previousLocation!, position);
+    }
+    previousLocation = position;
+
+    if (driverSymbol == null) {
+      driverSymbol = await mapController!.addSymbol(
+        SymbolOptions(
+          geometry: position,
+          iconImage: "driver-arrow",
+          iconSize: 0.8,
+          iconRotate: bearing,
+          iconAnchor: "center",
+        ),
+      );
+    } else {
+      await mapController!.updateSymbol(
+        driverSymbol!,
+        SymbolOptions(
+          geometry: position,
+          iconRotate: bearing,
+        ),
+      );
+    }
+  }
+
+  /// 📌 ثبت و قفل مارکر مقصد روی نقشه
+  Future<void> _setDestinationMarker(LatLng destination) async {
+    if (mapController == null) return;
+
+    if (destinationSymbol != null) {
+      await mapController!.removeSymbol(destinationSymbol!);
+    }
+
+    destinationSymbol = await mapController!.addSymbol(
+      SymbolOptions(
+        geometry: destination,
+        iconImage: "marker-15", // یا آیکون دلخواه مقصد در صورت لود در addImage
+        iconSize: 1.5,
+        iconAnchor: "bottom",
+      ),
+    );
+  }
+
+  /// 📌 پاکسازی مارکر مقصد
+  Future<void> _clearDestinationMarker() async {
+    if (mapController != null && destinationSymbol != null) {
+      await mapController!.removeSymbol(destinationSymbol!);
+      destinationSymbol = null;
+    }
   }
 
   void _animatedMapMove(LatLng destLocation, double destZoom) {
@@ -50,48 +145,48 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     );
   }
 
-  /// 📌 متد رسم خط سبز مسیر روی سرک
+  /// 📌 متد رسم خط مسیر
   Future<void> _drawRoutePolyline(List<LatLng> points) async {
     if (mapController == null || points.isEmpty) return;
 
-    await mapController!.clearLines(); // پاک کردن خطوط قبلی
+    await mapController!.clearLines();
 
     await mapController!.addLine(
       LineOptions(
         geometry: points,
-        lineColor: "#145A41", // رنگ سبز برند سفیر
+        lineColor: "#145A41",
         lineWidth: 6.0,
         lineOpacity: 0.85,
       ),
     );
   }
 
-  /// 📌 پاک کردن خط مسیر از روی نقشه
+  /// 📌 پاک کردن خط مسیر
   Future<void> _clearRoutePolyline() async {
     if (mapController != null) {
       await mapController!.clearLines();
     }
   }
 
-  /// 🚀 شروع مسیریابی واقعی به همراه رسم خط روی سرک
+  /// 🚀 شروع مسیریابی واقعی به همراه پین مقصد قفل‌شده
   Future<void> startRealNavigation(LatLng start, LatLng destination) async {
     final navController = Provider.of<NavigationController>(context, listen: false);
 
-    // دریافت نقاط مسیر از OSRM
     List<LatLng> points = await navController.startNavigation(
       start,
       destination,
       context.locale.languageCode,
     );
 
-    // رسم خط روی نقشه
     if (points.isNotEmpty) {
       await _drawRoutePolyline(points);
+      await _setDestinationMarker(destination);
       _animatedMapMove(start, 17.0);
+      _updateDriverMarker(start);
     }
   }
 
-  /// 🧪 تابع شبیه‌سازی حرکت و تست راهنمای صوتی
+  /// 🧪 تابع شبیه‌سازی حرکت
   void startSimulatedTestDrive(NavigationController navController) async {
     List<LatLng> simulatedPoints = [
       const LatLng(34.5553, 69.2075),
@@ -100,7 +195,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       const LatLng(34.5570, 69.2095),
     ];
 
-    // شروع مسیریابی و دریافت نقاط از کنترلر
     List<LatLng> points = await navController.startNavigation(
       simulatedPoints.first,
       simulatedPoints.last,
@@ -109,8 +203,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
     if (points.isNotEmpty) {
       await _drawRoutePolyline(points);
+      await _setDestinationMarker(simulatedPoints.last);
     } else {
       await _drawRoutePolyline(simulatedPoints);
+      await _setDestinationMarker(simulatedPoints.last);
     }
 
     List<String> instructions = [
@@ -133,8 +229,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       if (!mounted) return;
 
       _animatedMapMove(simulatedPoints[i], 17.5);
+      _updateDriverMarker(simulatedPoints[i]);
 
-      // به‌روزرسانی صحیح از طریق کنترلر بدون تداخل فاصله
       navController.updateInstruction(
         instruction: instructions[i],
         distance: (150 - (i * 40)).clamp(0, 500),
@@ -177,11 +273,14 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
       if (!mounted) return;
 
+      LatLng newPos = LatLng(currentPositionOfDriver!.latitude, currentPositionOfDriver!.longitude);
+
       setState(() {
-        currentLatLng = LatLng(currentPositionOfDriver!.latitude, currentPositionOfDriver!.longitude);
+        currentLatLng = newPos;
       });
 
       _animatedMapMove(currentLatLng, 16.0);
+      _updateDriverMarker(currentLatLng);
     } catch (e) {
       debugPrint("Error fetching location: $e");
     }
@@ -247,13 +346,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       final navController = Provider.of<NavigationController>(context, listen: false);
 
       if (navController.isNavigating) {
-        // 📌 بروزرسانی موقعیت راننده و قفل شدن روی خط سرک
         navController.updateDriverPosition(
           rawLatLng,
           langCode: context.locale.languageCode,
         );
 
-        // استفاده از موقعیت قفل شده روی سرک برای جلوگیری از پرش مارکر
         LatLng activeLocation = navController.snappedDriverLocation ?? rawLatLng;
 
         setState(() {
@@ -261,10 +358,12 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         });
 
         _animatedMapMove(activeLocation, 17.5);
+        _updateDriverMarker(activeLocation);
       } else {
         setState(() {
           currentLatLng = rawLatLng;
         });
+        _updateDriverMarker(rawLatLng);
       }
 
       if (isDriverAvailable) {
@@ -517,7 +616,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               if (isMapMoving && mounted) {
                 setState(() {
                   isMapMoving = false;
-                  if (mapController != null) {
+                  if (mapController != null && !navController.isNavigating) {
                     currentLatLng = mapController!.cameraPosition!.target;
                   }
                 });
@@ -526,66 +625,67 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           ),
 
           // 📍 مارکر مرکز نقشه
-          Align(
-            alignment: Alignment.center,
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 35),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
-                transform: Matrix4.translationValues(0, isMapMoving ? -14 : 0, 0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryBrand,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 3),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Colors.black26,
-                            blurRadius: 8,
-                            offset: Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Center(
-                        child: Container(
-                          width: 8,
-                          height: 8,
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
+          if (!navController.isNavigating)
+            Align(
+              alignment: Alignment.center,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 35),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  transform: Matrix4.translationValues(0, isMapMoving ? -14 : 0, 0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryBrand,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 3),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Colors.black26,
+                              blurRadius: 8,
+                              offset: Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Center(
+                          child: Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    Container(
-                      width: 3,
-                      height: 16,
-                      decoration: BoxDecoration(
-                        color: Colors.black87,
-                        borderRadius: BorderRadius.circular(2),
+                      Container(
+                        width: 3,
+                        height: 16,
+                        decoration: BoxDecoration(
+                          color: Colors.black87,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
                       ),
-                    ),
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
-                      width: isMapMoving ? 6 : 8,
-                      height: isMapMoving ? 3 : 5,
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(isMapMoving ? 0.3 : 0.7),
-                        borderRadius: BorderRadius.circular(10),
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 150),
+                        width: isMapMoving ? 6 : 8,
+                        height: isMapMoving ? 3 : 5,
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(isMapMoving ? 0.3 : 0.7),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
 
-          // 🔊 📌 بنر تصویری مسیریابی + دکمه لغو مسیریابی
+          // 🔊 📌 بنر نشان مسیریابی (طراحی تابلو به سبک تصویر دو)
           if (navController.isNavigating)
             Positioned(
               top: 10,
@@ -593,13 +693,13 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               right: 16,
               child: SafeArea(
                 child: Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   decoration: BoxDecoration(
-                    color: AppColors.primaryBrand,
-                    borderRadius: BorderRadius.circular(18),
+                    color: const Color(0xFF1E1E1E), // 👈 زمینه مشکی/تیره کامل مطابق تصویر
+                    borderRadius: BorderRadius.circular(14),
                     boxShadow: const [
                       BoxShadow(
-                        color: Colors.black26,
+                        color: Colors.black38,
                         blurRadius: 10,
                         offset: Offset(0, 4),
                       ),
@@ -607,19 +707,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   ),
                   child: Row(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          navController.currentTurnIcon,
-                          color: Colors.white,
-                          size: 36,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -629,16 +716,17 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                               '${navController.distanceToNextTurn} ${'meters'.tr()}',
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontSize: 20,
+                                fontSize: 22,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 2),
                             Text(
                               navController.navigationInstruction,
                               style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
+                                color: Color(0xFFB0BEC5),
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -646,6 +734,14 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                           ],
                         ),
                       ),
+                      const SizedBox(width: 10),
+                      // 👈 فلش سفید بزرگ جهت پیچیدن
+                      Icon(
+                        navController.currentTurnIcon,
+                        color: Colors.white,
+                        size: 44,
+                      ),
+                      const SizedBox(width: 8),
                       IconButton(
                         onPressed: () {
                           navController.toggleVoice();
@@ -654,19 +750,20 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                           navController.isVoiceEnabled
                               ? Icons.volume_up_rounded
                               : Icons.volume_off_rounded,
-                          color: Colors.white,
-                          size: 28,
+                          color: Colors.white70,
+                          size: 26,
                         ),
                       ),
                       IconButton(
                         onPressed: () {
                           navController.stopNavigation();
                           _clearRoutePolyline();
+                          _clearDestinationMarker();
                         },
                         icon: const Icon(
                           Icons.close,
-                          color: Colors.white,
-                          size: 28,
+                          color: Colors.white70,
+                          size: 26,
                         ),
                       ),
                     ],
