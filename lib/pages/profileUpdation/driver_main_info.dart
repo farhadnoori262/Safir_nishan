@@ -1,22 +1,24 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import 'package:safir_drivers/pages/profileUpdation/basic_driver_info_update_screen.dart'; 
 import 'package:safir_drivers/pages/profileUpdation/cninc_update_screen.dart';
 import 'package:safir_drivers/pages/profileUpdation/driving_license_update_screen.dart';
 import 'package:safir_drivers/pages/profileUpdation/selfie_with_cninc_update_screen.dart';
 import 'package:safir_drivers/pages/profileUpdation/vehicle_info_update_screen.dart';
 import 'package:safir_drivers/providers/registration_provider.dart';
-import 'package:safir_drivers/utils/lang_helper.dart';
+import 'package:safir_drivers/utils/app_colors.dart';
 
 class DriverMainInfo extends StatefulWidget {
   const DriverMainInfo({super.key});
 
   @override
-  _DriverMainInfoState createState() => _DriverMainInfoState();
+  State<DriverMainInfo> createState() => _DriverMainInfoState();
 }
 
 class _DriverMainInfoState extends State<DriverMainInfo> {
-  bool _forceShowContent = false; // میان‌بر برای رد کردن لودینگ در صورت تحریم بودن سرور
+  bool _forceShowContent = false; // میان‌بر برای رد کردن لودینگ در صورت تایم‌اوت شبکه
 
   @override
   void initState() {
@@ -27,9 +29,9 @@ class _DriverMainInfoState extends State<DriverMainInfo> {
   }
 
   Future<void> _fetchUserData() async {
-    // اگر بعد از ۴ ثانیه به خاطر تحریم/اینترنت پاسخی از فایربیس نیامد، لودینگ را متوقف کن
+    // اگر بعد از ۴ ثانیه پاسخی از سرور نیامد، لودینگ را متوقف کن
     Future.delayed(const Duration(seconds: 4), () {
-      if (mounted && _forceShowContent == false) {
+      if (mounted && !_forceShowContent) {
         setState(() {
           _forceShowContent = true;
         });
@@ -40,23 +42,56 @@ class _DriverMainInfoState extends State<DriverMainInfo> {
       await Provider.of<RegistrationProvider>(context, listen: false)
           .fetchUserData();
     } catch (e) {
-      print('Error fetching user data: $e');
+      debugPrint('Error fetching user data: $e');
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    const Color brandColor = Color(0xFF145A41); // سبز برند سفیر
-
     return Consumer<RegistrationProvider>(builder: (context, provider, child) {
-      // اگر دیتابیس هنوز لود نشده بود اما زمان تایم‌اوت ۴ ثانیه‌ای ما تمام شد، محتوا را نشان بده
       final isLoading = provider.isFetchLoading && !_forceShowContent;
 
+      // آرایه آیتم‌های لیست برای کدهای تمیزتر و پویایی بهتر
+      final List<Map<String, dynamic>> steps = [
+        {
+          'title': 'step_basic_info_title'.tr(),
+          'subtitle': 'step_basic_info_sub'.tr(),
+          'screen': const BasicDriverInfoUpdateScreen(),
+        },
+        {
+          'title': 'step_cnic_title'.tr(),
+          'subtitle': 'step_cnic_sub'.tr(),
+          'screen': const CnincUpdateScreen(),
+        },
+        {
+          'title': 'step_selfie_title'.tr(),
+          'subtitle': 'step_selfie_sub'.tr(),
+          'screen': const SelfieWithCnincUpdateScreen(),
+        },
+        {
+          'title': 'step_license_title'.tr(),
+          'subtitle': 'step_license_sub'.tr(),
+          'screen': const DrivingLicenseUpdateScreen(),
+        },
+        {
+          'title': 'step_vehicle_title'.tr(),
+          'subtitle': 'step_vehicle_sub'.tr(),
+          'screen': const VehicleInfoUpdateScreen(),
+        },
+      ];
+
       return Scaffold(
+        backgroundColor: AppColors.background,
         appBar: AppBar(
+          backgroundColor: AppColors.cardBackground,
+          elevation: 0,
           title: Text(
-            tr(context, 'reg_steps_title'),
-            style: const TextStyle(fontFamily: 'IranYekan', fontWeight: FontWeight.bold, fontSize: 16),
+            'reg_steps_title'.tr(),
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              color: AppColors.textPrimary,
+            ),
           ),
           centerTitle: true,
         ),
@@ -66,37 +101,41 @@ class _DriverMainInfoState extends State<DriverMainInfo> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      tr(context, 'please_wait'),
-                      style: const TextStyle(fontFamily: 'IranYekan', fontSize: 14, color: Colors.black87),
+                      'please_wait'.tr(),
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                     const SizedBox(height: 16),
                     const CircularProgressIndicator(
-                      color: brandColor,
+                      color: AppColors.primaryBrand,
                     ),
                   ],
                 ),
               )
             : Padding(
-                padding: const EdgeInsets.only(top: 15),
+                padding: const EdgeInsets.only(top: 16),
                 child: Column(
                   children: [
                     Center(
                       child: Container(
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(15),
-                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          color: AppColors.cardBackground,
                           boxShadow: const [
                             BoxShadow(
-                                color: Colors.black12,
-                                offset: Offset(0, 2),
-                                blurRadius: 6.0),
+                              color: Colors.black12,
+                              offset: Offset(0, 2),
+                              blurRadius: 6.0,
+                            ),
                           ],
                         ),
                         width: MediaQuery.of(context).size.width * 0.92,
                         child: ListView.separated(
                           shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(), 
-                          itemCount: 5,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: steps.length,
                           separatorBuilder: (context, index) => const Divider(
                             color: Colors.black12,
                             thickness: 0.5,
@@ -105,77 +144,19 @@ class _DriverMainInfoState extends State<DriverMainInfo> {
                             endIndent: 16,
                           ),
                           itemBuilder: (context, index) {
-                            if (index == 0) {
-                              return _buildListTile(
-                                title: tr(context, 'step_basic_info_title'),
-                                subtitle: tr(context, 'step_basic_info_sub'),
-                                onTap: () async {
-                                  await Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          const BasicDriverInfoUpdateScreen(),
-                                    ),
-                                  );
-                                },
-                              );
-                            } else if (index == 1) {
-                              return _buildListTile(
-                                title: tr(context, 'step_cnic_title'),
-                                subtitle: tr(context, 'step_cnic_sub'),
-                                onTap: () async {
-                                  await Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          const CnincUpdateScreen(),
-                                    ),
-                                  );
-                                },
-                              );
-                            } else if (index == 2) {
-                              return _buildListTile(
-                                title: tr(context, 'step_selfie_title'),
-                                subtitle: tr(context, 'step_selfie_sub'),
-                                onTap: () async {
-                                  await Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          const SelfieWithCnincUpdateScreen(),
-                                    ),
-                                  );
-                                },
-                              );
-                            } else if (index == 3) {
-                              return _buildListTile(
-                                title: tr(context, 'step_license_title'),
-                                subtitle: tr(context, 'step_license_sub'),
-                                onTap: () async {
-                                  await Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          const DrivingLicenseUpdateScreen(),
-                                    ),
-                                  );
-                                },
-                              );
-                            } else {
-                              return _buildListTile(
-                                title: tr(context, 'step_vehicle_title'),
-                                subtitle: tr(context, 'step_vehicle_sub'),
-                                onTap: () async {
-                                  await Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          const VehicleInfoUpdateScreen(),
-                                    ),
-                                  );
-                                },
-                              );
-                            }
+                            final step = steps[index];
+                            return _buildListTile(
+                              title: step['title'],
+                              subtitle: step['subtitle'],
+                              onTap: () async {
+                                await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => step['screen'],
+                                  ),
+                                );
+                              },
+                            );
                           },
                         ),
                       ),
@@ -190,18 +171,29 @@ class _DriverMainInfoState extends State<DriverMainInfo> {
   Widget _buildListTile({
     required String title,
     required String subtitle,
-    required Function() onTap,
+    required VoidCallback onTap,
   }) {
     return ListTile(
       title: Text(
         title,
-        style: const TextStyle(fontFamily: 'IranYekan', fontSize: 15, fontWeight: FontWeight.bold, color: Colors.black87),
+        style: const TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.bold,
+          color: AppColors.textPrimary,
+        ),
       ),
       subtitle: Text(
         subtitle,
-        style: const TextStyle(fontFamily: 'IranYekan', fontSize: 12, color: Colors.black54),
+        style: const TextStyle(
+          fontSize: 12,
+          color: AppColors.textSecondary,
+        ),
       ),
-      trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.black38), // اصلاح جهت آیکون برای حالت راست‌چین
+      trailing: const Icon(
+        Icons.chevron_left_rounded,
+        size: 20,
+        color: AppColors.iconSecondary,
+      ),
       onTap: onTap,
     );
   }
