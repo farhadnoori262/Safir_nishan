@@ -276,7 +276,7 @@ class RegistrationProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> pickAndCropCnincImage(bool isFrontImage) async {
+  Future<void> pickAndCropCnincImage(BuildContext context, bool isFrontImage) async {
     final ImagePickerService imagePickerService = ImagePickerService();
 
     final pickedFile = await imagePickerService.pickCropImage(context: context,
@@ -294,7 +294,7 @@ class RegistrationProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> pickAndCropVehicleRegistrationImages(bool isFrontImage) async {
+  Future<void> pickAndCropVehicleRegistrationImages(BuildContext context, bool isFrontImage) async {
     final ImagePickerService imagePickerService = ImagePickerService();
 
     final pickedFile = await imagePickerService.pickCropImage(context: context,
@@ -312,7 +312,7 @@ class RegistrationProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> pickAndCropDrivingLicenseImage(bool isFrontImage) async {
+  Future<void> pickAndCropDrivingLicenseImage(BuildContext context, bool isFrontImage) async {
     final ImagePickerService imagePickerService = ImagePickerService();
 
     final pickedFile = await imagePickerService.pickCropImage(context: context,
