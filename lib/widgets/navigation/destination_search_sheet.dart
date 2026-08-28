@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/place_search_result.dart';
 import '../../services/place_search_service.dart';
-import '../../utils/app_colors.dart';
+import '../../../utils/app_colors.dart';
 
 class DestinationSearchSheet extends StatefulWidget {
   final ValueChanged<PlaceSearchResult> onPlaceSelected;
