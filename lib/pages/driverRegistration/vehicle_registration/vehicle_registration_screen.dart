@@ -6,7 +6,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../providers/registration_provider.dart';
-import '../../utils/app_colors.dart';
+import '../../../utils/app_colors.dart';
+
 
 class VehicleRegistrationScreen extends StatefulWidget {
   const VehicleRegistrationScreen({super.key});
