@@ -45,7 +45,7 @@ class _EarningsPageState extends State<EarningsPage> {
           padding: const EdgeInsets.all(20.0),
           child: Container(
             width: double.infinity,
-            maxWidth: 340,
+            constraints: const BoxConstraints(maxWidth: 340),
             padding: const EdgeInsets.symmetric(vertical: 32.0, horizontal: 24.0),
             decoration: BoxDecoration(
               color: AppColors.cardBackground,
