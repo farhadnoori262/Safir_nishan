@@ -1,13 +1,15 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:safir_drivers/providers/trip_provider.dart'; 
-import 'package:safir_drivers/utils/lang_helper.dart';
+
+import 'package:safir_drivers/providers/trip_provider.dart';
+import 'package:safir_drivers/utils/app_colors.dart';
 
 class TripsHistoryPage extends StatefulWidget {
   const TripsHistoryPage({super.key});
 
   @override
-  _TripsHistoryPageState createState() => _TripsHistoryPageState();
+  State<TripsHistoryPage> createState() => _TripsHistoryPageState();
 }
 
 class _TripsHistoryPageState extends State<TripsHistoryPage> {
@@ -24,42 +26,57 @@ class _TripsHistoryPageState extends State<TripsHistoryPage> {
     final tripProvider = Provider.of<TripProvider>(context);
 
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text(
-          tr(context, 'trips_history_title'),
-          style: const TextStyle(fontFamily: 'IranYekan', fontWeight: FontWeight.bold, fontSize: 16),
+          'trips_history_title'.tr(),
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+            color: AppColors.textPrimary,
+          ),
         ),
         centerTitle: true,
-        backgroundColor: Colors.white,
-        elevation: 1,
-        iconTheme: const IconThemeData(color: Colors.black),
+        backgroundColor: AppColors.cardBackground,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: AppColors.iconPrimary),
       ),
       body: tripProvider.isLoading
           ? const Center(
               child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(const Color(0xFF145A41)), // رنگ برند سفیر
+                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryBrand),
               ),
             )
           : tripProvider.completedTrips.isEmpty
               ? Center(
                   child: Text(
-                    tr(context, 'no_trips_history'),
-                    style: const TextStyle(fontFamily: 'IranYekan', color: Colors.black54, fontSize: 14),
+                    'no_trips_history'.tr(),
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 14,
+                    ),
                   ),
                 )
               : ListView.builder(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
                   itemCount: tripProvider.completedTrips.length,
                   itemBuilder: (context, index) {
-                    var trip = tripProvider.completedTrips[index];
+                    final trip = tripProvider.completedTrips[index];
                     return Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      color: Colors.white,
-                      elevation: 3,
+                      margin: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 6,
+                      ),
+                      color: AppColors.cardBackground,
+                      elevation: 2,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -74,30 +91,31 @@ class _TripsHistoryPageState extends State<TripsHistoryPage> {
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Text(
-                                    "${tr(context, 'pickup_label')}: ${trip["pickUpAddress"] ?? ''}",
+                                    "${'pickup_label'.tr()}: ${trip["pickUpAddress"] ?? ''}",
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
-                                      fontFamily: 'IranYekan',
                                       fontSize: 13,
-                                      color: Colors.black87,
+                                      color: AppColors.textPrimary,
                                     ),
                                   ),
                                 ),
                                 const SizedBox(width: 10),
                                 // نمایش کرایه به افغانی
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF145A41).withOpacity(0.1),
+                                    color: AppColors.primaryBrand.withOpacity(0.1),
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Text(
-                                    "${trip["fareAmount"] ?? 0} ${tr(context, 'currency_afg')}",
+                                    "${trip["fareAmount"] ?? 0} ${'currency_afg'.tr()}",
                                     style: const TextStyle(
-                                      fontFamily: 'IranYekan',
                                       fontSize: 12,
                                       fontWeight: FontWeight.bold,
-                                      color: Color(0xFF145A41),
+                                      color: AppColors.primaryBrand,
                                     ),
                                   ),
                                 ),
@@ -115,12 +133,11 @@ class _TripsHistoryPageState extends State<TripsHistoryPage> {
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Text(
-                                    "${tr(context, 'destination_label')}: ${trip["dropOffAddress"] ?? ''}",
+                                    "${'destination_label'.tr()}: ${trip["dropOffAddress"] ?? ''}",
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
-                                      fontFamily: 'IranYekan',
                                       fontSize: 13,
-                                      color: Colors.black54,
+                                      color: AppColors.textSecondary,
                                     ),
                                   ),
                                 ),
