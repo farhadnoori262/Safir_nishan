@@ -169,19 +169,16 @@ class AuthenticationProvider extends ChangeNotifier {
     required VoidCallback onSuccess,
   }) async {
     startLoading();
-    notifyListeners();
 
     try {
       DatabaseReference usersRef =
           firebaseDatabase.ref().child("drivers").child(driverModel.id);
       await usersRef.set(driverModel.toMap()).then((value) {
         stopLoading();
-        notifyListeners();
         onSuccess();
       });
     } on FirebaseException catch (e) {
       stopLoading();
-      notifyListeners();
       if (context.mounted) {
         commonMethods.displaySnackBar(e.message ?? tr(context, 'err_save_failed'), context);
       }
@@ -219,7 +216,7 @@ class AuthenticationProvider extends ChangeNotifier {
       DataSnapshot snapshot = await driverRef.get();
 
       if (snapshot.exists && snapshot.value != null) {
-        Map driverData = snapshot.value as Map;
+        Map<String, dynamic> driverData = Map<String, dynamic>.from(snapshot.value as Map);
 
         _driverModel = Driver(
           id: driverData["id"] ?? '',
@@ -242,34 +239,16 @@ class AuthenticationProvider extends ChangeNotifier {
           deviceToken: driverData["deviceToken"] ?? '',
           driverRatings: driverData["driverRattings"] ?? '',
           earnings: driverData["earnings"] ?? '',
-          vehicleInfo: VehicleInfo(
-            brand: driverData["vehicleInfo"]?["brand"] ?? '',
-            color: driverData["vehicleInfo"]?["color"] ?? '',
-            productionYear: driverData["vehicleInfo"]?["productionYear"] ?? '',
-            vehiclePicture: driverData["vehicleInfo"]?["vehiclePicture"] ?? '',
-            type: driverData["vehicleInfo"]?["type"] ?? '',
-            registrationPlateNumber:
-                driverData["vehicleInfo"]?["registrationPlateNumber"] ?? '',
-            // 🇦🇫 اضافه شدن فیلدهای پلاک افغانستان
-            plateProvince: driverData["vehicleInfo"]?["plateProvince"] ?? 'کابل',
-            plateCategory: driverData["vehicleInfo"]?["plateCategory"] ?? 'ش',
-            plateType: driverData["vehicleInfo"]?["plateType"] ?? 'شخصی',
-            registrationCertificateFrontImage: driverData["vehicleInfo"]
-                    ?["registrationCertificateFrontImage"] ??
-                '',
-            registrationCertificateBackImage: driverData["vehicleInfo"]
-                    ?["registrationCertificateBackImage"] ??
-                '',
-          ),
+          vehicleInfo: driverData["vehicleInfo"] != null
+              ? VehicleInfo.fromMap(Map<String, dynamic>.from(driverData["vehicleInfo"]))
+              : VehicleInfo.empty(),
         );
 
         _uid = _driverModel!.id;
         notifyListeners(); 
-      } else {
-        print("Driver data not found.");
       }
     } catch (e) {
-      print("Error fetching driver data: $e");
+      debugPrint("Error fetching driver data: $e");
     }
   }
 
@@ -311,6 +290,7 @@ class AuthenticationProvider extends ChangeNotifier {
         String vehicleType = vehicleInfo["type"] ?? '';
         String registrationPlateNumber =
             vehicleInfo["registrationPlateNumber"] ?? '';
+        String plateProvince = vehicleInfo["plateProvince"] ?? '';
         String registrationCertificateFrontImage =
             vehicleInfo["registrationCertificateFrontImage"] ?? '';
         String registrationCertificateBackImage =
@@ -335,6 +315,7 @@ class AuthenticationProvider extends ChangeNotifier {
             vehiclePicture.isEmpty ||
             vehicleType.isEmpty ||
             registrationPlateNumber.isEmpty ||
+            plateProvince.isEmpty ||
             registrationCertificateFrontImage.isEmpty ||
             registrationCertificateBackImage.isEmpty) {
           return false; 
@@ -345,7 +326,7 @@ class AuthenticationProvider extends ChangeNotifier {
         return false;
       }
     } catch (e) {
-      print("Error checking driver fields: $e");
+      debugPrint("Error checking driver fields: $e");
       return false;
     }
   }
@@ -419,7 +400,7 @@ class AuthenticationProvider extends ChangeNotifier {
         return false; 
       }
     } catch (e) {
-      print("Error checking block status: $e");
+      debugPrint("Error checking block status: $e");
       return false; 
     }
   }
