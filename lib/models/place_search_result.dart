@@ -1,3 +1,5 @@
+import 'package:easy_localization/easy_localization.dart';
+
 class PlaceSearchResult {
   final String title;
   final String address;
@@ -11,6 +13,14 @@ class PlaceSearchResult {
     required this.longitude,
   });
 
+  /// دریافت عنوان مکان با پشتیبانی از چندزبانه بودن
+  String get displayTitle {
+    if (title == 'selected_place_default') {
+      return 'selected_place_default'.tr();
+    }
+    return title;
+  }
+
   factory PlaceSearchResult.fromNominatim(
     Map<String, dynamic> json,
   ) {
@@ -22,7 +32,8 @@ class PlaceSearchResult {
         .toList();
 
     return PlaceSearchResult(
-      title: parts.isNotEmpty ? parts.first : 'مکان انتخاب‌شده',
+      // استفاده از کلید ترجمه به جای متن فارسی سخت‌کدشده
+      title: parts.isNotEmpty ? parts.first : 'selected_place_default',
       address: parts.length > 1
           ? parts.skip(1).take(3).join('، ')
           : displayName,
