@@ -567,7 +567,7 @@ class _NavigationPageState extends State<NavigationPage>
     await _mapController!.clearLines();
 
     await _mapController!.addLine(
-      const LineOptions(
+       LineOptions(
         geometry: points,
         lineColor: '#145A41',
         lineWidth: 14.0,
@@ -576,7 +576,7 @@ class _NavigationPageState extends State<NavigationPage>
     );
 
     await _mapController!.addLine(
-      const LineOptions(
+       LineOptions(
         geometry: points,
         lineColor: '#22C55E',
         lineWidth: 8.0,
