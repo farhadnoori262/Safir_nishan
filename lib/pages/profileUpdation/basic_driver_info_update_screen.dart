@@ -1,11 +1,11 @@
 import 'dart:io';
 
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:safir_drivers/methods/common_method.dart'; 
 import 'package:safir_drivers/providers/registration_provider.dart'; 
-// فرض بر این است که فایل هلپر در مسیر زیر قرار دارد، در صورت نیاز مسیر را اصلاح کن
-import 'package:safir_drivers/utils/lang_helper.dart'; 
+import 'package:safir_drivers/utils/app_colors.dart';
 
 class BasicDriverInfoUpdateScreen extends StatefulWidget {
   const BasicDriverInfoUpdateScreen({super.key});
@@ -18,18 +18,24 @@ class BasicDriverInfoUpdateScreen extends StatefulWidget {
 class _BasicDriverInfoUpdateScreenState
     extends State<BasicDriverInfoUpdateScreen> {
   final _formKey = GlobalKey<FormState>();
-  CommonMethods commonMethods = CommonMethods();
 
   @override
   Widget build(BuildContext context) {
-    const Color brandColor = Color(0xFF145A41); // رنگ سبز برند سفیر
+    final CommonMethods commonMethods = CommonMethods();
 
     return Consumer<RegistrationProvider>(
       builder: (context, registrationProvider, child) => Scaffold(
+        backgroundColor: AppColors.background,
         appBar: AppBar(
+          backgroundColor: AppColors.cardBackground,
+          elevation: 0,
           title: Text(
-            tr(context, 'basic_info_title'),
-            style: const TextStyle(fontFamily: 'IranYekan', fontWeight: FontWeight.bold, fontSize: 16),
+            'basic_info_title'.tr(),
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
           ),
           centerTitle: true,
           leading: TextButton(
@@ -37,8 +43,11 @@ class _BasicDriverInfoUpdateScreenState
               Navigator.pop(context);
             },
             child: Text(
-              tr(context, 'close'),
-              style: const TextStyle(fontFamily: 'IranYekan', color: Colors.black87, fontWeight: FontWeight.bold),
+              'close'.tr(),
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
           leadingWidth: 70,
@@ -55,14 +64,14 @@ class _BasicDriverInfoUpdateScreenState
                   // بخش بارگذاری عکس پروفایل راننده
                   Container(
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.black12),
-                      borderRadius: BorderRadius.circular(15),
-                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      color: AppColors.cardBackground,
                       boxShadow: const [
                         BoxShadow(
-                            color: Colors.black12,
-                            offset: Offset(0, 2),
-                            blurRadius: 6.0),
+                          color: Colors.black12,
+                          offset: Offset(0, 2),
+                          blurRadius: 6.0,
+                        ),
                       ],
                     ),
                     width: double.infinity,
@@ -80,17 +89,25 @@ class _BasicDriverInfoUpdateScreenState
                         Container(
                           height: 40,
                           decoration: BoxDecoration(
-                            border: Border.all(color: brandColor),
+                            border: Border.all(color: AppColors.primaryBrand),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: TextButton.icon(
                             onPressed: () {
                               registrationProvider.pickProfileImageFromGallary();
                             },
-                            icon: const Icon(Icons.add_a_photo_outlined, color: brandColor, size: 16),
+                            icon: const Icon(
+                              Icons.add_a_photo_outlined,
+                              color: AppColors.primaryBrand,
+                              size: 16,
+                            ),
                             label: Text(
-                              tr(context, 'add_profile_photo'),
-                              style: const TextStyle(fontFamily: 'IranYekan', color: brandColor, fontWeight: FontWeight.bold, fontSize: 13),
+                              'add_profile_photo'.tr(),
+                              style: const TextStyle(
+                                color: AppColors.primaryBrand,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
                             ),
                           ),
                         ),
@@ -103,32 +120,32 @@ class _BasicDriverInfoUpdateScreenState
                   // کارت فرم اطلاعات متنی
                   Container(
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.black12),
-                      borderRadius: BorderRadius.circular(15),
-                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      color: AppColors.cardBackground,
                       boxShadow: const [
                         BoxShadow(
-                            color: Colors.black12,
-                            offset: Offset(0, 2),
-                            blurRadius: 6.0),
+                          color: Colors.black12,
+                          offset: Offset(0, 2),
+                          blurRadius: 6.0,
+                        ),
                       ],
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.all(14.0),
+                      padding: const EdgeInsets.all(16.0),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           TextFormField(
                             controller: registrationProvider.firstNameController,
                             decoration: InputDecoration(
-                              labelText: tr(context, 'first_name'),
-                              labelStyle: const TextStyle(fontFamily: 'IranYekan', fontSize: 13),
+                              labelText: 'first_name'.tr(),
+                              labelStyle: const TextStyle(fontSize: 13),
                               border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
                               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                             ),
                             validator: (value) {
                               if (value == null || value.isEmpty) {
-                                return tr(context, 'err_first_name');
+                                return 'err_first_name'.tr();
                               }
                               return null;
                             },
@@ -138,14 +155,14 @@ class _BasicDriverInfoUpdateScreenState
                           TextFormField(
                             controller: registrationProvider.lastNameController,
                             decoration: InputDecoration(
-                              labelText: tr(context, 'last_name'),
-                              labelStyle: const TextStyle(fontFamily: 'IranYekan', fontSize: 13),
+                              labelText: 'last_name'.tr(),
+                              labelStyle: const TextStyle(fontSize: 13),
                               border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
                               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                             ),
                             validator: (value) {
                               if (value == null || value.isEmpty) {
-                                return tr(context, 'err_last_name');
+                                return 'err_last_name'.tr();
                               }
                               return null;
                             },
@@ -156,14 +173,14 @@ class _BasicDriverInfoUpdateScreenState
                             controller: registrationProvider.emailController,
                             keyboardType: TextInputType.emailAddress,
                             decoration: InputDecoration(
-                              labelText: tr(context, 'email'),
-                              labelStyle: const TextStyle(fontFamily: 'IranYekan', fontSize: 13),
+                              labelText: 'email'.tr(),
+                              labelStyle: const TextStyle(fontSize: 13),
                               border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
                               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                             ),
                             validator: (value) {
                               if (value == null || value.isEmpty || !value.contains('@')) {
-                                return tr(context, 'invalid_email_error');
+                                return 'invalid_email_error'.tr();
                               }
                               return null;
                             },
@@ -173,14 +190,14 @@ class _BasicDriverInfoUpdateScreenState
                           TextFormField(
                             controller: registrationProvider.addressController,
                             decoration: InputDecoration(
-                              labelText: tr(context, 'home_address'),
-                              labelStyle: const TextStyle(fontFamily: 'IranYekan', fontSize: 13),
+                              labelText: 'home_address'.tr(),
+                              labelStyle: const TextStyle(fontSize: 13),
                               border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
                               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                             ),
                             validator: (value) {
                               if (value == null || value.isEmpty || value.length < 5) {
-                                return tr(context, 'err_address');
+                                return 'err_address'.tr();
                               }
                               return null;
                             },
@@ -190,8 +207,8 @@ class _BasicDriverInfoUpdateScreenState
                           TextFormField(
                             controller: registrationProvider.phoneController,
                             decoration: InputDecoration(
-                              labelText: "${tr(context, 'phone')} (${tr(context, 'not_registered')})",
-                              labelStyle: const TextStyle(fontFamily: 'IranYekan', fontSize: 13),
+                              labelText: "${'phone'.tr()} (${'not_registered'.tr()})",
+                              labelStyle: const TextStyle(fontSize: 13),
                               border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
                               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                             ),
@@ -201,8 +218,8 @@ class _BasicDriverInfoUpdateScreenState
                           TextFormField(
                             controller: registrationProvider.dobController,
                             decoration: InputDecoration(
-                              labelText: tr(context, 'dob'),
-                              labelStyle: const TextStyle(fontFamily: 'IranYekan', fontSize: 13),
+                              labelText: 'dob'.tr(),
+                              labelStyle: const TextStyle(fontSize: 13),
                               border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
                               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                               suffixIcon: const Icon(Icons.calendar_month, size: 18),
@@ -230,27 +247,28 @@ class _BasicDriverInfoUpdateScreenState
                   // دکمه به‌روزرسانی اطلاعات
                   SizedBox(
                     width: MediaQuery.of(context).size.width * 0.93,
-                    height: 50,
+                    height: 52,
                     child: ElevatedButton(
-                      onPressed: registrationProvider.isLoading == false && registrationProvider.isFormValidBasic
+                      onPressed: !registrationProvider.isLoading && registrationProvider.isFormValidBasic
                           ? () async {
                               if (_formKey.currentState?.validate() == true) {
                                 try {
-                                  await registrationProvider
-                                      .updateBasicDriverInfo(context);
+                                  await registrationProvider.updateBasicDriverInfo(context);
 
                                   if (context.mounted) {
                                     commonMethods.displaySnackBar(
-                                        tr(context, 'vehicle_update_success'), context);
+                                      'driver_info_update_success'.tr(),
+                                      context,
+                                    );
                                   }
                                 } catch (e) {
-                                  print("Error while saving data: $e");
+                                  debugPrint("Error while saving data: $e");
                                 }
                               }
                             }
                           : null,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: brandColor,
+                        backgroundColor: AppColors.primaryBrand,
                         disabledBackgroundColor: Colors.grey.shade400,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -261,8 +279,12 @@ class _BasicDriverInfoUpdateScreenState
                               color: Colors.white,
                             )
                           : Text(
-                              tr(context, 'vehicle_update_btn'),
-                              style: const TextStyle(fontFamily: 'IranYekan', color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                              'driver_info_update_btn'.tr(),
+                              style: const TextStyle(
+                                color: AppColors.buttonText,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                              ),
                             ),
                     ),
                   ),
