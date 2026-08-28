@@ -5,8 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
-import '../../providers/registration_provider.dart';
-import '../../utils/app_colors.dart';
+import '../../../providers/registration_provider.dart';
+import '../../../utils/app_colors.dart';
 
 class DriverCarImageScreeen extends StatefulWidget {
   const DriverCarImageScreeen({super.key});
