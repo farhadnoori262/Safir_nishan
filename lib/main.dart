@@ -5,7 +5,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 
 import 'package:safir_drivers/controllers/navigation_controller.dart';
-import 'package:safir_drivers/pages/navigation/navigation_page.dart'; // مسیر اضافه شده برای صفحه مسیریابی
+import 'package:safir_drivers/pages/navigation/navigation_page.dart';
 import 'package:safir_drivers/pages/splash_screen.dart';
 import 'package:safir_drivers/providers/authentication_provider.dart';
 import 'package:safir_drivers/providers/dashboard_provider.dart';
@@ -35,7 +35,7 @@ Future<void> main() async {
     debugPrint('Firebase initialization error: $error');
   }
 
-  _requestPermissionsSafely();
+  await _requestPermissionsSafely();
 
   runApp(
     EasyLocalization(
@@ -69,7 +69,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     ErrorWidget.builder = (FlutterErrorDetails details) {
       return Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.cardBackground,
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(20),
@@ -116,15 +116,29 @@ class MyApp extends StatelessWidget {
         locale: context.locale,
         theme: ThemeData(
           useMaterial3: true,
-          fontFamily: 'IranYekan',
-          primaryColor: SafirColors.primary,
-          scaffoldBackgroundColor: const Color(0xFFFAFAFA),
+          fontFamily: 'IranYekan', // 👈 اعمال سراسری فونت ایران یکان
+          primaryColor: AppColors.primaryBrand,
+          scaffoldBackgroundColor: AppColors.background,
           colorScheme: ColorScheme.fromSeed(
-            seedColor: SafirColors.primary,
+            seedColor: AppColors.primaryBrand,
+            primary: AppColors.primaryBrand,
+            surface: AppColors.cardBackground,
+          ),
+          appBarTheme: const AppBarTheme(
+            backgroundColor: AppColors.cardBackground,
+            elevation: 0,
+            centerTitle: true,
+            iconTheme: IconThemeData(color: AppColors.textPrimary),
+            titleTextStyle: TextStyle(
+              fontFamily: 'IranYekan',
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
           ),
         ),
-        // تنظیم صفحه مسیریابی به عنوان صفحه اصلی برنامه سفیر
-        home: const NavigationPage(), 
+        // شروع برنامه با اسپلش یا مستقیم از صفحه مسیریابی
+        home: const SplashScreen(),
       ),
     );
   }
