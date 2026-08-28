@@ -1118,7 +1118,7 @@ class _NavigationPageState extends State<NavigationPage>
               child: SafeArea(
                 child: Center(
                   child: Card(
-                    backgroundColor: AppColors.cardBackground,
+                    Color: AppColors.cardBackground,
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 14,
