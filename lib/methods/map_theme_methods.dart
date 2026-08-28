@@ -1,17 +1,18 @@
-import 'package:flutter/material.dart';
-
 class MapThemeMethods {
-  // آدرس تم لایت (روشن) رایگان و استاندارد اوپن‌استریت‌مپ
-  static const String lightThemeUrl = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
-  
-  // آدرس تم دارک (تیره) استاندارد و باکیفیت از سرورهای CartoDB بدون نیاز به کلید
-  static const String darkThemeUrl = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+  // استایل‌های وکتوری نقشه سفیر (با قابلیت چرخش و رندر روان)
+  static const String lightThemeStyle = 
+      "https://demotiles.maplibre.org/style.json";
+      
+  static const String darkThemeStyle = 
+      "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
 
-  /// تابعی برای گرفتن آدرس کاشی‌های نقشه بر اساس وضعیت تم برنامه راننده سفیر
-  String getMapTileUrl(bool isDarkMode) {
+  /// دریافت آدرس استایل نقشه MapLibre بر اساس تم تاریک/روشن
+  String getMapStyle(bool isDarkMode) {
     if (isDarkMode) {
-      return darkThemeUrl;
+      return darkThemeStyle;
     }
-    return lightThemeUrl;
+    return lightThemeStyle;
   }
 }
+
+final MapThemeMethods mapThemeMethods = MapThemeMethods();
