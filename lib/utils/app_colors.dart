@@ -5,6 +5,12 @@ class AppColors {
 
   // 🟢 برند و هویت visual
   static const Color primaryBrand = Color(0xFF1B7A57);
+    // 📦 اضافه کردن موارد کمبود برای رفع خطای بیلد
+  static const Color background = Color(0xFFF8F9FA); // یا همون backgroundLight
+  
+// و این خط را دقیقاً در انتهای فایل (خارج از کلاس AppColors) قرار دهید:
+typedef SafirColors = AppColors;
+
 
   // 🟩 دکمه اصلی و حالت‌های لمس
   static const Color primaryButton = Color(0xFF169365);
