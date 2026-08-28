@@ -88,7 +88,7 @@ class _NewTripPageState extends State<NewTripPage> {
       if (mapController != null) {
         await mapController!.clearLines();
         await mapController!.addLine(
-          const LineOptions(
+           LineOptions(
             geometry: polylinePointsList,
             lineColor: "#145A41",
             lineWidth: 5.0,
