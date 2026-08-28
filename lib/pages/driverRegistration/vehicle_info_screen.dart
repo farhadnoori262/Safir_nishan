@@ -4,9 +4,9 @@ import 'package:provider/provider.dart';
 
 import '../../../providers/registration_provider.dart';
 import '../../../utils/app_colors.dart';
-import 'driver_car_image_screen.dart';
-import 'vehicle_basic_info_screen.dart';
-import 'vehicle_registration_screen.dart';
+import 'vehicle_registration/driver_car_image_screen.dart';
+import 'vehicle_registration/vehicle_basic_info_screen.dart';
+import 'vehicle_registration/vehicle_registration_screen.dart';
 
 class VehicleInfoScreen extends StatefulWidget {
   const VehicleInfoScreen({super.key});
