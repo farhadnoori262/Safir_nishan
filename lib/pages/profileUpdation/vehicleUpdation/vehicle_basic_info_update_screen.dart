@@ -1,8 +1,9 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:safir_drivers/methods/common_method.dart';
 import 'package:safir_drivers/providers/registration_provider.dart';
-import 'package:safir_drivers/utils/lang_helper.dart';
+import 'package:safir_drivers/utils/app_colors.dart';
 
 class VehicleBasicInfoUpdateScreen extends StatefulWidget {
   const VehicleBasicInfoUpdateScreen({super.key});
@@ -31,22 +32,31 @@ class _VehicleBasicInfoUpdateScreenState
 
   @override
   Widget build(BuildContext context) {
-    CommonMethods commonMethods = CommonMethods();
-    const Color brandColor = Color(0xFF145A41);
+    final CommonMethods commonMethods = CommonMethods();
 
     return Consumer<RegistrationProvider>(
       builder: (context, registrationProvider, child) => Scaffold(
+        backgroundColor: AppColors.background,
         appBar: AppBar(
+          backgroundColor: AppColors.cardBackground,
+          elevation: 0,
           title: Text(
-            tr(context, 'vehicle_info_title'),
-            style: const TextStyle(fontFamily: 'IranYekan', fontWeight: FontWeight.bold, fontSize: 16),
+            'vehicle_info_title'.tr(),
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              color: AppColors.textPrimary,
+            ),
           ),
           centerTitle: true,
           leading: TextButton(
             onPressed: () => Navigator.pop(context),
             child: Text(
-              tr(context, 'close'),
-              style: const TextStyle(fontFamily: 'IranYekan', color: Colors.black87, fontWeight: FontWeight.bold),
+              'close'.tr(),
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
           leadingWidth: 70,
@@ -66,9 +76,8 @@ class _VehicleBasicInfoUpdateScreenState
                   Container(
                     margin: const EdgeInsets.symmetric(vertical: 10),
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.black12),
-                      borderRadius: BorderRadius.circular(15),
-                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      color: AppColors.cardBackground,
                       boxShadow: const [
                         BoxShadow(
                           color: Colors.black12,
@@ -80,12 +89,12 @@ class _VehicleBasicInfoUpdateScreenState
                     child: Column(
                       children: [
                         CheckboxListTile(
-                          activeColor: brandColor,
+                          activeColor: AppColors.primaryBrand,
                           title: Row(
                             children: [
                               Image.asset("assets/vehicles/home_car.png", height: 40, width: 80),
                               const SizedBox(width: 10),
-                              const Text('موتر', style: TextStyle(fontFamily: 'IranYekan', fontSize: 14)),
+                              Text('vehicle_car'.tr(), style: const TextStyle(fontSize: 14)),
                             ],
                           ),
                           value: registrationProvider.selectedVehicle == "Car",
@@ -97,12 +106,12 @@ class _VehicleBasicInfoUpdateScreenState
                         ),
                         const SizedBox(height: 5),
                         CheckboxListTile(
-                          activeColor: brandColor,
+                          activeColor: AppColors.primaryBrand,
                           title: Row(
                             children: [
                               Image.asset("assets/vehicles/bike.png", height: 40, width: 80),
                               const SizedBox(width: 10),
-                              const Text('موتورسایکل', style: TextStyle(fontFamily: 'IranYekan', fontSize: 14)),
+                              Text('vehicle_bike'.tr(), style: const TextStyle(fontSize: 14)),
                             ],
                           ),
                           value: registrationProvider.selectedVehicle == "Bike",
@@ -114,12 +123,12 @@ class _VehicleBasicInfoUpdateScreenState
                         ),
                         const SizedBox(height: 5),
                         CheckboxListTile(
-                          activeColor: brandColor,
+                          activeColor: AppColors.primaryBrand,
                           title: Row(
                             children: [
                               Image.asset("assets/vehicles/auto.png", height: 40, width: 80),
                               const SizedBox(width: 10),
-                              const Text('ریکشا / دری چرخ', style: TextStyle(fontFamily: 'IranYekan', fontSize: 14)),
+                              Text('vehicle_auto'.tr(), style: const TextStyle(fontSize: 14)),
                             ],
                           ),
                           value: registrationProvider.selectedVehicle == "Auto",
@@ -136,9 +145,8 @@ class _VehicleBasicInfoUpdateScreenState
                   // ۲. کادر مشخصات موتر و پلاک
                   Container(
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.black12),
-                      borderRadius: BorderRadius.circular(15),
-                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      color: AppColors.cardBackground,
                       boxShadow: const [
                         BoxShadow(
                           color: Colors.black12,
@@ -154,13 +162,13 @@ class _VehicleBasicInfoUpdateScreenState
                         // برند
                         TextFormField(
                           controller: registrationProvider.brandController,
-                          decoration: const InputDecoration(
-                            labelText: 'برند یا کمپنی (مثلاً تویوتا)',
-                            labelStyle: TextStyle(fontFamily: 'IranYekan', fontSize: 13),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
-                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          decoration: InputDecoration(
+                            labelText: 'vehicle_brand_label'.tr(),
+                            labelStyle: const TextStyle(fontSize: 13),
+                            border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                           ),
-                          validator: (value) => (value == null || value.isEmpty) ? 'لطفاً برند را وارد کنید' : null,
+                          validator: (value) => (value == null || value.isEmpty) ? 'vehicle_brand_error'.tr() : null,
                           onChanged: (_) => registrationProvider.checkVehicleBasicFormValidity(),
                         ),
                         const SizedBox(height: 14),
@@ -168,13 +176,13 @@ class _VehicleBasicInfoUpdateScreenState
                         // رنگ
                         TextFormField(
                           controller: registrationProvider.colorController,
-                          decoration: const InputDecoration(
-                            labelText: 'رنگ موتر (مثلاً سفید)',
-                            labelStyle: TextStyle(fontFamily: 'IranYekan', fontSize: 13),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
-                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          decoration: InputDecoration(
+                            labelText: 'vehicle_color_label'.tr(),
+                            labelStyle: const TextStyle(fontSize: 13),
+                            border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                           ),
-                          validator: (value) => (value == null || value.isEmpty) ? 'لطفاً رنگ را وارد کنید' : null,
+                          validator: (value) => (value == null || value.isEmpty) ? 'vehicle_color_error'.tr() : null,
                           onChanged: (_) => registrationProvider.checkVehicleBasicFormValidity(),
                         ),
                         const SizedBox(height: 14),
@@ -183,20 +191,20 @@ class _VehicleBasicInfoUpdateScreenState
                         TextFormField(
                           controller: registrationProvider.productionYearController,
                           keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            labelText: 'سال تولید (مدل)',
-                            labelStyle: TextStyle(fontFamily: 'IranYekan', fontSize: 13),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
-                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          decoration: InputDecoration(
+                            labelText: 'vehicle_year_label'.tr(),
+                            labelStyle: const TextStyle(fontSize: 13),
+                            border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                           ),
-                          validator: (value) => (value == null || value.isEmpty) ? 'لطفاً سال تولید را وارد کنید' : null,
+                          validator: (value) => (value == null || value.isEmpty) ? 'vehicle_year_error'.tr() : null,
                           onChanged: (_) => registrationProvider.checkVehicleBasicFormValidity(),
                         ),
                         
                         const SizedBox(height: 20),
-                        const Text(
-                          'مشخصات پلاک موتر (افغانستان)',
-                          style: TextStyle(fontFamily: 'IranYekan', fontWeight: FontWeight.bold, fontSize: 13, color: brandColor),
+                        Text(
+                          'plate_info_header'.tr(),
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primaryBrand),
                         ),
                         const SizedBox(height: 12),
 
@@ -211,15 +219,15 @@ class _VehicleBasicInfoUpdateScreenState
                                     ? registrationProvider.plateProvince
                                     : afghanistanProvinces.first,
                                 decoration: InputDecoration(
-                                  labelText: 'ولایت',
-                                  labelStyle: const TextStyle(fontFamily: 'IranYekan', fontSize: 11),
+                                  labelText: 'province'.tr(),
+                                  labelStyle: const TextStyle(fontSize: 11),
                                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                   contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
                                 ),
                                 items: afghanistanProvinces.map((prov) {
                                   return DropdownMenuItem(
                                     value: prov, 
-                                    child: Text(prov, style: const TextStyle(fontFamily: 'IranYekan', fontSize: 12)),
+                                    child: Text(prov, style: const TextStyle(fontSize: 12)),
                                   );
                                 }).toList(),
                                 onChanged: (val) {
@@ -239,15 +247,15 @@ class _VehicleBasicInfoUpdateScreenState
                                     ? registrationProvider.plateCategory
                                     : plateCategories.first,
                                 decoration: InputDecoration(
-                                  labelText: 'حرف',
-                                  labelStyle: const TextStyle(fontFamily: 'IranYekan', fontSize: 11),
+                                  labelText: 'plate_letter'.tr(),
+                                  labelStyle: const TextStyle(fontSize: 11),
                                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                   contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
                                 ),
                                 items: plateCategories.map((cat) {
                                   return DropdownMenuItem(
                                     value: cat, 
-                                    child: Text(cat, style: const TextStyle(fontFamily: 'IranYekan', fontSize: 12)),
+                                    child: Text(cat, style: const TextStyle(fontSize: 12)),
                                   );
                                 }).toList(),
                                 onChanged: (val) {
@@ -265,14 +273,14 @@ class _VehicleBasicInfoUpdateScreenState
                               child: TextFormField(
                                 controller: registrationProvider.numberPlateController,
                                 keyboardType: TextInputType.number,
-                                decoration: const InputDecoration(
-                                  labelText: 'نمبر پلاک',
-                                  labelStyle: TextStyle(fontFamily: 'IranYekan', fontSize: 11),
+                                decoration: InputDecoration(
+                                  labelText: 'plate_number'.tr(),
+                                  labelStyle: const TextStyle(fontSize: 11),
                                   hintText: '44892',
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                  border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                                 ),
-                                validator: (value) => (value == null || value.isEmpty) ? 'نمبر پلاک را وارد کنید' : null,
+                                validator: (value) => (value == null || value.isEmpty) ? 'plate_number_error'.tr() : null,
                                 onChanged: (_) => registrationProvider.checkVehicleBasicFormValidity(),
                               ),
                             ),
@@ -287,15 +295,15 @@ class _VehicleBasicInfoUpdateScreenState
                               ? registrationProvider.plateType
                               : plateTypes.first,
                           decoration: InputDecoration(
-                            labelText: 'نوع پلاک',
-                            labelStyle: const TextStyle(fontFamily: 'IranYekan', fontSize: 12),
+                            labelText: 'plate_type'.tr(),
+                            labelStyle: const TextStyle(fontSize: 12),
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                             contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                           ),
                           items: plateTypes.map((type) {
                             return DropdownMenuItem(
                               value: type, 
-                              child: Text(type, style: const TextStyle(fontFamily: 'IranYekan', fontSize: 13)),
+                              child: Text(type, style: const TextStyle(fontSize: 13)),
                             );
                           }).toList(),
                           onChanged: (val) {
@@ -313,7 +321,7 @@ class _VehicleBasicInfoUpdateScreenState
                   // دکمه تایید و ثبت اطلاعات
                   SizedBox(
                     width: double.infinity,
-                    height: 50,
+                    height: 52,
                     child: ElevatedButton(
                       onPressed: registrationProvider.isVehicleBasicFormValid &&
                               !registrationProvider.isLoading
@@ -322,17 +330,17 @@ class _VehicleBasicInfoUpdateScreenState
                                 try {
                                   await registrationProvider.updateVehicleBasicInfo(context);
                                   if (context.mounted) {
-                                    commonMethods.displaySnackBar('اطلاعات با موفقیت ثبت شد', context);
+                                    commonMethods.displaySnackBar('save_success'.tr(), context);
                                     Navigator.pop(context);
                                   }
                                 } catch (e) {
-                                  print("Error while saving data: $e");
+                                  debugPrint("Error while saving data: $e");
                                 }
                               }
                             }
                           : null,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: brandColor,
+                        backgroundColor: AppColors.primaryBrand,
                         disabledBackgroundColor: Colors.grey.shade400,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -340,9 +348,13 @@ class _VehicleBasicInfoUpdateScreenState
                       ),
                       child: registrationProvider.isLoading
                           ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text(
-                              'تایید و ثبت نام',
-                              style: TextStyle(fontFamily: 'IranYekan', color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                          : Text(
+                              'confirm_and_submit'.tr(),
+                              style: const TextStyle(
+                                color: AppColors.buttonText,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                              ),
                             ),
                     ),
                   ),
