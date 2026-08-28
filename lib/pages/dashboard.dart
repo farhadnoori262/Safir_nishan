@@ -1,11 +1,13 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:safir_drivers/pages/earnings/earnings_page.dart'; 
-import 'package:safir_drivers/pages/home/home_page.dart'; 
-import 'package:safir_drivers/pages/profile/profile_page.dart'; 
-import 'package:safir_drivers/pages/trips/trips_page.dart'; 
-import 'package:safir_drivers/providers/dashboard_provider.dart'; 
-import 'package:safir_drivers/utils/lang_helper.dart';
+
+import 'package:safir_drivers/pages/earnings/earnings_page.dart';
+import 'package:safir_drivers/pages/home/home_page.dart';
+import 'package:safir_drivers/pages/profile/profile_page.dart';
+import 'package:safir_drivers/pages/trips/trips_page.dart';
+import 'package:safir_drivers/providers/dashboard_provider.dart';
+import 'package:safir_drivers/utils/app_colors.dart';
 
 class Dashboard extends StatefulWidget {
   const Dashboard({super.key});
@@ -18,10 +20,6 @@ class _DashboardState extends State<Dashboard>
     with SingleTickerProviderStateMixin {
   TabController? controller;
 
-  // 🎨 تعریف ثوابت پالت رنگی سفیر
-  static const Color primaryBrand = Color(0xFF145A41);
-  static const Color cardBgLight = Color(0xFFEAF6F1);
-
   @override
   void initState() {
     super.initState();
@@ -30,7 +28,7 @@ class _DashboardState extends State<Dashboard>
 
   @override
   void dispose() {
-    controller!.dispose();
+    controller?.dispose();
     super.dispose();
   }
 
@@ -39,7 +37,7 @@ class _DashboardState extends State<Dashboard>
     final dashboardProvider = Provider.of<DashboardProvider>(context);
 
     return Scaffold(
-      backgroundColor: cardBgLight, // پس‌زمینه روشن استاندارد سفیر
+      backgroundColor: AppColors.background,
       body: TabBarView(
         physics: const NeverScrollableScrollPhysics(),
         controller: controller,
@@ -50,13 +48,12 @@ class _DashboardState extends State<Dashboard>
           ProfilePage(),
         ],
       ),
-      // 🌟 منوی پایینی مدرن منطبق با پالت سفیر
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.cardBackground,
           boxShadow: [
             BoxShadow(
-              color: primaryBrand.withOpacity(0.08), // سایه نرم بر پایه رنگ برند
+              color: AppColors.primaryBrand.withOpacity(0.08),
               blurRadius: 16,
               offset: const Offset(0, -4),
             ),
@@ -71,59 +68,57 @@ class _DashboardState extends State<Dashboard>
                   icon: const Padding(
                     padding: EdgeInsets.only(bottom: 4),
                     child: Icon(Icons.map_outlined, size: 24),
-                  ), 
+                  ),
                   activeIcon: const Padding(
                     padding: EdgeInsets.only(bottom: 4),
                     child: Icon(Icons.map, size: 24),
-                  ), 
-                  label: tr(context, 'nav_home'),
+                  ),
+                  label: 'nav_home'.tr(),
                 ),
                 BottomNavigationBarItem(
                   icon: const Padding(
                     padding: EdgeInsets.only(bottom: 4),
                     child: Icon(Icons.account_balance_wallet_outlined, size: 24),
-                  ), 
+                  ),
                   activeIcon: const Padding(
                     padding: EdgeInsets.only(bottom: 4),
                     child: Icon(Icons.account_balance_wallet, size: 24),
-                  ), 
-                  label: tr(context, 'nav_earnings'),
+                  ),
+                  label: 'nav_earnings'.tr(),
                 ),
                 BottomNavigationBarItem(
                   icon: const Padding(
                     padding: EdgeInsets.only(bottom: 4),
                     child: Icon(Icons.route_outlined, size: 24),
-                  ), 
+                  ),
                   activeIcon: const Padding(
                     padding: EdgeInsets.only(bottom: 4),
                     child: Icon(Icons.route, size: 24),
-                  ), 
-                  label: tr(context, 'nav_trips'),
+                  ),
+                  label: 'nav_trips'.tr(),
                 ),
                 BottomNavigationBarItem(
                   icon: const Padding(
                     padding: EdgeInsets.only(bottom: 4),
                     child: Icon(Icons.person_outline_rounded, size: 24),
-                  ), 
+                  ),
                   activeIcon: const Padding(
                     padding: EdgeInsets.only(bottom: 4),
                     child: Icon(Icons.person_rounded, size: 24),
-                  ), 
-                  label: tr(context, 'nav_profile'),
+                  ),
+                  label: 'nav_profile'.tr(),
                 ),
               ],
               currentIndex: dashboardProvider.selectedIndex,
-              unselectedItemColor: Colors.grey.shade400,
-              selectedItemColor: primaryBrand, // استفاده از #145A41
+              unselectedItemColor: AppColors.iconSecondary,
+              selectedItemColor: AppColors.primaryBrand,
               showSelectedLabels: true,
               showUnselectedLabels: true,
               selectedLabelStyle: const TextStyle(
-                fontFamily: 'IranYekan', 
-                fontSize: 12, 
+                fontSize: 12,
                 fontWeight: FontWeight.bold,
               ),
               unselectedLabelStyle: const TextStyle(
-                fontFamily: 'IranYekan', 
                 fontSize: 11,
                 fontWeight: FontWeight.w500,
               ),
@@ -132,7 +127,7 @@ class _DashboardState extends State<Dashboard>
               elevation: 0,
               onTap: (index) {
                 dashboardProvider.setIndex(index);
-                controller!.index = index;
+                controller?.index = index;
               },
             ),
           ),
