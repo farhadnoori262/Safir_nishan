@@ -8,7 +8,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:maplibre_gl/maplibre_gl.dart';
 
-import '../helpers/voice_guidance_helper.dart';
+import 'package:safir_drivers/helpers/voice_guidance_helper.dart';
 
 class StepInstruction {
   final String instruction;
@@ -26,21 +26,18 @@ class StepInstruction {
   });
 
   factory StepInstruction.fromJson(Map<String, dynamic> json) {
-    final maneuver =
-        json['maneuver'] as Map<String, dynamic>? ?? {};
+    final maneuver = json['maneuver'] as Map<String, dynamic>? ?? {};
+    final location = maneuver['location'] as List<dynamic>? ?? const [0.0, 0.0];
 
-    final location =
-        maneuver['location'] as List<dynamic>? ?? const [0.0, 0.0];
-
-    final longitude = location.isNotEmpty && location[0] is num
+    final double longitude = location.isNotEmpty && location[0] is num
         ? (location[0] as num).toDouble()
         : 0.0;
 
-    final latitude = location.length > 1 && location[1] is num
+    final double latitude = location.length > 1 && location[1] is num
         ? (location[1] as num).toDouble()
         : 0.0;
 
-    final name = json['name']?.toString().trim() ?? '';
+    final String name = json['name']?.toString().trim() ?? '';
 
     return StepInstruction(
       instruction: maneuver['type']?.toString() ?? 'straight',
@@ -88,7 +85,6 @@ class NavigationController extends ChangeNotifier {
   IconData _currentTurnIcon = Icons.straight_rounded;
 
   bool get isVoiceEnabled => _isVoiceEnabled;
-
   int get distanceToNextTurn => distanceToNextStep.ceil();
 
   String get navigationInstruction {
@@ -104,12 +100,8 @@ class NavigationController extends ChangeNotifier {
   }
 
   IconData get currentTurnIcon => _currentTurnIcon;
-
-  List<LatLng> get currentRoutePoints =>
-      List.unmodifiable(routePoints);
-
-  List<StepInstruction> get routeSteps =>
-      List.unmodifiable(_steps);
+  List<LatLng> get currentRoutePoints => List.unmodifiable(routePoints);
+  List<StepInstruction> get routeSteps => List.unmodifiable(_steps);
 
   void toggleVoice() {
     _isVoiceEnabled = !_isVoiceEnabled;
@@ -157,7 +149,6 @@ class NavigationController extends ChangeNotifier {
     snappedDriverLocation = start;
 
     _clearRouteState();
-
     _safeNotifyListeners();
 
     final route = await _fetchRoute(
@@ -179,7 +170,6 @@ class NavigationController extends ChangeNotifier {
     }
 
     _speakStartInstruction();
-
     _safeNotifyListeners();
 
     return List.unmodifiable(routePoints);
@@ -213,8 +203,7 @@ class NavigationController extends ChangeNotifier {
 
     _updateStepProgress();
 
-    if (distanceFromRoute > _rerouteDistanceMeters &&
-        !isRerouting) {
+    if (distanceFromRoute > _rerouteDistanceMeters && !isRerouting) {
       _rerouteFromCurrentLocation(driverLocation);
     }
 
@@ -236,11 +225,7 @@ class NavigationController extends ChangeNotifier {
       final response = await http.get(url);
 
       if (response.statusCode != 200) {
-        debugPrint(
-          'osrm_error_status'.tr(
-            args: [response.statusCode.toString()],
-          ),
-        );
+        debugPrint('osrm_error_status'.tr(args: [response.statusCode.toString()]));
         return null;
       }
 
@@ -264,12 +249,7 @@ class NavigationController extends ChangeNotifier {
 
       return route;
     } catch (error) {
-      debugPrint(
-        'osrm_error_fetch'.tr(
-          args: [error.toString()],
-        ),
-      );
-
+      debugPrint('osrm_error_fetch'.tr(args: [error.toString()]));
       return null;
     }
   }
@@ -318,7 +298,6 @@ class NavigationController extends ChangeNotifier {
       ..addAll(parsedPoints);
 
     final parsedSteps = <StepInstruction>[];
-
     final legs = route['legs'];
 
     if (legs is List && legs.isNotEmpty) {
@@ -330,9 +309,7 @@ class NavigationController extends ChangeNotifier {
         if (steps is List) {
           for (final step in steps) {
             if (step is Map<String, dynamic>) {
-              parsedSteps.add(
-                StepInstruction.fromJson(step),
-              );
+              parsedSteps.add(StepInstruction.fromJson(step));
             }
           }
         }
@@ -355,7 +332,7 @@ class NavigationController extends ChangeNotifier {
     } else {
       currentStreet = '';
       currentModifier = 'straight';
-      _currentInstruction = 'مستقیم بروید';
+      _currentInstruction = 'nav_go_straight'.tr();
       _currentTurnIcon = Icons.straight_rounded;
     }
 
@@ -446,19 +423,10 @@ class NavigationController extends ChangeNotifier {
     var closestSegmentIndex = 0;
     var closestBearing = 0.0;
 
-    final startIndex = math.max(
-      0,
-      _lastMatchedSegmentIndex - 25,
-    );
+    final startIndex = math.max(0, _lastMatchedSegmentIndex - 25);
+    final endIndex = math.min(routePoints.length - 2, _lastMatchedSegmentIndex + 100);
 
-    final endIndex = math.min(
-      routePoints.length - 2,
-      _lastMatchedSegmentIndex + 100,
-    );
-
-    for (var index = startIndex;
-        index <= endIndex;
-        index++) {
+    for (var index = startIndex; index <= endIndex; index++) {
       final segmentStart = routePoints[index];
       final segmentEnd = routePoints[index + 1];
 
@@ -499,45 +467,29 @@ class NavigationController extends ChangeNotifier {
     LatLng segmentStart,
     LatLng segmentEnd,
   ) {
-    final latitudeRadians =
-        point.latitude * math.pi / 180.0;
-
+    final latitudeRadians = point.latitude * math.pi / 180.0;
     const metersPerLatitudeDegree = 111132.0;
+    final metersPerLongitudeDegree = 111320.0 * math.cos(latitudeRadians);
 
-    final metersPerLongitudeDegree =
-        111320.0 * math.cos(latitudeRadians);
+    final pointX = point.longitude * metersPerLongitudeDegree;
+    final pointY = point.latitude * metersPerLatitudeDegree;
 
-    final pointX =
-        point.longitude * metersPerLongitudeDegree;
-    final pointY =
-        point.latitude * metersPerLatitudeDegree;
+    final startX = segmentStart.longitude * metersPerLongitudeDegree;
+    final startY = segmentStart.latitude * metersPerLatitudeDegree;
 
-    final startX =
-        segmentStart.longitude * metersPerLongitudeDegree;
-    final startY =
-        segmentStart.latitude * metersPerLatitudeDegree;
-
-    final endX =
-        segmentEnd.longitude * metersPerLongitudeDegree;
-    final endY =
-        segmentEnd.latitude * metersPerLatitudeDegree;
+    final endX = segmentEnd.longitude * metersPerLongitudeDegree;
+    final endY = segmentEnd.latitude * metersPerLatitudeDegree;
 
     final deltaX = endX - startX;
     final deltaY = endY - startY;
 
-    final lengthSquared =
-        (deltaX * deltaX) + (deltaY * deltaY);
+    final lengthSquared = (deltaX * deltaX) + (deltaY * deltaY);
 
     if (lengthSquared == 0) {
       return segmentStart;
     }
 
-    var projection = (
-          ((pointX - startX) * deltaX) +
-          ((pointY - startY) * deltaY)
-        ) /
-        lengthSquared;
-
+    var projection = (((pointX - startX) * deltaX) + ((pointY - startY) * deltaY)) / lengthSquared;
     projection = projection.clamp(0.0, 1.0).toDouble();
 
     final projectedX = startX + (projection * deltaX);
@@ -549,41 +501,22 @@ class NavigationController extends ChangeNotifier {
     );
   }
 
-  double _bearingBetween(
-    LatLng start,
-    LatLng end,
-  ) {
-    final startLatitude =
-        start.latitude * math.pi / 180.0;
+  double _bearingBetween(LatLng start, LatLng end) {
+    final startLatitude = start.latitude * math.pi / 180.0;
+    final endLatitude = end.latitude * math.pi / 180.0;
+    final longitudeDifference = (end.longitude - start.longitude) * math.pi / 180.0;
 
-    final endLatitude =
-        end.latitude * math.pi / 180.0;
-
-    final longitudeDifference =
-        (end.longitude - start.longitude) *
-            math.pi /
-            180.0;
-
-    final y = math.sin(longitudeDifference) *
-        math.cos(endLatitude);
-
-    final x =
-        (math.cos(startLatitude) *
-            math.sin(endLatitude)) -
-        (math.sin(startLatitude) *
-            math.cos(endLatitude) *
-            math.cos(longitudeDifference));
+    final y = math.sin(longitudeDifference) * math.cos(endLatitude);
+    final x = (math.cos(startLatitude) * math.sin(endLatitude)) -
+        (math.sin(startLatitude) * math.cos(endLatitude) * math.cos(longitudeDifference));
 
     final bearing = math.atan2(y, x) * 180.0 / math.pi;
 
     return (bearing + 360.0) % 360.0;
   }
 
-  void _updateCurrentStepInfo({
-    bool notify = true,
-  }) {
-    if (_steps.isEmpty ||
-        _currentStepIndex >= _steps.length) {
+  void _updateCurrentStepInfo({bool notify = true}) {
+    if (_steps.isEmpty || _currentStepIndex >= _steps.length) {
       return;
     }
 
@@ -608,18 +541,18 @@ class NavigationController extends ChangeNotifier {
       case 'right':
       case 'slight right':
       case 'sharp right':
-        return 'به راست بپیچید';
+        return 'nav_turn_right'.tr();
 
       case 'left':
       case 'slight left':
       case 'sharp left':
-        return 'به چپ بپیچید';
+        return 'nav_turn_left'.tr();
 
       case 'uturn':
-        return 'دور بزنید';
+        return 'nav_u_turn'.tr();
 
       default:
-        return 'مستقیم بروید';
+        return 'nav_go_straight'.tr();
     }
   }
 
