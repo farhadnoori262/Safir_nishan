@@ -1,154 +1,216 @@
 import 'dart:convert';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_geofire/flutter_geofire.dart';
 import 'package:http/http.dart' as http;
-import 'package:maplibre_gl/maplibre_gl.dart'; // 📌 جایگزین پکیج latlong2
-import '../global/global.dart';
+import 'package:maplibre_gl/maplibre_gl.dart';
+
+import '../global/global_variables.dart';
 import '../models/direction_details.dart';
-import '../utils/lang_helper.dart';
 
 class CommonMethods {
-  // بررسی اتصال اینترنت راننده
+  /// بررسی وضعیت اتصال اینترنت راننده (سازگار با connectivity_plus 6.0+)
   Future<void> checkConnectivity(BuildContext context) async {
-    var connectionResults = await Connectivity().checkConnectivity();
+    final List<ConnectivityResult> connectionResults =
+        await Connectivity().checkConnectivity();
 
-    if (connectionResults != ConnectivityResult.wifi &&
-        connectionResults != ConnectivityResult.mobile) {
+    final bool hasConnection = connectionResults.contains(ConnectivityResult.wifi) ||
+        connectionResults.contains(ConnectivityResult.mobile) ||
+        connectionResults.contains(ConnectivityResult.ethernet);
+
+    if (!hasConnection) {
       if (!context.mounted) return;
-      displaySnackBar(tr(context, 'no_internet_error'), context);
+      displaySnackBar('no_internet_error'.tr(), context);
     }
   }
 
-  // نمایش پیام‌های سیستم با فونت بومی سفیر
+  /// نمایش پیام‌های سیستم با استایل یکنواخت سفیر
   void displaySnackBar(String message, BuildContext context) {
-    var snackBar = SnackBar(
+    if (!context.mounted) return;
+
+    final snackBar = SnackBar(
       content: Text(
         message,
-        style: const TextStyle(fontFamily: 'IranYekan', fontSize: 14),
+        style: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8.0),
       ),
     );
+
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(snackBar);
   }
 
-  // متد کمکی showSnackBar برای پشتیبانی از سایر کدهای پروژه
+  /// متد کمکی برای پشتیبانی از فراخوانی‌های قدیمی
   void showSnackBar(BuildContext context, String message) {
     displaySnackBar(message, context);
   }
 
-  // غیرفعال کردن ردیابی زنده لوکیشن
+  /// غیرفعال کردن موقت به‌روزرسانی زنده موقعیت
   void turnOffLocationUpdatesForHomePage() {
-    if (positionStreamHomePage != null) {
-      positionStreamHomePage!.pause();
-    }
+    positionStreamHomePage?.pause();
   }
 
-  // فعال کردن ردیابی زنده و به‌روزرسانی آنلاین موقعیت راننده در Geofire فایربیس
+  /// فعال کردن به‌روزرسانی زنده و ثبت موقعیت راننده در Geofire فایربیس
   void turnOnLocationUpdatesForHomePage() {
-    if (positionStreamHomePage != null) {
-      positionStreamHomePage!.resume();
-    }
+    positionStreamHomePage?.resume();
 
-    if (driverCurrentPosition != null) {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    final currentPos = driverCurrentPosition;
+
+    if (currentUser != null && currentPos != null) {
       Geofire.setLocation(
-        FirebaseAuth.instance.currentUser!.uid,
-        driverCurrentPosition!.latitude,
-        driverCurrentPosition!.longitude,
+        currentUser.uid,
+        currentPos.latitude,
+        currentPos.longitude,
       );
     }
   }
 
-  // متد ارسال درخواست به API های عمومی
-  static sendRequestToAPI(String apiUrl) async {
+  /// متد عمومی ارسال درخواست به API
+  static Future<dynamic> sendRequestToAPI(String apiUrl) async {
     try {
-      http.Response responseFromAPI = await http.get(Uri.parse(apiUrl));
+      final response = await http.get(Uri.parse(apiUrl));
 
-      if (responseFromAPI.statusCode == 200) {
-        String dataFromApi = responseFromAPI.body;
-        var dataDecoded = jsonDecode(dataFromApi);
-        return dataDecoded;
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
       } else {
+        debugPrint("API Error: Status code ${response.statusCode}");
         return "error";
       }
-    } catch (errorMsg) {
+    } catch (error) {
+      debugPrint("HTTP Request Exception: $error");
       return "error";
     }
   }
 
-  // دریافت جزئیات و نقاط مسیر از سرویس OSRM
+  /// دریافت جزئیات و نقاط مسیر از سرویس مسیریابی OSRM
   static Future<DirectionDetails?> getDirectionDetailsFromAPI(
-      LatLng source, LatLng destination) async {
-    
-    String urlDirectionsAPI =
-        "https://router.project-osrm.org/route/v1/driving/${source.longitude},${source.latitude};${destination.longitude},${destination.latitude}?overview=full&geometries=geojson";
+    LatLng source,
+    LatLng destination,
+  ) async {
+    final String urlDirectionsAPI =
+        "https://router.project-osrm.org/route/v1/driving/"
+        "${source.longitude},${source.latitude};"
+        "${destination.longitude},${destination.latitude}"
+        "?overview=full&geometries=geojson";
 
-    var responseFromDirectionsAPI = await sendRequestToAPI(urlDirectionsAPI);
+    final responseFromAPI = await sendRequestToAPI(urlDirectionsAPI);
 
-    if (responseFromDirectionsAPI == "error" ||
-        responseFromDirectionsAPI["routes"] == null ||
-        (responseFromDirectionsAPI["routes"] as List).isEmpty) {
+    if (responseFromAPI == "error" ||
+        responseFromAPI == null ||
+        responseFromAPI["routes"] == null ||
+        (responseFromAPI["routes"] as List).isEmpty) {
       return null;
     }
 
-    DirectionDetails detailsModel = DirectionDetails();
+    final detailsModel = DirectionDetails();
+    final firstRoute = responseFromAPI["routes"][0];
 
-    double distanceInMeters =
-        (responseFromDirectionsAPI["routes"][0]["distance"] as num).toDouble();
-    double durationInSeconds =
-        (responseFromDirectionsAPI["routes"][0]["duration"] as num).toDouble();
+    final double distanceInMeters = (firstRoute["distance"] as num).toDouble();
+    final double durationInSeconds = (firstRoute["duration"] as num).toDouble();
 
     detailsModel.distanceValueDigits = distanceInMeters.round();
     detailsModel.durationValueDigits = durationInSeconds.round();
 
-    double distanceInKm = distanceInMeters / 1000;
-    double durationInMinutes = durationInSeconds / 60;
+    final double distanceInKm = distanceInMeters / 1000;
+    final double durationInMinutes = durationInSeconds / 60;
 
     detailsModel.distanceTextString = "${distanceInKm.toStringAsFixed(1)} km";
     detailsModel.durationTextString = "${durationInMinutes.round()} min";
 
-    List<dynamic> coordinates =
-        responseFromDirectionsAPI["routes"][0]["geometry"]["coordinates"];
-    List<LatLng> polylinePointsList = [];
+    final List<dynamic> coordinates =
+        firstRoute["geometry"]["coordinates"] as List<dynamic>;
 
-    for (var point in coordinates) {
-      polylinePointsList.add(LatLng(point[1].toDouble(), point[0].toDouble()));
-    }
+    final List<LatLng> polylinePointsList = coordinates.map((point) {
+      return LatLng(
+        (point[1] as num).toDouble(),
+        (point[0] as num).toDouble(),
+      );
+    }).toList();
 
     detailsModel.polylinePoints = polylinePointsList;
 
     return detailsModel;
   }
 
-  // فرمول محاسبه کرایه سفیر
-  calculateFareAmount(DirectionDetails directionDetails,
-      {double surgeMultiplier = 1.0}) {
-    double distancePerKmAmount = 20;
-    double durationPerMinuteAmount = 15;
-    double baseFareAmount = 50;
-    double bookingFee = 10;
-    double minimumFare = 100;
+  /// فرمول هوشمند محاسبه کرایه سفیر بر اساس نوع خدمت و مسافت
+  String calculateFareAmount(
+    DirectionDetails directionDetails, {
+    String vehicleCategory = "economic_car",
+    double surgeMultiplier = 1.0,
+  }) {
+    double baseFare = 50.0;
+    double perKmRate = 20.0;
+    double perMinuteRate = 5.0;
+    double minimumFare = 80.0;
+    double bookingFee = 10.0;
 
-    double totalDistanceTravelledFareAmount =
-        (directionDetails.distanceValueDigits! / 1000) * distancePerKmAmount;
+    // تنظیم نرخ بر اساس نوع وسیله یا خدمت انتخاب‌شده
+    switch (vehicleCategory) {
+      case "modern_car":
+        baseFare = 80.0;
+        perKmRate = 30.0;
+        perMinuteRate = 8.0;
+        minimumFare = 130.0;
+        break;
 
-    double totalDurationSpendFareAmount =
-        (directionDetails.durationValueDigits! / 60) * durationPerMinuteAmount;
+      case "motorbike":
+        baseFare = 30.0;
+        perKmRate = 12.0;
+        perMinuteRate = 3.0;
+        minimumFare = 50.0;
+        break;
 
-    double totalFareBeforeSurge = baseFareAmount +
-        totalDistanceTravelledFareAmount +
-        totalDurationSpendFareAmount +
-        bookingFee;
+      case "cargo":
+        baseFare = 100.0;
+        perKmRate = 35.0;
+        perMinuteRate = 10.0;
+        minimumFare = 150.0;
+        break;
 
-    double overAllTotalFareAmount = totalFareBeforeSurge * surgeMultiplier;
+      case "intercity":
+        baseFare = 150.0;
+        perKmRate = 25.0;
+        perMinuteRate = 4.0;
+        minimumFare = 300.0;
+        break;
 
-    if (overAllTotalFareAmount < minimumFare) {
-      overAllTotalFareAmount = minimumFare;
+      case "economic_car":
+      default:
+        baseFare = 50.0;
+        perKmRate = 20.0;
+        perMinuteRate = 5.0;
+        minimumFare = 80.0;
+        break;
     }
 
-    return overAllTotalFareAmount.toStringAsFixed(2);
+    final double distanceInKm =
+        (directionDetails.distanceValueDigits ?? 0) / 1000.0;
+    final double durationInMinutes =
+        (directionDetails.durationValueDigits ?? 0) / 60.0;
+
+    final double totalDistanceFare = distanceInKm * perKmRate;
+    final double totalDurationFare = durationInMinutes * perMinuteRate;
+
+    double totalFare =
+        (baseFare + totalDistanceFare + totalDurationFare + bookingFee) *
+            surgeMultiplier;
+
+    if (totalFare < minimumFare) {
+      totalFare = minimumFare;
+    }
+
+    return totalFare.toStringAsFixed(0);
   }
 }
 
-// نمونه متغیر عمومی جهت رفع خطای commonMethods در صفحات تغییر اطلاعات
-CommonMethods commonMethods = CommonMethods();
+/// نمونه متغیر عمومی جهت دسترسی سریع در برنامه
+final CommonMethods commonMethods = CommonMethods();
