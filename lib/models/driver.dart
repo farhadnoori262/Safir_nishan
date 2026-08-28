@@ -1,10 +1,12 @@
+import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/material.dart';
 import 'package:safir_drivers/models/vehicle_info.dart';
 
 class Driver {
   final String id;
   final String profilePicture;         // عکس پروفایل راننده
   final String firstName;              // نام
-  final String secondName;             // نام خانوادگی
+  final String secondName;             // نام خانوادگی / تخلص
   final String phoneNumber;            // شماره تلفن
   final String address;                // آدرس
   final String dob;                    // تاریخ تولد
@@ -45,6 +47,17 @@ class Driver {
     required this.vehicleInfo,
   });
 
+  /// دریافت نام و تخلص کامل
+  String get fullName => '$firstName $secondName'.trim();
+
+  /// دریافت وضعیت حساب به صورت ترجمه‌شده (فعال / مسدود)
+  String getFormattedStatus(BuildContext context) {
+    if (blockStatus.toLowerCase() == 'yes') {
+      return 'driver_status_blocked'.tr();
+    }
+    return 'driver_status_active'.tr();
+  }
+
   // تبدیل شیء راننده به مپ برای ذخیره‌سازی در فایربیس
   Map<String, dynamic> toMap() {
     return {
@@ -67,11 +80,11 @@ class Driver {
       'deviceToken': deviceToken,
       'earnings': earnings,
       'driverRatings': driverRatings,
-      'vehicleInfo': vehicleInfo.toMap(), // تبدیل اطلاعات تودرتوی وسیله نقلیه
+      'vehicleInfo': vehicleInfo.toMap(),
     };
   }
 
-  // ساختن شیء راننده از روی اطلاعات دریافتی از فایربیس با مدیریت ایمن Null-Safety
+  // ساختن شیء راننده از روی اطلاعات دریافتی از فایربیس
   factory Driver.fromMap(Map<String, dynamic> map) {
     return Driver(
       id: map['id'] ?? '',
@@ -92,11 +105,10 @@ class Driver {
       blockStatus: map['blockStatus'] ?? 'no',
       deviceToken: map['deviceToken'] ?? '',
       earnings: map['earnings'] ?? '0',
-      // پشتیبانی همزمان از کلید قدیمی و جدید برای جلوگیری از ارور
       driverRatings: map['driverRatings'] ?? map['driverRattings'] ?? '0',
       vehicleInfo: map['vehicleInfo'] != null 
           ? VehicleInfo.fromMap(Map<String, dynamic>.from(map['vehicleInfo']))
-          : VehicleInfo.empty(), // در صورت خالی بودن مقدار خالی برمی‌گرداند
+          : VehicleInfo.empty(),
     );
   }
 }
