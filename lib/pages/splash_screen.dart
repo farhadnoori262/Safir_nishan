@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -5,9 +6,8 @@ import 'package:provider/provider.dart';
 import 'package:safir_drivers/pages/auth/register_screen.dart';
 import 'package:safir_drivers/pages/dashboard.dart';
 import 'package:safir_drivers/providers/authentication_provider.dart';
+import 'package:safir_drivers/utils/app_colors.dart';
 import 'package:safir_drivers/widgets/blocked_screen.dart';
-
-const Color safirColor = Color(0xFF145A41);
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -127,7 +127,7 @@ class _SplashScreenState extends State<SplashScreen> {
   Widget build(BuildContext context) {
     if (_hasError) {
       return Scaffold(
-        backgroundColor: safirColor,
+        backgroundColor: AppColors.primaryBrand,
         body: SafeArea(
           child: Stack(
             children: [
@@ -141,14 +141,14 @@ class _SplashScreenState extends State<SplashScreen> {
                       fit: BoxFit.contain,
                     ),
                     const SizedBox(height: 32),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 40.0),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 40.0),
                       child: Text(
-                        'ارتباط با سرور برقرار نشد. لطفاً اینترنت خود را بررسی کنید.',
+                        'network_error_msg'.tr(),
                         textAlign: TextAlign.center,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 16,
-                          color: Colors.white,
+                          color: AppColors.buttonText,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -166,18 +166,18 @@ class _SplashScreenState extends State<SplashScreen> {
                     child: ElevatedButton(
                       onPressed: _checkAuthAndNavigation,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
+                        backgroundColor: AppColors.cardBackground,
                         elevation: 0,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),
                       ),
-                      child: const Text(
-                        'تلاش دوباره',
-                        style: TextStyle(
+                      child: Text(
+                        'retry'.tr(),
+                        style: const TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.bold,
-                          color: safirColor,
+                          color: AppColors.primaryBrand,
                         ),
                       ),
                     ),
@@ -192,7 +192,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
     if (_isLoading || _targetScreen == null) {
       return Scaffold(
-        backgroundColor: safirColor,
+        backgroundColor: AppColors.primaryBrand,
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -204,7 +204,7 @@ class _SplashScreenState extends State<SplashScreen> {
               ),
               const SizedBox(height: 32),
               const CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                valueColor: AlwaysStoppedAnimation<Color>(AppColors.buttonText),
                 strokeWidth: 3,
               ),
             ],
