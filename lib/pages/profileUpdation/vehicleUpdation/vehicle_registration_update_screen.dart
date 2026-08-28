@@ -1,12 +1,12 @@
 import 'dart:io';
-import 'package:safir_drivers/methods/common_method.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
-import 'package:safir_drivers/providers/registration_provider.dart';
-import 'package:safir_drivers/utils/lang_helper.dart'; // 👈 هیلپر زبان سفیر
 
-import '../../../global/global.dart';
+import 'package:safir_drivers/methods/common_method.dart';
+import 'package:safir_drivers/providers/registration_provider.dart';
+import 'package:safir_drivers/utils/app_colors.dart';
 
 class VehicleRegistrationUpdateScreen extends StatefulWidget {
   const VehicleRegistrationUpdateScreen({super.key});
@@ -21,16 +21,22 @@ class _VehicleRegistrationUpdateScreenState
   final _formKey = GlobalKey<FormState>();
 
   @override
-  Widget build(BuildContext context) {CommonMethods commonMethods = CommonMethods();
-
-    const Color brandColor = Color(0xFF145A41); // رنگ سبز برند سفیر
+  Widget build(BuildContext context) {
+    final CommonMethods commonMethods = CommonMethods();
 
     return Consumer<RegistrationProvider>(
       builder: (context, registrationProvider, child) => Scaffold(
+        backgroundColor: AppColors.background,
         appBar: AppBar(
+          backgroundColor: AppColors.cardBackground,
+          elevation: 0,
           title: Text(
-            tr(context, 'reg_card_title'),
-            style: const TextStyle(fontFamily: 'IranYekan', fontSize: 15, fontWeight: FontWeight.bold),
+            'reg_card_title'.tr(),
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
           ),
           centerTitle: true,
           leading: TextButton(
@@ -38,8 +44,11 @@ class _VehicleRegistrationUpdateScreenState
               Navigator.pop(context);
             },
             child: Text(
-              tr(context, 'close'),
-              style: const TextStyle(fontFamily: 'IranYekan', color: Colors.black87, fontWeight: FontWeight.bold),
+              'close'.tr(),
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
           leadingWidth: 70,
@@ -53,31 +62,35 @@ class _VehicleRegistrationUpdateScreenState
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // بارگذاری روی جواز سیر
-                  _buildImagePickerFront(
-                      context,
-                      tr(context, 'reg_card_front_label'),
-                      registrationProvider.vehicleRegistrationFrontImage,
-                      () => registrationProvider
-                          .pickAndCropVehicleRegistrationImages(true)),
+                  _buildImagePicker(
+                    context,
+                    'reg_card_front_label'.tr(),
+                    registrationProvider.vehicleRegistrationFrontImage,
+                    'assets/auth/cnic-front.png',
+                    () => registrationProvider
+                        .pickAndCropVehicleRegistrationImages(true),
+                  ),
                   const SizedBox(height: 16),
 
                   // بارگذاری پشت جواز سیر
-                  _buildImagePickerBack(
-                      context,
-                      tr(context, 'reg_card_back_label'),
-                      registrationProvider.vehicleRegistrationBackImage,
-                      () => registrationProvider
-                          .pickAndCropVehicleRegistrationImages(false)),
-                  const SizedBox(height: 20),
+                  _buildImagePicker(
+                    context,
+                    'reg_card_back_label'.tr(),
+                    registrationProvider.vehicleRegistrationBackImage,
+                    'assets/auth/cnic-back.png',
+                    () => registrationProvider
+                        .pickAndCropVehicleRegistrationImages(false),
+                  ),
+                  const SizedBox(height: 24),
 
                   // دکمه ثبت و به‌روزرسانی
                   SizedBox(
                     width: MediaQuery.of(context).size.width * 0.9,
-                    height: 50,
+                    height: 52,
                     child: ElevatedButton(
                       onPressed: registrationProvider.vehicleRegistrationFrontImage != null &&
                               registrationProvider.vehicleRegistrationBackImage != null &&
-                              registrationProvider.isLoading == false
+                              !registrationProvider.isLoading
                           ? () async {
                               if (_formKey.currentState?.validate() == true) {
                                 try {
@@ -85,17 +98,18 @@ class _VehicleRegistrationUpdateScreenState
                                       .updateVehicleRegistraionImages(context);
                                   if (context.mounted) {
                                     commonMethods.displaySnackBar(
-                                        tr(context, 'reg_card_success'),
-                                        context);
+                                      'reg_card_success'.tr(),
+                                      context,
+                                    );
                                   }
                                 } catch (e) {
-                                  print("Error while saving data: $e");
+                                  debugPrint("Error while saving data: $e");
                                 }
                               }
                             }
                           : null,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: brandColor,
+                        backgroundColor: AppColors.primaryBrand,
                         disabledBackgroundColor: Colors.grey.shade400,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -106,8 +120,12 @@ class _VehicleRegistrationUpdateScreenState
                               color: Colors.white,
                             )
                           : Text(
-                              tr(context, 'update_docs'),
-                              style: const TextStyle(fontFamily: 'IranYekan', color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                              'update_docs'.tr(),
+                              style: const TextStyle(
+                                color: AppColors.buttonText,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                              ),
                             ),
                     ),
                   ),
@@ -120,15 +138,23 @@ class _VehicleRegistrationUpdateScreenState
     );
   }
 
-  Widget _buildImagePickerFront(BuildContext context, String label,
-      XFile? imageFile, VoidCallback onPressed) {
+  Widget _buildImagePicker(
+    BuildContext context,
+    String label,
+    XFile? imageFile,
+    String placeholderAsset,
+    VoidCallback onPressed,
+  ) {
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.black12),
-        borderRadius: BorderRadius.circular(15),
-        color: Colors.white,
+        color: AppColors.cardBackground,
+        borderRadius: BorderRadius.circular(16),
         boxShadow: const [
-          BoxShadow(color: Colors.black12, offset: Offset(0, 2), blurRadius: 6.0),
+          BoxShadow(
+            color: Colors.black12,
+            offset: Offset(0, 2),
+            blurRadius: 6.0,
+          ),
         ],
       ),
       child: Column(
@@ -138,80 +164,52 @@ class _VehicleRegistrationUpdateScreenState
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: Text(
               label,
-              style: const TextStyle(fontFamily: 'IranYekan', fontSize: 14, fontWeight: FontWeight.w500),
-            ),
-          ),
-          const SizedBox(height: 16),
-          imageFile != null
-              ? ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.file(File(imageFile.path), height: 150, width: 240, fit: BoxFit.cover),
-                )
-              : Image.asset('assets/auth/cnic-front.png', height: 150, width: 240, fit: BoxFit.contain),
-          const SizedBox(height: 16),
-          Container(
-            width: 180,
-            height: 42,
-            decoration: BoxDecoration(
-              border: Border.all(color: const Color(0xFF145A41)),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: TextButton.icon(
-              onPressed: onPressed,
-              icon: const Icon(Icons.camera_alt, color: Color(0xFF145A41), size: 18),
-              label: Text(
-                tr(context, 'take_photo'),
-                style: const TextStyle(fontFamily: 'IranYekan', color: Color(0xFF145A41), fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textPrimary,
               ),
             ),
           ),
           const SizedBox(height: 16),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildImagePickerBack(BuildContext context, String label,
-      XFile? imageFile, VoidCallback onPressed) {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.black12),
-        borderRadius: BorderRadius.circular(15),
-        color: Colors.white,
-        boxShadow: const [
-          BoxShadow(color: Colors.black12, offset: Offset(0, 2), blurRadius: 6.0),
-        ],
-      ),
-      child: Column(
-        children: [
-          const SizedBox(height: 16),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Text(
-              label,
-              style: const TextStyle(fontFamily: 'IranYekan', fontSize: 14, fontWeight: FontWeight.w500),
-            ),
-          ),
-          const SizedBox(height: 16),
           imageFile != null
               ? ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.file(File(imageFile.path), height: 150, width: 240, fit: BoxFit.cover),
+                  borderRadius: BorderRadius.circular(10),
+                  child: Image.file(
+                    File(imageFile.path),
+                    height: 150,
+                    width: 240,
+                    fit: BoxFit.cover,
+                  ),
                 )
-              : Image.asset('assets/auth/cnic-back.png', height: 150, width: 240, fit: BoxFit.contain),
+              : Image.asset(
+                  placeholderAsset,
+                  height: 150,
+                  width: 240,
+                  fit: BoxFit.contain,
+                ),
           const SizedBox(height: 16),
           Container(
             width: 180,
             height: 42,
             decoration: BoxDecoration(
-                border: Border.all(color: const Color(0xFF145A41)),
-                borderRadius: BorderRadius.circular(12)),
+              border: Border.all(color: AppColors.primaryBrand),
+              borderRadius: BorderRadius.circular(12),
+            ),
             child: TextButton.icon(
               onPressed: onPressed,
-              icon: const Icon(Icons.camera_alt, color: Color(0xFF145A41), size: 18),
+              icon: const Icon(
+                Icons.camera_alt,
+                color: AppColors.primaryBrand,
+                size: 18,
+              ),
               label: Text(
-                tr(context, 'take_photo'),
-                style: const TextStyle(fontFamily: 'IranYekan', color: Color(0xFF145A41), fontWeight: FontWeight.bold),
+                'take_photo'.tr(),
+                style: const TextStyle(
+                  color: AppColors.primaryBrand,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ),
