@@ -1,8 +1,10 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:safir_drivers/providers/trip_provider.dart'; 
-import 'package:safir_drivers/utils/lang_helper.dart';
-import 'trips_history_page.dart';
+
+import 'package:safir_drivers/pages/trips_history_page.dart';
+import 'package:safir_drivers/providers/trip_provider.dart';
+import 'package:safir_drivers/utils/app_colors.dart';
 
 class TripsPage extends StatefulWidget {
   const TripsPage({super.key});
@@ -12,12 +14,6 @@ class TripsPage extends StatefulWidget {
 }
 
 class _TripsPageState extends State<TripsPage> {
-  // 🎨 پالت رنگی رسمی برند سفیر
-  static const Color brandPrimary = Color(0xFF145A41);   // رنگ اصلی برند
-  static const Color btnPrimary = Color(0xFF1B7A57);     // دکمه اصلی
-  static const Color cardBgLight = Color(0xFFEAF6F1);    // پس‌زمینه روشن کارت‌ها
-  static const Color textOnBtn = Color(0xFFFFFFFF);      // متن روی دکمه
-
   @override
   void initState() {
     super.initState();
@@ -31,47 +27,48 @@ class _TripsPageState extends State<TripsPage> {
     final tripProvider = Provider.of<TripProvider>(context);
 
     return Scaffold(
-      backgroundColor: cardBgLight, // استفاده از پس‌زمینه کارت‌های پالت
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text(
-          tr(context, 'trips_report_title'),
+          'trips_report_title'.tr(),
           style: const TextStyle(
-            fontFamily: 'IranYekan', 
-            fontWeight: FontWeight.bold, 
+            fontWeight: FontWeight.bold,
             fontSize: 16,
-            color: Colors.black87,
+            color: AppColors.textPrimary,
           ),
         ),
         centerTitle: true,
-        backgroundColor: Colors.white,
-        elevation: 0.5,
+        backgroundColor: AppColors.cardBackground,
+        elevation: 0,
         automaticallyImplyLeading: false,
       ),
       body: tripProvider.isLoading
           ? const Center(
               child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(brandPrimary),
+                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryBrand),
               ),
             )
           : SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
               child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 20),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 24,
+                  horizontal: 20,
+                ),
                 child: Column(
-
                   children: [
                     // کارت نمایش مجموع سفرها
                     Center(
                       child: Container(
                         width: double.infinity,
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: AppColors.cardBackground,
                           borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
+                          boxShadow: const [
                             BoxShadow(
-                              color: brandPrimary.withOpacity(0.06),
-                              offset: const Offset(0, 4),
-                              blurRadius: 15,
+                              color: Colors.black12,
+                              offset: Offset(0, 4),
+                              blurRadius: 12,
                             ),
                           ],
                         ),
@@ -85,10 +82,9 @@ class _TripsPageState extends State<TripsPage> {
                               ),
                               const SizedBox(height: 16),
                               Text(
-                                tr(context, 'total_completed_trips'),
-                                style: TextStyle(
-                                  fontFamily: 'IranYekan',
-                                  color: Colors.grey.shade600,
+                                'total_completed_trips'.tr(),
+                                style: const TextStyle(
+                                  color: AppColors.textSecondary,
                                   fontSize: 14,
                                 ),
                               ),
@@ -96,8 +92,7 @@ class _TripsPageState extends State<TripsPage> {
                               Text(
                                 tripProvider.currentDriverTotalTripsCompleted,
                                 style: const TextStyle(
-                                  fontFamily: 'IranYekan',
-                                  color: brandPrimary,
+                                  color: AppColors.primaryBrand,
                                   fontSize: 34,
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -107,9 +102,9 @@ class _TripsPageState extends State<TripsPage> {
                         ),
                       ),
                     ),
-                    
+
                     const SizedBox(height: 20),
-                    
+
                     // دکمه/کارت هدایت به تاریخچه سفرها
                     Material(
                       color: Colors.transparent,
@@ -117,18 +112,20 @@ class _TripsPageState extends State<TripsPage> {
                         onTap: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (c) => const TripsHistoryPage()),
+                            MaterialPageRoute(
+                              builder: (c) => const TripsHistoryPage(),
+                            ),
                           );
                         },
                         borderRadius: BorderRadius.circular(20),
                         child: Container(
                           width: double.infinity,
                           decoration: BoxDecoration(
-                            color: btnPrimary, // دکمه اصلی بر اساس پالت
+                            color: AppColors.primaryBrand,
                             borderRadius: BorderRadius.circular(20),
                             boxShadow: [
                               BoxShadow(
-                                color: btnPrimary.withOpacity(0.25),
+                                color: AppColors.primaryBrand.withOpacity(0.3),
                                 offset: const Offset(0, 6),
                                 blurRadius: 12,
                               ),
@@ -140,8 +137,8 @@ class _TripsPageState extends State<TripsPage> {
                               children: [
                                 Image.asset(
                                   "assets/images/tripscompleted.png",
-                                  width: 100,
-                                  color: textOnBtn,
+                                  width: 90,
+                                  color: AppColors.buttonText,
                                   colorBlendMode: BlendMode.modulate,
                                 ),
                                 const SizedBox(height: 14),
@@ -149,22 +146,19 @@ class _TripsPageState extends State<TripsPage> {
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Text(
-                                      tr(context, 'view_trips_history'),
+                                      'view_trips_history'.tr(),
                                       style: const TextStyle(
-                                        fontFamily: 'IranYekan',
-                                        color: textOnBtn,
+                                        color: AppColors.buttonText,
                                         fontSize: 15,
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
                                     const SizedBox(width: 8),
-                                    Icon(
-                                      Directionality.of(context) == TextDirection.rtl
-                                          ? Icons.arrow_back_ios_new
-                                          : Icons.arrow_forward_ios,
-                                      color: textOnBtn,
-                                      size: 14,
-                                    )
+                                    const Icon(
+                                      Icons.chevron_left_rounded,
+                                      color: AppColors.buttonText,
+                                      size: 20,
+                                    ),
                                   ],
                                 ),
                               ],
