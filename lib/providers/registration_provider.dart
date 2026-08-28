@@ -12,7 +12,6 @@ import 'package:safir_drivers/methods/common_method.dart';
 import 'package:safir_drivers/methods/image_picker_service.dart'; 
 import 'package:safir_drivers/models/driver.dart'; 
 import 'package:safir_drivers/models/vehicle_info.dart'; 
-import 'package:safir_drivers/pages/profile/profile_page.dart'; 
 import 'package:safir_drivers/providers/authentication_provider.dart'; 
 import 'package:safir_drivers/utils/lang_helper.dart';
 import 'package:http/http.dart' as http;
@@ -43,11 +42,11 @@ class RegistrationProvider extends ChangeNotifier {
   XFile? _vehicleRegistrationBackImage;
   bool _isDataFetched = false;
   bool get isDataFetched => _isDataFetched;
-  final bool _currentDriverInfo = false;
+  
   double _driverEarnings = 0.0;
-  get driverEarnings => _driverEarnings;
+  double get driverEarnings => _driverEarnings;
 
-  // 🇦🇫 متغیرهای پلاک اختصاصی افغانستان
+  // 🇦🇫 متغیرهای اختصاصی پلاک افغانستان
   String _plateProvince = 'کابل';
   String _plateCategory = 'ش';
   String _plateType = 'شخصی';
@@ -87,7 +86,7 @@ class RegistrationProvider extends ChangeNotifier {
   final TextEditingController numberPlateController = TextEditingController();
   final TextEditingController productionYearController = TextEditingController();
 
-  // گترها (Getters) و سترها (Setters) هماهنگ با صفحات برنامه
+  // گترها و سترها
   XFile? get profilePhoto => _profilePhoto;
   bool get isPhotoAdded => _isPhotoAdded;
   bool get isFormValidBasic => _isFormValidBasic;
@@ -111,10 +110,8 @@ class RegistrationProvider extends ChangeNotifier {
   }
 
   Timer? _debounce;
-
   CommonMethods commonMethods = CommonMethods();
 
-  // گتر و ستر بخش سلفی و شناسنامه
   XFile? get cnicWithSelfieImage => _cnicWithSelfieImage;
   set cnicWithSelfieImage(XFile? val) {
     _cnicWithSelfieImage = val;
@@ -133,7 +130,6 @@ class RegistrationProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // گتر و ستر گواهینامه رانندگی
   XFile? get drivingLicenseFrontImage => _drivingLicenseFrontImage;
   set drivingLicenseFrontImage(XFile? val) {
     _drivingLicenseFrontImage = val;
@@ -146,7 +142,6 @@ class RegistrationProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // گتر و ستر عکس خودرو
   XFile? get vehicleImage => _vehicleImage;
   set vehicleImage(XFile? val) {
     _vehicleImage = val;
@@ -182,10 +177,8 @@ class RegistrationProvider extends ChangeNotifier {
   void initFields(AuthenticationProvider authProvider) {
     if (!authProvider.isGoogleSignedIn) {
       phoneController.text = authProvider.phoneNumber;
-    }
-    if (authProvider.isGoogleSignedIn) {
-      emailController.text =
-          authProvider.firebaseAuth.currentUser?.email ?? '';
+    } else {
+      emailController.text = authProvider.firebaseAuth.currentUser?.email ?? '';
       phoneController.text = '';
     }
     checkBasicFormValidity();
@@ -211,7 +204,7 @@ class RegistrationProvider extends ChangeNotifier {
       _isFormValidCninc = _cnicFrontImage != null &&
           _cnicBackImage != null &&
           cnicController.text.isNotEmpty &&
-          cnicController.text.length == 13;
+          cnicController.text.length >= 10;
       notifyListeners();
     });
   }
@@ -221,8 +214,7 @@ class RegistrationProvider extends ChangeNotifier {
     _debounce = Timer(const Duration(milliseconds: 300), () {
       _isFormValidDrivingLicense = _drivingLicenseFrontImage != null &&
           _drivingLicenseBackImage != null &&
-          drivingLicenseController.text.isNotEmpty &&
-          licenseRegExp.hasMatch(drivingLicenseController.text);
+          drivingLicenseController.text.isNotEmpty;
       notifyListeners();
     });
   }
@@ -352,8 +344,8 @@ class RegistrationProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // آپلود عکس به استوریج فایربیس
-  Future<String> uploadImageToFirebaseStorage(XFile? photo, String? path, BuildContext context) async {
+  // آپلود عکس به Firebase Storage
+  Future<String> uploadImageToFirebaseStorage(XFile? photo, String path, BuildContext context) async {
     if (photo == null) {
       throw Exception(tr(context, 'err_no_image_selected'));
     }
@@ -363,7 +355,7 @@ class RegistrationProvider extends ChangeNotifier {
     final reference = _storage
         .ref()
         .child(_auth.currentUser!.uid)
-        .child(path!)
+        .child(path)
         .child(imageIDName);
     final uploadTask = reference.putFile(file);
     final snapshot = await uploadTask.whenComplete(() => {});
@@ -371,6 +363,7 @@ class RegistrationProvider extends ChangeNotifier {
     return downloadUrl;
   }
 
+  // ذخیره کل اطلاعات راننده در فایربیس
   Future<void> saveUserData(BuildContext context) async {
     if (!isFormValidBasic ||
         !isFormValidCninc ||
@@ -433,8 +426,8 @@ class RegistrationProvider extends ChangeNotifier {
           plateProvince: _plateProvince,
           plateCategory: _plateCategory,
           plateType: _plateType,
-          registrationCertificateBackImage: vehicleRegistrationFrontImageUrl,
-          registrationCertificateFrontImage: vehicleRegistrationBackImageUrl,
+          registrationCertificateFrontImage: vehicleRegistrationFrontImageUrl,
+          registrationCertificateBackImage: vehicleRegistrationBackImageUrl,
         ), 
       );
 
@@ -444,7 +437,7 @@ class RegistrationProvider extends ChangeNotifier {
       stopLoading();
     } catch (e) {
       stopLoading();
-      print("Error saving driver data: $e");
+      debugPrint("Error saving driver data: $e");
     }
   }
 
@@ -504,7 +497,7 @@ class RegistrationProvider extends ChangeNotifier {
         stopFetchLoading();
       }
     } catch (e) {
-      print("Error loading driver data: $e");
+      debugPrint("Error loading driver data: $e");
       stopFetchLoading();
     }
   }
@@ -548,7 +541,7 @@ class RegistrationProvider extends ChangeNotifier {
         notifyListeners();
       }
     } catch (e) {
-      print("Error fetching driver's earnings: $e");
+      debugPrint("Error fetching driver's earnings: $e");
     }
   }
 
@@ -577,7 +570,7 @@ class RegistrationProvider extends ChangeNotifier {
         notifyListeners();
       }
     } catch (e) {
-      print("Error retrieving current driver profile: $e");
+      debugPrint("Error retrieving current driver profile: $e");
     }
   }
 
@@ -602,8 +595,8 @@ class RegistrationProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     } catch (e) {
-      print("An error occurred: $e");
       _isLoading = false;
+      notifyListeners();
     }
   }
 
@@ -627,6 +620,7 @@ class RegistrationProvider extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       _isLoading = false;
+      notifyListeners();
     }
   }
 
@@ -646,6 +640,7 @@ class RegistrationProvider extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       _isLoading = false;
+      notifyListeners();
     }
   }
 
@@ -658,9 +653,9 @@ class RegistrationProvider extends ChangeNotifier {
       final drivingLicenseBackImageUrl = await uploadImageToFirebaseStorage(
           _drivingLicenseBackImage, "DrivingLicenseImages", context);
       final driverData = {
-        'driverLicenseFrontImage': drivingLicenseFrontImageUrl,
-        'driverLicenseBackImage': drivingLicenseBackImageUrl,
-        'driverLicenseNumber': drivingLicenseController.text,
+        'drivingLicenseFrontImage': drivingLicenseFrontImageUrl,
+        'drivingLicenseBackImage': drivingLicenseBackImageUrl,
+        'drivingLicenseNumber': drivingLicenseController.text,
       };
       final userRef =
           _database.ref().child("drivers").child(_auth.currentUser!.uid);
@@ -669,6 +664,7 @@ class RegistrationProvider extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       _isLoading = false;
+      notifyListeners();
     }
   }
 
@@ -696,6 +692,7 @@ class RegistrationProvider extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       _isLoading = false;
+      notifyListeners();
     }
   }
 
@@ -718,6 +715,7 @@ class RegistrationProvider extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       _isLoading = false;
+      notifyListeners();
     }
   }
 
@@ -745,6 +743,7 @@ class RegistrationProvider extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       _isLoading = false;
+      notifyListeners();
     }
   }
 }
