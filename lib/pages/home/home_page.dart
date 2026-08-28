@@ -50,7 +50,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   Future<void> _loadCustomIcons() async {
     if (mapController == null) return;
     try {
-      final ByteData bytes = await rootBundle.load("assets/images/car_icon.png");
+      final ByteData bytes = await rootBundle.load("assets/images/driver_arrow.png");
       final Uint8List list = bytes.buffer.asUint8List();
       await mapController!.addImage("driver-arrow", list);
     } catch (e) {
