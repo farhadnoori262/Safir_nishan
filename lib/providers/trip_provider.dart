@@ -50,4 +50,14 @@ class TripProvider with ChangeNotifier {
       notifyListeners();
     }
   }
+
+  // رفع خطای فراخوانی در trips_page.dart
+  String getCurrentDriverTotalNumberOfTripsCompleted() {
+    return currentDriverTotalTripsCompleted;
+  }
+
+  // رفع خطای فراخوانی در trips_history_page.dart
+  Future<void> getCompletedTrips() async {
+    await fetchCompletedTrips();
+  }
 }
