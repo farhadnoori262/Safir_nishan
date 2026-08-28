@@ -2,7 +2,8 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import 'package:safir_drivers/pages/trips_history_page.dart';
+import 'trips_history_page.dart';
+
 import 'package:safir_drivers/providers/trip_provider.dart';
 import 'package:safir_drivers/utils/app_colors.dart';
 
