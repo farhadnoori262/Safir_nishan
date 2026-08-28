@@ -8,7 +8,6 @@ import 'package:provider/provider.dart';
 import '../../../providers/registration_provider.dart';
 import '../../../utils/app_colors.dart';
 
-
 class VehicleRegistrationScreen extends StatefulWidget {
   const VehicleRegistrationScreen({super.key});
 
@@ -19,16 +18,15 @@ class VehicleRegistrationScreen extends StatefulWidget {
 
 class _VehicleRegistrationScreenState extends State<VehicleRegistrationScreen> {
   final _formKey = GlobalKey<FormState>();
-  final ImagePicker _picker = ImagePicker(); // ابزار دوربین سبک داخلی برای جلوگیری از کرش
+  final ImagePicker _picker = ImagePicker();
 
-  // متد گرفتن عکس و آپدیت مستقیم پرووایدر از طریق Setterهای جدید
   Future<void> _pickLightImage(bool isFront, RegistrationProvider provider) async {
     try {
       final XFile? pickedFile = await _picker.pickImage(
         source: ImageSource.camera,
         maxWidth: 600,
         maxHeight: 600,
-        imageQuality: 40, // فشرده‌سازی جهت بهینه‌سازی حافظه گوشی
+        imageQuality: 40,
       );
 
       if (pickedFile != null) {
@@ -91,7 +89,6 @@ class _VehicleRegistrationScreenState extends State<VehicleRegistrationScreen> {
                 children: [
                   const SizedBox(height: 10),
                   
-                  // بارگذاری تصویر روی کارت موتر
                   _buildImagePicker(
                     context: context,
                     label: 'registration_front_title'.tr(),
@@ -102,7 +99,6 @@ class _VehicleRegistrationScreenState extends State<VehicleRegistrationScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // بارگذاری تصویر پشت کارت موتر
                   _buildImagePicker(
                     context: context,
                     label: 'registration_back_title'.tr(),
@@ -113,7 +109,6 @@ class _VehicleRegistrationScreenState extends State<VehicleRegistrationScreen> {
                   ),
                   const SizedBox(height: 25),
 
-                  // دکمه تایید نهایی سند موتر
                   SizedBox(
                     width: MediaQuery.of(context).size.width,
                     height: 50,
@@ -159,7 +154,6 @@ class _VehicleRegistrationScreenState extends State<VehicleRegistrationScreen> {
     );
   }
 
-  // ویجت ساخت کادر دریافت عکس روی/پشت کارت موتر
   Widget _buildImagePicker({
     required BuildContext context,
     required String label,
