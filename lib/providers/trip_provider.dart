@@ -4,77 +4,47 @@ import 'package:firebase_database/firebase_database.dart';
 
 class TripProvider with ChangeNotifier {
   String currentDriverTotalTripsCompleted = "0";
-  bool isLoading = true;
+  bool isLoading = false;
   List<Map<String, dynamic>> completedTrips = [];
 
-  // متد دریافت تعداد کل سفرهای موفق و پایان یافته راننده جاری
-  Future<void> getCurrentDriverTotalNumberOfTripsCompleted() async {
-    try {
-      isLoading = true;
-      notifyListeners();
-      
-      DatabaseReference tripRequestsRef =
-          FirebaseDatabase.instance.ref().child("tripRequest");
+  final DatabaseReference _tripRequestsRef =
+      FirebaseDatabase.instance.ref().child("tripRequest");
 
-      final snapshot = await tripRequestsRef.once();
-      final currentUid = FirebaseAuth.instance.currentUser?.uid;
+  // دریافت تمام سفرهای تکمیل شده در یک کوئری بهینه‌شده
+  Future<void> fetchCompletedTrips() async {
+    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUid == null) return;
 
-      if (snapshot.snapshot.value != null && currentUid != null) {
-        Map<dynamic, dynamic> allTripsMap = snapshot.snapshot.value as Map;
-        int completedCount = 0;
-
-        allTripsMap.forEach((key, value) {
-          if (value is Map &&
-              value["status"] == "ended" &&
-              value["driverId"] == currentUid) {
-            completedCount++;
-          }
-        });
-
-        currentDriverTotalTripsCompleted = completedCount.toString();
-      } else {
-        currentDriverTotalTripsCompleted = "0";
-      }
-    } catch (error) {
-      debugPrint("Error fetching completed trips count: $error");
-    } finally {
-      isLoading = false;
-      notifyListeners();
-    }
-  }
-
-  // متد دریافت لیست کامل جزییات سفرهای تکمیل شده جهت نمایش در تاریخچه
-  Future<void> getCompletedTrips() async {
     try {
       isLoading = true;
       notifyListeners();
 
-      DatabaseReference tripRequestsRef =
-          FirebaseDatabase.instance.ref().child("tripRequest");
+      // فیلتر کردن سفرها بر اساس driverId مستقیم در سمت سرور
+      final querySnapshot = await _tripRequestsRef
+          .orderByChild("driverId")
+          .equalTo(currentUid)
+          .once();
 
-      final snapshot = await tripRequestsRef.once();
-      final currentUid = FirebaseAuth.instance.currentUser?.uid;
+      final dataMap = querySnapshot.snapshot.value;
 
-      if (snapshot.snapshot.value != null && currentUid != null) {
-        Map<dynamic, dynamic> allTripsMap = snapshot.snapshot.value as Map;
+      if (dataMap != null && dataMap is Map) {
         List<Map<String, dynamic>> tempList = [];
 
-        allTripsMap.forEach((key, value) {
-          if (value is Map &&
-              value["status"] == "ended" &&
-              value["driverId"] == currentUid) {
-            // تبدیل امن مپ دیتابیس به فرمت کست شده جهت استفاده در کدهای UI
+        dataMap.forEach((key, value) {
+          if (value is Map && value["status"] == "ended") {
             Map<String, dynamic> tripData = Map<String, dynamic>.from(value);
             tempList.add({"key": key, ...tripData});
           }
         });
-        
+
         completedTrips = tempList;
+        currentDriverTotalTripsCompleted = tempList.length.toString();
       } else {
         completedTrips = [];
+        currentDriverTotalTripsCompleted = "0";
       }
     } catch (error) {
-      debugPrint("Error fetching completed trips list: $error");
+      debugPrint("Error fetching completed trips: $error");
     } finally {
       isLoading = false;
       notifyListeners();
