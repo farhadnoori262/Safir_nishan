@@ -1,14 +1,15 @@
 import 'dart:io';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:safir_drivers/methods/common_method.dart';
+import 'package:safir_drivers/pages/auth/login_screen.dart';
 import 'package:safir_drivers/pages/dashboard.dart';
-import '../widgets/loading_dialog.dart';
-import '../utils/lang_helper.dart'; // 👈 اضافه شدن هیلپر ترجمه
-import 'login_screen.dart';
+import 'package:safir_drivers/utils/app_colors.dart';
+import 'package:safir_drivers/widgets/loading_dialog.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -18,107 +19,130 @@ class SignUpScreen extends StatefulWidget {
 }
 
 class _SignUpScreenState extends State<SignUpScreen> {
-  TextEditingController userNameTextEditingController = TextEditingController();
-  TextEditingController userPhoneTextEditingController = TextEditingController();
-  TextEditingController emailTextEditingController = TextEditingController();
-  TextEditingController passwordTextEditingController = TextEditingController();
-  TextEditingController vehicleModelTextEditingController = TextEditingController();
-  TextEditingController vehicleColorTextEditingController = TextEditingController();
-  TextEditingController vehicleNumberTextEditingController = TextEditingController();
-  CommonMethods cMethods = CommonMethods();
+  final TextEditingController userNameTextEditingController = TextEditingController();
+  final TextEditingController userPhoneTextEditingController = TextEditingController();
+  final TextEditingController emailTextEditingController = TextEditingController();
+  final TextEditingController passwordTextEditingController = TextEditingController();
+  final TextEditingController vehicleModelTextEditingController = TextEditingController();
+  final TextEditingController vehicleColorTextEditingController = TextEditingController();
+  final TextEditingController vehicleNumberTextEditingController = TextEditingController();
+  
+  final CommonMethods cMethods = CommonMethods();
   XFile? imageFile;
   String urlOfUploadedImage = "";
-
   String selectedVehicleType = "economic_car";
 
-  checkIfNetworkIsAvailable() {
+  @override
+  void dispose() {
+    userNameTextEditingController.dispose();
+    userPhoneTextEditingController.dispose();
+    emailTextEditingController.dispose();
+    passwordTextEditingController.dispose();
+    vehicleModelTextEditingController.dispose();
+    vehicleColorTextEditingController.dispose();
+    vehicleNumberTextEditingController.dispose();
+    super.dispose();
+  }
+
+  void checkIfNetworkIsAvailable() {
     if (imageFile != null) {
       signUpFormValidation();
     } else {
-      cMethods.displaySnackBar(tr(context, 'select_pic_error'), context);
+      cMethods.displaySnackBar('select_pic_error'.tr(), context);
     }
   }
 
-  signUpFormValidation() {
-    if (userNameTextEditingController.text.trim().length < 4) { // اصلاح اعتبارسنجی با توجه به متن پیام ارور
-      cMethods.displaySnackBar(tr(context, 'name_length_error'), context);
-    } else if (userPhoneTextEditingController.text.trim().length < 8) { // اصلاح منطق مطابق حداقل ۸ رقم
-      cMethods.displaySnackBar(tr(context, 'phone_length_error'), context);
+  void signUpFormValidation() {
+    if (userNameTextEditingController.text.trim().length < 4) {
+      cMethods.displaySnackBar('name_length_error'.tr(), context);
+    } else if (userPhoneTextEditingController.text.trim().length < 8) {
+      cMethods.displaySnackBar('phone_length_error'.tr(), context);
     } else if (!emailTextEditingController.text.contains("@")) {
-      cMethods.displaySnackBar(tr(context, 'invalid_email_error'), context);
+      cMethods.displaySnackBar('invalid_email_error'.tr(), context);
     } else if (passwordTextEditingController.text.trim().length < 6) {
-      cMethods.displaySnackBar(tr(context, 'password_length_error'), context);
+      cMethods.displaySnackBar('password_length_error'.tr(), context);
     } else if (vehicleModelTextEditingController.text.trim().isEmpty) {
-      cMethods.displaySnackBar(tr(context, 'enter_vehicle_model_error'), context);
+      cMethods.displaySnackBar('enter_vehicle_model_error'.tr(), context);
     } else if (vehicleColorTextEditingController.text.trim().isEmpty) {
-      cMethods.displaySnackBar(tr(context, 'enter_vehicle_color_error'), context);
+      cMethods.displaySnackBar('enter_vehicle_color_error'.tr(), context);
     } else if (vehicleNumberTextEditingController.text.isEmpty) {
-      cMethods.displaySnackBar(tr(context, 'enter_vehicle_plate_error'), context);
+      cMethods.displaySnackBar('enter_vehicle_plate_error'.tr(), context);
     } else {
       uploadImageToStorage();
     }
   }
 
-  uploadImageToStorage() async {
-    String imageIDName = DateTime.now().millisecondsSinceEpoch.toString();
-    Reference referenceImage = FirebaseStorage.instance.ref().child("Images").child(imageIDName);
+  Future<void> uploadImageToStorage() async {
+    try {
+      String imageIDName = DateTime.now().millisecondsSinceEpoch.toString();
+      Reference referenceImage = FirebaseStorage.instance.ref().child("Images").child(imageIDName);
 
-    UploadTask uploadTask = referenceImage.putFile(File(imageFile!.path));
-    TaskSnapshot snapshot = await uploadTask;
-    urlOfUploadedImage = await snapshot.ref.getDownloadURL();
+      UploadTask uploadTask = referenceImage.putFile(File(imageFile!.path));
+      TaskSnapshot snapshot = await uploadTask;
+      urlOfUploadedImage = await snapshot.ref.getDownloadURL();
 
-    setState(() {
-      urlOfUploadedImage;
-    });
-
-    registerNewDriver();
+      if (!mounted) return;
+      registerNewDriver();
+    } catch (errorMsg) {
+      if (!mounted) return;
+      cMethods.displaySnackBar(errorMsg.toString(), context);
+    }
   }
 
-  registerNewDriver() async {
-    try {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (BuildContext context) => LoadingDialog(messageText: tr(context, 'registering_account')),
-      );
+  Future<void> registerNewDriver() async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) => LoadingDialog(messageText: 'registering_account'.tr()),
+    );
 
-      final User? userFirebase = (await FirebaseAuth.instance.createUserWithEmailAndPassword(
+    try {
+      final UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: emailTextEditingController.text.trim(),
         password: passwordTextEditingController.text.trim(),
-      ))
-          .user;
+      );
 
-      if (!context.mounted) return;
+      final User? userFirebase = userCredential.user;
+
+      if (!mounted) return;
       Navigator.pop(context);
 
-      DatabaseReference usersRef = FirebaseDatabase.instance.ref().child("drivers").child(userFirebase!.uid);
+      if (userFirebase != null) {
+        DatabaseReference usersRef = FirebaseDatabase.instance.ref().child("drivers").child(userFirebase.uid);
 
-      Map driverCarInfo = {
-        "type": selectedVehicleType, 
-        "carColor": vehicleColorTextEditingController.text.trim(),
-        "carModel": vehicleModelTextEditingController.text.trim(),
-        "carNumber": vehicleNumberTextEditingController.text.trim(),
-      };
+        Map<String, dynamic> driverCarInfo = {
+          "type": selectedVehicleType,
+          "carColor": vehicleColorTextEditingController.text.trim(),
+          "carModel": vehicleModelTextEditingController.text.trim(),
+          "carNumber": vehicleNumberTextEditingController.text.trim(),
+        };
 
-      Map driverDataMap = {
-        "photo": urlOfUploadedImage,
-        "car_details": driverCarInfo,
-        "name": userNameTextEditingController.text.trim(),
-        "email": emailTextEditingController.text.trim(),
-        "phone": userPhoneTextEditingController.text.trim(),
-        "id": userFirebase.uid,
-        "blockStatus": "no",
-      };
-      usersRef.set(driverDataMap);
+        Map<String, dynamic> driverDataMap = {
+          "photo": urlOfUploadedImage,
+          "car_details": driverCarInfo,
+          "name": userNameTextEditingController.text.trim(),
+          "email": emailTextEditingController.text.trim(),
+          "phone": userPhoneTextEditingController.text.trim(),
+          "id": userFirebase.uid,
+          "blockStatus": "no",
+        };
+        
+        await usersRef.set(driverDataMap);
 
-      Navigator.push(context, MaterialPageRoute(builder: (c) => const Dashboard()));
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (c) => const Dashboard()),
+        );
+      }
     } catch (errorMsg) {
+      if (!mounted) return;
       Navigator.pop(context);
       cMethods.displaySnackBar(errorMsg.toString(), context);
     }
   }
 
-  chooseImageFromGallery() async {
+  Future<void> chooseImageFromGallery() async {
     final pickedFile = await ImagePicker().pickImage(source: ImageSource.gallery);
 
     if (pickedFile != null) {
@@ -130,186 +154,252 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // ایجاد داینامیک لیست کشویی برای پشتیبانی کامل از تغییر زبان منوها
     final List<DropdownMenuItem<String>> vehicleTypeItems = [
-      DropdownMenuItem(value: "economic_car", child: Text(tr(context, 'economic_car'), style: const TextStyle(fontFamily: 'IranYekan'))),
-      DropdownMenuItem(value: "modern_car", child: Text(tr(context, 'modern_car'), style: const TextStyle(fontFamily: 'IranYekan'))),
-      DropdownMenuItem(value: "motorbike", child: Text(tr(context, 'motorbike'), style: const TextStyle(fontFamily: 'IranYekan'))),
+      DropdownMenuItem(value: "economic_car", child: Text('economic_car'.tr())),
+      DropdownMenuItem(value: "modern_car", child: Text('modern_car'.tr())),
+      DropdownMenuItem(value: "motorbike", child: Text('motorbike'.tr())),
     ];
 
     return Scaffold(
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Column(
-            children: [
-              const SizedBox(height: 40),
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const SizedBox(height: 20),
 
-              imageFile == null
-                  ? const CircleAvatar(
-                      radius: 86,
-                      backgroundImage: AssetImage("assets/images/avatarman.png"),
-                    )
-                  : Container(
-                      width: 180,
-                      height: 180,
-                      decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.grey,
-                          image: DecorationImage(
-                              fit: BoxFit.fitHeight,
-                              image: FileImage(File(imageFile!.path)))),
-                    ),
-
-              const SizedBox(height: 10),
-
-              GestureDetector(
-                onTap: () {
-                  chooseImageFromGallery();
-                },
-                child: Text(
-                  tr(context, 'choose_profile_pic'),
-                  style: const TextStyle(
-                    fontFamily: 'IranYekan',
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                // انتخاب عکس پروفایل
+                GestureDetector(
+                  onTap: chooseImageFromGallery,
+                  child: Stack(
+                    children: [
+                      imageFile == null
+                          ? const CircleAvatar(
+                              radius: 60,
+                              backgroundColor: Colors.grey,
+                              backgroundImage: AssetImage("assets/images/avatarman.png"),
+                            )
+                          : Container(
+                              width: 120,
+                              height: 120,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                image: DecorationImage(
+                                  fit: BoxFit.cover,
+                                  image: FileImage(File(imageFile!.path)),
+                                ),
+                              ),
+                            ),
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: const BoxDecoration(
+                            color: AppColors.primaryBrand,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.camera_alt, color: Colors.white, size: 18),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
 
-              Padding(
-                padding: const EdgeInsets.all(22),
-                child: Column(
+                const SizedBox(height: 12),
+
+                GestureDetector(
+                  onTap: chooseImageFromGallery,
+                  child: Text(
+                    'choose_profile_pic'.tr(),
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primaryBrand,
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 24),
+
+                // فرم اطلاعات
+                Column(
                   children: [
-                    TextField(
+                    _buildTextField(
                       controller: userNameTextEditingController,
-                      keyboardType: TextInputType.text,
-                      decoration: InputDecoration(
-                        labelText: tr(context, 'full_name'),
-                        labelStyle: const TextStyle(fontFamily: 'IranYekan', fontSize: 14),
-                      ),
-                      style: const TextStyle(color: Colors.grey, fontSize: 15),
+                      label: 'full_name'.tr(),
+                      icon: Icons.person_outline,
                     ),
-                    const SizedBox(height: 22),
-                    TextField(
+                    const SizedBox(height: 16),
+                    _buildTextField(
                       controller: userPhoneTextEditingController,
+                      label: 'phone'.tr(),
+                      icon: Icons.phone_outlined,
                       keyboardType: TextInputType.phone,
-                      decoration: InputDecoration(
-                        labelText: tr(context, 'phone'),
-                        labelStyle: const TextStyle(fontFamily: 'IranYekan', fontSize: 14),
-                      ),
-                      style: const TextStyle(color: Colors.grey, fontSize: 15),
                     ),
-                    const SizedBox(height: 22),
-                    TextField(
+                    const SizedBox(height: 16),
+                    _buildTextField(
                       controller: emailTextEditingController,
+                      label: 'email'.tr(),
+                      icon: Icons.email_outlined,
                       keyboardType: TextInputType.emailAddress,
-                      decoration: InputDecoration(
-                        labelText: tr(context, 'email'),
-                        labelStyle: const TextStyle(fontFamily: 'IranYekan', fontSize: 14),
-                      ),
-                      style: const TextStyle(color: Colors.grey, fontSize: 15),
                     ),
-                    const SizedBox(height: 22),
-                    TextField(
+                    const SizedBox(height: 16),
+                    _buildTextField(
                       controller: passwordTextEditingController,
+                      label: 'password'.tr(),
+                      icon: Icons.lock_outline_rounded,
                       obscureText: true,
-                      keyboardType: TextInputType.text,
-                      decoration: InputDecoration(
-                        labelText: tr(context, 'password'),
-                        labelStyle: const TextStyle(fontFamily: 'IranYekan', fontSize: 14),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // انتخاب نوع خودرو
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.cardBackground,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade200),
                       ),
-                      style: const TextStyle(color: Colors.grey, fontSize: 15),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'vehicle_type'.tr(),
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: selectedVehicleType,
+                              items: vehicleTypeItems,
+                              onChanged: (value) {
+                                setState(() {
+                                  selectedVehicleType = value!;
+                                });
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    
-                    const SizedBox(height: 25),
-                    
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          "${tr(context, 'vehicle_type')}:",
-                          style: const TextStyle(fontFamily: 'IranYekan', fontSize: 15, color: Colors.grey),
-                        ),
-                        DropdownButton<String>(
-                          value: selectedVehicleType,
-                          items: vehicleTypeItems,
-                          onChanged: (value) {
-                            setState(() {
-                              selectedVehicleType = value!;
-                            });
-                          },
-                        ),
-                      ],
-                    ),
-                    
-                    const SizedBox(height: 15),
-                    TextField(
+
+                    const SizedBox(height: 16),
+                    _buildTextField(
                       controller: vehicleModelTextEditingController,
-                      keyboardType: TextInputType.text,
-                      decoration: InputDecoration(
-                        labelText: tr(context, 'vehicle_model_hint'),
-                        labelStyle: const TextStyle(fontFamily: 'IranYekan', fontSize: 14),
-                      ),
-                      style: const TextStyle(color: Colors.grey, fontSize: 15),
+                      label: 'vehicle_model_hint'.tr(),
+                      icon: Icons.directions_car_outlined,
                     ),
-                    const SizedBox(height: 22),
-                    TextField(
+                    const SizedBox(height: 16),
+                    _buildTextField(
                       controller: vehicleColorTextEditingController,
-                      keyboardType: TextInputType.text,
-                      decoration: InputDecoration(
-                        labelText: tr(context, 'vehicle_color_label'),
-                        labelStyle: const TextStyle(fontFamily: 'IranYekan', fontSize: 14),
-                      ),
-                      style: const TextStyle(color: Colors.grey, fontSize: 15),
+                      label: 'vehicle_color_label'.tr(),
+                      icon: Icons.palette_outlined,
                     ),
-                    const SizedBox(height: 22),
-                    TextField(
+                    const SizedBox(height: 16),
+                    _buildTextField(
                       controller: vehicleNumberTextEditingController,
-                      keyboardType: TextInputType.text,
-                      decoration: InputDecoration(
-                        labelText: tr(context, 'vehicle_plate_label'),
-                        labelStyle: const TextStyle(fontFamily: 'IranYekan', fontSize: 14),
-                      ),
-                      style: const TextStyle(color: Colors.grey, fontSize: 15),
+                      label: 'vehicle_plate_label'.tr(),
+                      icon: Icons.confirmation_number_outlined,
                     ),
-                    const SizedBox(height: 22),
-                    ElevatedButton(
-                      onPressed: () {
-                        checkIfNetworkIsAvailable();
-                      },
-                      style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF145A41), 
-                          padding: const EdgeInsets.symmetric(horizontal: 80, vertical: 10)),
-                      child: Text(
-                        tr(context, 'register_btn'),
-                        style: const TextStyle(
-                          fontFamily: 'IranYekan',
-                          fontSize: 16,
-                          color: Colors.white,
+
+                    const SizedBox(height: 32),
+
+                    // دکمه ثبت‌نام
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: ElevatedButton(
+                        onPressed: checkIfNetworkIsAvailable,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryBrand,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: Text(
+                          'register_btn'.tr(),
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.buttonText,
+                          ),
                         ),
                       ),
                     ),
                   ],
                 ),
-              ),
 
-              const SizedBox(height: 12),
+                const SizedBox(height: 16),
 
-              TextButton(
-                onPressed: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (c) => const LoginScreen()));
-                },
-                child: Text(
-                  tr(context, 'already_have_account'),
-                  style: const TextStyle(
-                    fontFamily: 'IranYekan',
-                    color: Colors.grey,
+                // دکمه بازگشت به صفحه ورود
+                TextButton(
+                  onPressed: () {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(builder: (c) => const LoginScreen()),
+                    );
+                  },
+                  child: Text(
+                    'already_have_account'.tr(),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    bool obscureText = false,
+    TextInputType keyboardType = TextInputType.text,
+  }) {
+    return TextField(
+      controller: controller,
+      obscureText: obscureText,
+      keyboardType: keyboardType,
+      style: const TextStyle(
+        fontSize: 15,
+        color: AppColors.textPrimary,
+      ),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(
+          fontSize: 14,
+          color: AppColors.textSecondary,
+        ),
+        prefixIcon: Icon(icon, color: AppColors.iconSecondary),
+        filled: true,
+        fillColor: AppColors.cardBackground,
+        contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade200),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.primaryBrand, width: 1.5),
         ),
       ),
     );
