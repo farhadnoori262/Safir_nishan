@@ -15,6 +15,7 @@ import 'package:safir_drivers/widgets/notification_dialog.dart';
 
 class PushNotificationSystem {
   FirebaseMessaging firebaseCloudMessaging = FirebaseMessaging.instance;
+  final AudioPlayer _audioPlayer = AudioPlayer(); // ساخت یک‌باره برای جلوگیری از نشت حافظه
 
   Future<String?> generateDeviceRegistrationToken() async {
     String? deviceRecognitionToken = await firebaseCloudMessaging.getToken();
@@ -30,8 +31,8 @@ class PushNotificationSystem {
       }, SetOptions(merge: true));
     }
     
-    firebaseCloudMessaging.subscribeToTopic("drivers");
-    firebaseCloudMessaging.subscribeToTopic("users");
+    await firebaseCloudMessaging.subscribeToTopic("drivers");
+    await firebaseCloudMessaging.subscribeToTopic("users");
     return deviceRecognitionToken;
   }
 
@@ -49,7 +50,7 @@ class PushNotificationSystem {
         .getInitialMessage()
         .then((RemoteMessage? messageRemote) {
       if (messageRemote != null) {
-        String? tripID = messageRemote.data["tripID"] ?? messageRemote.data["trip_id"] ?? messageRemote.data["ride_id"];
+        String? tripID = _extractTripId(messageRemote);
         if (tripID != null) {
           log("Terminated Trip ID: $tripID");
           retrieveTripRequestInfo(tripID, context);
@@ -59,7 +60,7 @@ class PushNotificationSystem {
 
     FirebaseMessaging.onMessage.listen((RemoteMessage? messageRemote) {
       if (messageRemote != null) {
-        String? tripID = messageRemote.data["tripID"] ?? messageRemote.data["trip_id"] ?? messageRemote.data["ride_id"];
+        String? tripID = _extractTripId(messageRemote);
         if (tripID != null) {
           log("Foreground Trip ID: $tripID");
           retrieveTripRequestInfo(tripID, context);
@@ -69,7 +70,7 @@ class PushNotificationSystem {
 
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage? messageRemote) {
       if (messageRemote != null) {
-        String? tripID = messageRemote.data["tripID"] ?? messageRemote.data["trip_id"] ?? messageRemote.data["ride_id"];
+        String? tripID = _extractTripId(messageRemote);
         if (tripID != null) {
           log("Background Trip ID: $tripID");
           retrieveTripRequestInfo(tripID, context);
@@ -78,78 +79,93 @@ class PushNotificationSystem {
     });
   }
 
+  // استخراج آیدی سفر از انواع کلیدهای ممکن
+  String? _extractTripId(RemoteMessage message) {
+    return message.data["tripID"] ?? message.data["trip_id"] ?? message.data["ride_id"];
+  }
+
+  // تبدیل امن مقادیر مختصات به double
+  double? _parseDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value.toString());
+  }
+
   retrieveTripRequestInfo(String tripID, BuildContext context) async {
     final currentContext = navigatorKey.currentContext ?? context;
 
-    if (currentContext != null) {
-      try {
-        DocumentSnapshot tripSnapshot = await FirebaseFirestore.instance
-            .collection("rides")
-            .doc(tripID)
-            .get();
+    try {
+      DocumentSnapshot tripSnapshot = await FirebaseFirestore.instance
+          .collection("rides")
+          .doc(tripID)
+          .get();
 
-        if (!tripSnapshot.exists || tripSnapshot.data() == null) {
-          log("Error: No document found in Firestore for tripID $tripID");
-          return;
-        }
-
-        Map<String, dynamic> data = tripSnapshot.data() as Map<String, dynamic>;
-        log("Firestore Trip Data: $data");
-
-        try {
-          final player = AudioPlayer();
-          player.play(AssetSource('audio/alert-sound.mp3'));
-        } catch (e) {
-          log("Audio error: $e");
-        }
-
-        TripDetails tripDetailsInfo = TripDetails();
-
-        // 📍 ۱. مبدأ
-        if (data["from_lat"] != null && data["from_lng"] != null) {
-          double lat = double.parse(data["from_lat"].toString());
-          double lng = double.parse(data["from_lng"].toString());
-          tripDetailsInfo.pickUpLatLng = LatLng(lat, lng);
-        } else if (data["from"] is GeoPoint) {
-          GeoPoint gp = data["from"] as GeoPoint;
-          tripDetailsInfo.pickUpLatLng = LatLng(gp.latitude, gp.longitude);
-        }
-
-        tripDetailsInfo.pickupAddress = data["pickup_address"]?.toString() ?? data["pickUpAddress"]?.toString() ?? "";
-
-        // 🏁 ۲. مقصد
-        if (data["to_lat"] != null && data["to_lng"] != null) {
-          double lat = double.parse(data["to_lat"].toString());
-          double lng = double.parse(data["to_lng"].toString());
-          tripDetailsInfo.dropOffLatLng = LatLng(lat, lng);
-        } else if (data["to"] is GeoPoint) {
-          GeoPoint gp = data["to"] as GeoPoint;
-          tripDetailsInfo.dropOffLatLng = LatLng(gp.latitude, gp.longitude);
-        }
-
-        tripDetailsInfo.dropOffAddress = data["dropoff_address"]?.toString() ?? data["dropOffAddress"]?.toString() ?? "";
-
-        // 👤 ۳. مشخصات مسافر و کرایه
-        tripDetailsInfo.userName = data["full_name"]?.toString() ?? data["userName"]?.toString() ?? "";
-        tripDetailsInfo.userPhone = data["phone"]?.toString() ?? data["userPhone"]?.toString() ?? "";
-        
-        bidAmount = data["bidAmount"]?.toString() ?? data["bid_amount"]?.toString() ?? "";
-        fareAmount = data["fare"]?.toString() ?? data["fareAmount"]?.toString() ?? "";
-        tripDetailsInfo.tripID = tripID;
-
-        // 🔔 ۴. نمایش پاپ‌آپ پذیرش سفر
-        showDialog(
-          context: currentContext,
-          barrierDismissible: false,
-          builder: (BuildContext context) => NotificationDialog(
-            tripDetailsInfo: tripDetailsInfo,
-            bidAmount: bidAmount,
-            fareAmount: fareAmount,
-          ),
-        );
-      } catch (e, stackTrace) {
-        log("Error parsing trip request info from Firestore: $e\n$stackTrace");
+      if (!tripSnapshot.exists || tripSnapshot.data() == null) {
+        log("Error: No document found in Firestore for tripID $tripID");
+        return;
       }
+
+      Map<String, dynamic> data = tripSnapshot.data() as Map<String, dynamic>;
+      log("Firestore Trip Data: $data");
+
+      // پخش هشدار صوتی
+      try {
+        await _audioPlayer.stop();
+        await _audioPlayer.play(AssetSource('audio/alert-sound.mp3'));
+      } catch (e) {
+        log("Audio error: $e");
+      }
+
+      TripDetails tripDetailsInfo = TripDetails();
+
+      // 📍 ۱. مبدأ
+      if (data["from_lat"] != null && data["from_lng"] != null) {
+        double? lat = _parseDouble(data["from_lat"]);
+        double? lng = _parseDouble(data["from_lng"]);
+        if (lat != null && lng != null) {
+          tripDetailsInfo.pickUpLatLng = LatLng(lat, lng);
+        }
+      } else if (data["from"] is GeoPoint) {
+        GeoPoint gp = data["from"] as GeoPoint;
+        tripDetailsInfo.pickUpLatLng = LatLng(gp.latitude, gp.longitude);
+      }
+
+      tripDetailsInfo.pickupAddress = data["pickup_address"]?.toString() ?? data["pickUpAddress"]?.toString() ?? "";
+
+      // 🏁 ۲. مقصد
+      if (data["to_lat"] != null && data["to_lng"] != null) {
+        double? lat = _parseDouble(data["to_lat"]);
+        double? lng = _parseDouble(data["to_lng"]);
+        if (lat != null && lng != null) {
+          tripDetailsInfo.dropOffLatLng = LatLng(lat, lng);
+        }
+      } else if (data["to"] is GeoPoint) {
+        GeoPoint gp = data["to"] as GeoPoint;
+        tripDetailsInfo.dropOffLatLng = LatLng(gp.latitude, gp.longitude);
+      }
+
+      tripDetailsInfo.dropOffAddress = data["dropoff_address"]?.toString() ?? data["dropOffAddress"]?.toString() ?? "";
+
+      // 👤 ۳. مشخصات مسافر و کرایه
+      tripDetailsInfo.userName = data["full_name"]?.toString() ?? data["userName"]?.toString() ?? "";
+      tripDetailsInfo.userPhone = data["phone"]?.toString() ?? data["userPhone"]?.toString() ?? "";
+      
+      bidAmount = data["bidAmount"]?.toString() ?? data["bid_amount"]?.toString() ?? "";
+      fareAmount = data["fare"]?.toString() ?? data["fareAmount"]?.toString() ?? "";
+      tripDetailsInfo.tripID = tripID;
+
+      // 🔔 ۴. نمایش پاپ‌آپ پذیرش سفر
+      showDialog(
+        context: currentContext,
+        barrierDismissible: false,
+        builder: (BuildContext dialogContext) => NotificationDialog(
+          tripDetailsInfo: tripDetailsInfo,
+          bidAmount: bidAmount,
+          fareAmount: fareAmount,
+        ),
+      );
+    } catch (e, stackTrace) {
+      log("Error parsing trip request info from Firestore: $e\n$stackTrace");
     }
   }
 }
