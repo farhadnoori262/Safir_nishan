@@ -2,8 +2,8 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../providers/registration_provider.dart';
-import '../../utils/app_colors.dart';
+import '../../../providers/registration_provider.dart';
+import '../../../utils/app_colors.dart';
 
 class VehicleBasicInfoScreen extends StatefulWidget {
   const VehicleBasicInfoScreen({super.key});
@@ -15,7 +15,6 @@ class VehicleBasicInfoScreen extends StatefulWidget {
 class _VehicleBasicInfoScreenState extends State<VehicleBasicInfoScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  // هیلپر برای تبدیل تمام اعداد فارسی/دری به اعداد استاندارد انگلیسی
   String _toEnglishNumbers(String input) {
     const english = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
     const farsi = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
@@ -31,7 +30,7 @@ class _VehicleBasicInfoScreenState extends State<VehicleBasicInfoScreen> {
   @override
   Widget build(BuildContext context) {
     return Consumer<RegistrationProvider>(
-      builder: (context, registrationProvider, child) => Scaffold(
+      builder: (context, RegistrationProvider registrationProvider, child) => Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
           title: Text(
@@ -68,7 +67,6 @@ class _VehicleBasicInfoScreenState extends State<VehicleBasicInfoScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // بخش انتخاب نوع وسیله نقلیه
                   Container(
                     margin: const EdgeInsets.symmetric(vertical: 10),
                     decoration: BoxDecoration(
@@ -174,7 +172,6 @@ class _VehicleBasicInfoScreenState extends State<VehicleBasicInfoScreen> {
 
                   const SizedBox(height: 10),
 
-                  // بخش فیلدهای اطلاعات متنی وسیله نقلیه
                   Container(
                     decoration: BoxDecoration(
                       border: Border.all(color: Colors.grey.shade200),
@@ -196,9 +193,9 @@ class _VehicleBasicInfoScreenState extends State<VehicleBasicInfoScreen> {
                           decoration: InputDecoration(
                             labelText: 'label_brand'.tr(),
                             labelStyle: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: const BorderRadius.all(Radius.circular(12)),
-                              borderSide: const BorderSide(color: AppColors.primaryBrand, width: 2),
+                            focusedBorder: const OutlineInputBorder(
+                              borderRadius: BorderRadius.all(Radius.circular(12)),
+                              borderSide: BorderSide(color: AppColors.primaryBrand, width: 2),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: const BorderRadius.all(Radius.circular(12)),
@@ -220,9 +217,9 @@ class _VehicleBasicInfoScreenState extends State<VehicleBasicInfoScreen> {
                           decoration: InputDecoration(
                             labelText: 'label_color'.tr(),
                             labelStyle: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: const BorderRadius.all(Radius.circular(12)),
-                              borderSide: const BorderSide(color: AppColors.primaryBrand, width: 2),
+                            focusedBorder: const OutlineInputBorder(
+                              borderRadius: BorderRadius.all(Radius.circular(12)),
+                              borderSide: BorderSide(color: AppColors.primaryBrand, width: 2),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: const BorderRadius.all(Radius.circular(12)),
@@ -245,9 +242,9 @@ class _VehicleBasicInfoScreenState extends State<VehicleBasicInfoScreen> {
                           decoration: InputDecoration(
                             labelText: 'label_year'.tr(),
                             labelStyle: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: const BorderRadius.all(Radius.circular(12)),
-                              borderSide: const BorderSide(color: AppColors.primaryBrand, width: 2),
+                            focusedBorder: const OutlineInputBorder(
+                              borderRadius: BorderRadius.all(Radius.circular(12)),
+                              borderSide: BorderSide(color: AppColors.primaryBrand, width: 2),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: const BorderRadius.all(Radius.circular(12)),
@@ -262,7 +259,6 @@ class _VehicleBasicInfoScreenState extends State<VehicleBasicInfoScreen> {
                             return null;
                           },
                           onChanged: (val) {
-                            // تبدیل بلادرنگ اعداد تایپ شده به انگلیسی
                             final converted = _toEnglishNumbers(val);
                             if (converted != val) {
                               registrationProvider.productionYearController.value = TextEditingValue(
@@ -279,9 +275,9 @@ class _VehicleBasicInfoScreenState extends State<VehicleBasicInfoScreen> {
                           decoration: InputDecoration(
                             labelText: 'label_plate'.tr(),
                             labelStyle: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: const BorderRadius.all(Radius.circular(12)),
-                              borderSide: const BorderSide(color: AppColors.primaryBrand, width: 2),
+                            focusedBorder: const OutlineInputBorder(
+                              borderRadius: BorderRadius.all(Radius.circular(12)),
+                              borderSide: BorderSide(color: AppColors.primaryBrand, width: 2),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: const BorderRadius.all(Radius.circular(12)),
@@ -296,7 +292,6 @@ class _VehicleBasicInfoScreenState extends State<VehicleBasicInfoScreen> {
                             return null;
                           },
                           onChanged: (val) {
-                            // تبدیل اعداد پلاک به انگلیسی برای اعتبارسنجی درست
                             final converted = _toEnglishNumbers(val);
                             if (converted != val) {
                               registrationProvider.numberPlateController.value = TextEditingValue(
@@ -314,7 +309,6 @@ class _VehicleBasicInfoScreenState extends State<VehicleBasicInfoScreen> {
 
                   const SizedBox(height: 25),
 
-                  // دکمه ذخیره و بازگشت
                   SizedBox(
                     width: MediaQuery.of(context).size.width,
                     height: 50,
