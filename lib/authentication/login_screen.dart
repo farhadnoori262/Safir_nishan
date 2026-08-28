@@ -1,11 +1,12 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
-import 'package:safir_drivers/pages/dashboard.dart'; 
-import '../methods/common_method.dart';
-import '../widgets/loading_dialog.dart';
-import '../utils/lang_helper.dart'; // 👈 اضافه شدن هیلپر ترجمه سه‌زبانه
-import 'signup_screen.dart';
+import 'package:safir_drivers/methods/common_method.dart';
+import 'package:safir_drivers/pages/auth/signup_screen.dart';
+import 'package:safir_drivers/pages/dashboard.dart';
+import 'package:safir_drivers/utils/app_colors.dart';
+import 'package:safir_drivers/widgets/loading_dialog.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -15,167 +16,229 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  TextEditingController emailTextEditingController = TextEditingController();
-  TextEditingController passwordTextEditingController = TextEditingController();
-  CommonMethods cMethods = CommonMethods();
+  final TextEditingController emailTextEditingController = TextEditingController();
+  final TextEditingController passwordTextEditingController = TextEditingController();
+  final CommonMethods cMethods = CommonMethods();
 
-  checkIfNetworkIsAvailable() {
-    //cMethods.checkConnectivity(context);
+  @override
+  void dispose() {
+    emailTextEditingController.dispose();
+    passwordTextEditingController.dispose();
+    super.dispose();
+  }
+
+  void checkIfNetworkIsAvailable() {
     signInFormValidation();
   }
 
-  signInFormValidation() {
+  void signInFormValidation() {
     if (!emailTextEditingController.text.contains("@")) {
-      cMethods.displaySnackBar(tr(context, 'invalid_email_error'), context); // 👈 سه‌زبانه کردن پیام خطا
-    } else if (passwordTextEditingController.text.trim().length < 6) { // اصلاح منطق به ۶ کاراکتر مطابق پیام متن
-      cMethods.displaySnackBar(tr(context, 'password_length_error'), context); // 👈 سه‌زبانه کردن پیام خطا
+      cMethods.displaySnackBar('invalid_email_error'.tr(), context);
+    } else if (passwordTextEditingController.text.trim().length < 6) {
+      cMethods.displaySnackBar('password_length_error'.tr(), context);
     } else {
       signInUser();
     }
   }
 
-  signInUser() async {
+  Future<void> signInUser() async {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (BuildContext context) => LoadingDialog(messageText: tr(context, 'logging_in')), // 👈 متغیر داینامیک لودینگ
+      builder: (BuildContext context) => LoadingDialog(messageText: 'logging_in'.tr()),
     );
 
-    final User? userFirebase = (await FirebaseAuth.instance
-            .signInWithEmailAndPassword(
-          email: emailTextEditingController.text.trim(),
-          password: passwordTextEditingController.text.trim(),
-        )
-            .catchError((errorMsg) {
-      Navigator.pop(context);
-      cMethods.displaySnackBar(errorMsg.toString(), context);
-    }))
-        .user;
+    try {
+      final UserCredential userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: emailTextEditingController.text.trim(),
+        password: passwordTextEditingController.text.trim(),
+      );
 
-    if (!context.mounted) return;
-    Navigator.pop(context);
+      final User? userFirebase = userCredential.user;
 
-    if (userFirebase != null) {
-      DatabaseReference usersRef = FirebaseDatabase.instance.ref().child("drivers").child(userFirebase.uid);
-      usersRef.once().then((snap) {
+      if (!mounted) return;
+      Navigator.pop(context); // بستن دایالوگ لودینگ
+
+      if (userFirebase != null) {
+        DatabaseReference usersRef = FirebaseDatabase.instance.ref().child("drivers").child(userFirebase.uid);
+        final snap = await usersRef.once();
+
+        if (!mounted) return;
+
         if (snap.snapshot.value != null) {
-          if ((snap.snapshot.value as Map)["blockStatus"] == "no") {
-            Navigator.push(context, MaterialPageRoute(builder: (c) => Dashboard()));
+          final rawData = snap.snapshot.value;
+          if (rawData is Map && rawData["blockStatus"] == "no") {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (c) => const Dashboard()),
+            );
           } else {
-            FirebaseAuth.instance.signOut();
-            cMethods.displaySnackBar(tr(context, 'blocked_account_error'), context); // 👈 سه‌زبانه کردن پیام مسدودی
+            await FirebaseAuth.instance.signOut();
+            if (!mounted) return;
+            cMethods.displaySnackBar('blocked_account_error'.tr(), context);
           }
         } else {
-          FirebaseAuth.instance.signOut();
-          cMethods.displaySnackBar(tr(context, 'no_driver_record'), context); // 👈 سه‌زبانه کردن پیام عدم وجود راننده
+          await FirebaseAuth.instance.signOut();
+          if (!mounted) return;
+          cMethods.displaySnackBar('no_driver_record'.tr(), context);
         }
-      });
+      }
+    } catch (errorMsg) {
+      if (!mounted) return;
+      Navigator.pop(context); // بستن دایالوگ لودینگ در صورت خطا
+      cMethods.displaySnackBar(errorMsg.toString(), context);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Column(
-            children: [
-              const SizedBox(height: 60),
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+            child: Column(
+              crossAxisAlignment: CrossAlignment.center,
+              children: [
+                const SizedBox(height: 40),
 
-              // تصویر خودروی سفیر
-              Image.asset(
-                "assets/images/uberexec.png",
-                width: 220,
-              ),
-
-              const SizedBox(height: 30),
-
-              Text(
-                tr(context, 'driver_login_title'), // 👈 تیتر سه‌زبانه صفحه ورود
-                style: const TextStyle(
-                  fontFamily: 'IranYekan',
-                  fontSize: 26,
-                  fontWeight: FontWeight.bold,
+                // تصویر لوگو/خودرو سفیر
+                Image.asset(
+                  "assets/images/uberexec.png",
+                  width: 200,
+                  fit: BoxFit.contain,
                 ),
-              ),
 
-              Padding(
-                padding: const EdgeInsets.all(22),
-                child: Column(
-                  children: [
-                    TextField(
-                      controller: emailTextEditingController,
-                      keyboardType: TextInputType.emailAddress,
-                      decoration: InputDecoration(
-                        labelText: tr(context, 'your_email'), // 👈 لیبل ایمیل
-                        labelStyle: const TextStyle(
-                          fontFamily: 'IranYekan',
-                          fontSize: 14,
-                        ),
-                      ),
-                      style: const TextStyle(
-                        color: Colors.grey,
-                        fontSize: 15,
-                      ),
-                    ),
+                const SizedBox(height: 28),
 
-                    const SizedBox(height: 22),
-
-                    TextField(
-                      controller: passwordTextEditingController,
-                      obscureText: true,
-                      keyboardType: TextInputType.text,
-                      decoration: InputDecoration(
-                        labelText: tr(context, 'password'), // 👈 لیبل پسورد
-                        labelStyle: const TextStyle(
-                          fontFamily: 'IranYekan',
-                          fontSize: 14,
-                        ),
-                      ),
-                      style: const TextStyle(
-                        color: Colors.grey,
-                        fontSize: 15,
-                      ),
-                    ),
-
-                    const SizedBox(height: 32),
-
-                    ElevatedButton(
-                      onPressed: () {
-                        checkIfNetworkIsAvailable();
-                      },
-                      style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF145A41), 
-                          padding: const EdgeInsets.symmetric(horizontal: 80, vertical: 10)),
-                      child: Text(
-                        tr(context, 'login_btn'), // 👈 دکمه ورود سه‌زبانه
-                        style: const TextStyle(
-                          fontFamily: 'IranYekan',
-                          fontSize: 16,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 12),
-
-              TextButton(
-                onPressed: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (c) => const SignUpScreen()));
-                },
-                child: Text(
-                  tr(context, 'no_account_signup'), // 👈 متن دکمه ثبت‌نام
+                Text(
+                  'driver_login_title'.tr(),
                   style: const TextStyle(
-                    fontFamily: 'IranYekan',
-                    color: Colors.grey,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
                   ),
                 ),
-              ),
-            ],
+
+                const SizedBox(height: 32),
+
+                // فیلد ایمیل
+                TextField(
+                  controller: emailTextEditingController,
+                  keyboardType: TextInputType.emailAddress,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    color: AppColors.textPrimary,
+                  ),
+                  decoration: InputDecoration(
+                    labelText: 'your_email'.tr(),
+                    labelStyle: const TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                    ),
+                    prefixIcon: const Icon(Icons.email_outlined, color: AppColors.iconSecondary),
+                    filled: true,
+                    fillColor: AppColors.cardBackground,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey.shade200),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppColors.primaryBrand, width: 1.5),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                // فیلد رمز عبور
+                TextField(
+                  controller: passwordTextEditingController,
+                  obscureText: true,
+                  keyboardType: TextInputType.text,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    color: AppColors.textPrimary,
+                  ),
+                  decoration: InputDecoration(
+                    labelText: 'password'.tr(),
+                    labelStyle: const TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                    ),
+                    prefixIcon: const Icon(Icons.lock_outline_rounded, color: AppColors.iconSecondary),
+                    filled: true,
+                    fillColor: AppColors.cardBackground,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey.shade200),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppColors.primaryBrand, width: 1.5),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 32),
+
+                // دکمه ورود
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed: checkIfNetworkIsAvailable,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryBrand,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text(
+                      'login_btn'.tr(),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.buttonText,
+                      ),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // دکمه ثبت نام
+                TextButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (c) => const SignUpScreen()),
+                    );
+                  },
+                  child: Text(
+                    'no_account_signup'.tr(),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
