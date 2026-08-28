@@ -1,8 +1,8 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import '../utils/lang_helper.dart';
 
 // اطلاعات عمومی کاربر
 String userName = '';
@@ -16,7 +16,7 @@ StreamSubscription<Position>? positionStreamNewTripPage;
 int driverTripRequestTimeout = 40;
 
 // پخش‌کننده صدای زنگ درخواست سفر سفیر
-final audioPlayer = AudioPlayer();
+final AudioPlayer audioPlayer = AudioPlayer();
 
 // موقعیت مکانی زنده و فعلی راننده
 Position? driverCurrentPosition;
@@ -30,7 +30,7 @@ String driverSecondName = "";
 String address = "";
 String rating = "";
 
-// اطلاعات وسیله نقلیه (موتر، موتورسایکل یا ریکشا)
+// اطلاعات وسیله نقلیه (اقتصادی، مدرن، موتور، باربری، بین‌شهری)
 String vehicleType = "economic_car";
 String carModel = "";
 String carColor = "";
@@ -43,13 +43,18 @@ String fareAmount = "";
 // متغیرهای مربوط به زبان سیستم سفیر
 String currentLanguage = "fa";
 
-/// تابعی برای دریافت ترجمه نوع وسیله نقلیه
+/// تابعی برای دریافت ترجمه نوع وسیله نقلیه و خدمت
 String getTranslatedVehicleType(BuildContext context, String type) {
-  if (type == "economic_car" || type == "modern_car" || type == "motorbike") {
-    return tr(context, type);
+  const validVehicleTypes = {
+    "economic_car",
+    "modern_car",
+    "motorbike",
+    "cargo",
+    "intercity",
+  };
+
+  if (validVehicleTypes.contains(type)) {
+    return type.tr();
   }
   return type;
 }
-
-const Color black80 = Colors.black87;
-const Color black90 = Colors.black87;
