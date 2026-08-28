@@ -1,10 +1,12 @@
 import 'dart:io';
-import 'package:safir_drivers/methods/common_method.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+
+import 'package:safir_drivers/methods/common_method.dart';
 import 'package:safir_drivers/providers/registration_provider.dart';
-import 'package:safir_drivers/utils/lang_helper.dart'; // 👈 هیلپر زبان سفیر
+import 'package:safir_drivers/utils/app_colors.dart';
 
 import '../../../global/global.dart';
 
@@ -19,16 +21,22 @@ class DriverCarImageUpdateScreen extends StatefulWidget {
 class _DriverCarImageUpdateScreenState
     extends State<DriverCarImageUpdateScreen> {
   @override
-  Widget build(BuildContext context) {CommonMethods commonMethods = CommonMethods();
-
-    const Color brandColor = Color(0xFF145A41); // رنگ سبز برند سفیر
+  Widget build(BuildContext context) {
+    final CommonMethods commonMethods = CommonMethods();
 
     return Consumer<RegistrationProvider>(
       builder: (context, registrationProvider, child) => Scaffold(
+        backgroundColor: AppColors.background,
         appBar: AppBar(
+          backgroundColor: AppColors.cardBackground,
+          elevation: 0,
           title: Text(
-            tr(context, 'car_img_title'),
-            style: const TextStyle(fontFamily: 'IranYekan', fontWeight: FontWeight.bold, fontSize: 16),
+            'car_img_title'.tr(),
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              color: AppColors.textPrimary,
+            ),
           ),
           centerTitle: true,
           leading: TextButton(
@@ -36,8 +44,11 @@ class _DriverCarImageUpdateScreenState
               Navigator.pop(context);
             },
             child: Text(
-              tr(context, 'close'),
-              style: const TextStyle(fontFamily: 'IranYekan', color: Colors.black87, fontWeight: FontWeight.bold),
+              'close'.tr(),
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
           leadingWidth: 70,
@@ -50,7 +61,7 @@ class _DriverCarImageUpdateScreenState
               children: [
                 _buildImagePicker(
                   context,
-                  tr(context, 'car_img_picker_label'),
+                  'car_img_picker_label'.tr(),
                   registrationProvider.vehicleImage,
                   registrationProvider.pickVehicleImageFromCamera,
                 ),
@@ -62,22 +73,22 @@ class _DriverCarImageUpdateScreenState
                   height: 52,
                   child: ElevatedButton(
                     onPressed: registrationProvider.isVehiclePhotoAdded &&
-                            registrationProvider.isLoading == false
+                            !registrationProvider.isLoading
                         ? () async {
                             try {
                               await registrationProvider
                                   .updateVehicleImage(context);
                               if (context.mounted) {
                                 commonMethods.displaySnackBar(
-                                    tr(context, 'car_img_success'), context);
+                                    'car_img_success'.tr(), context);
                               }
                             } catch (e) {
-                              print("Error while saving data: $e");
+                              debugPrint("Error while saving data: $e");
                             }
                           }
                         : null,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: brandColor,
+                      backgroundColor: AppColors.primaryBrand,
                       disabledBackgroundColor: Colors.grey.shade400,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -88,8 +99,12 @@ class _DriverCarImageUpdateScreenState
                             color: Colors.white,
                           )
                         : Text(
-                            tr(context, 'final_confirm'),
-                            style: const TextStyle(fontFamily: 'IranYekan', color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                            'final_confirm'.tr(),
+                            style: const TextStyle(
+                              color: AppColors.buttonText,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
                           ),
                   ),
                 ),
@@ -101,16 +116,22 @@ class _DriverCarImageUpdateScreenState
     );
   }
 
-  Widget _buildImagePicker(BuildContext context, String label, XFile? imageFile,
-      VoidCallback onPressed) {
+  Widget _buildImagePicker(
+    BuildContext context,
+    String label,
+    XFile? imageFile,
+    VoidCallback onPressed,
+  ) {
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.black12),
-        borderRadius: BorderRadius.circular(15),
-        color: Colors.white,
+        color: AppColors.cardBackground,
+        borderRadius: BorderRadius.circular(16),
         boxShadow: const [
           BoxShadow(
-              color: Colors.black12, offset: Offset(0, 2), blurRadius: 6.0),
+            color: Colors.black12,
+            offset: Offset(0, 2),
+            blurRadius: 6.0,
+          ),
         ],
       ),
       child: Column(
@@ -120,30 +141,52 @@ class _DriverCarImageUpdateScreenState
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: Text(
               label,
-              style: const TextStyle(fontFamily: 'IranYekan', fontSize: 14, fontWeight: FontWeight.w500),
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textPrimary,
+              ),
             ),
           ),
           const SizedBox(height: 16),
           imageFile != null
               ? ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.file(File(imageFile.path), height: 160, width: 260, fit: BoxFit.cover),
+                  borderRadius: BorderRadius.circular(10),
+                  child: Image.file(
+                    File(imageFile.path),
+                    height: 160,
+                    width: 260,
+                    fit: BoxFit.cover,
+                  ),
                 )
-              : Image.asset('assets/vehicles/civic.jpg', height: 160, width: 260, fit: BoxFit.contain),
+              : Image.asset(
+                  'assets/vehicles/civic.jpg',
+                  height: 160,
+                  width: 260,
+                  fit: BoxFit.contain,
+                ),
           const SizedBox(height: 20),
           Container(
             width: 180,
             height: 44,
             decoration: BoxDecoration(
-              border: Border.all(color: const Color(0xFF145A41)),
+              border: Border.all(color: AppColors.primaryBrand),
               borderRadius: BorderRadius.circular(12),
             ),
             child: TextButton.icon(
               onPressed: onPressed,
-              icon: const Icon(Icons.camera_alt, color: Color(0xFF145A41), size: 18),
+              icon: const Icon(
+                Icons.camera_alt,
+                color: AppColors.primaryBrand,
+                size: 18,
+              ),
               label: Text(
-                tr(context, 'car_img_take_photo'),
-                style: const TextStyle(fontFamily: 'IranYekan', color: Color(0xFF145A41), fontWeight: FontWeight.bold),
+                'car_img_take_photo'.tr(),
+                style: const TextStyle(
+                  color: AppColors.primaryBrand,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ),
