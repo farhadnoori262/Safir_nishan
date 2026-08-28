@@ -279,7 +279,7 @@ class RegistrationProvider extends ChangeNotifier {
   Future<void> pickAndCropCnincImage(bool isFrontImage) async {
     final ImagePickerService imagePickerService = ImagePickerService();
 
-    final pickedFile = await imagePickerService.pickCropImage(
+    final pickedFile = await imagePickerService.pickCropImage(context: context,
       cropAspectRatio: const CropAspectRatio(ratioX: 16, ratioY: 9),
       imageSource: ImageSource.camera,
     );
@@ -297,7 +297,7 @@ class RegistrationProvider extends ChangeNotifier {
   Future<void> pickAndCropVehicleRegistrationImages(bool isFrontImage) async {
     final ImagePickerService imagePickerService = ImagePickerService();
 
-    final pickedFile = await imagePickerService.pickCropImage(
+    final pickedFile = await imagePickerService.pickCropImage(context: context,
       cropAspectRatio: const CropAspectRatio(ratioX: 16, ratioY: 12),
       imageSource: ImageSource.camera,
     );
@@ -315,7 +315,7 @@ class RegistrationProvider extends ChangeNotifier {
   Future<void> pickAndCropDrivingLicenseImage(bool isFrontImage) async {
     final ImagePickerService imagePickerService = ImagePickerService();
 
-    final pickedFile = await imagePickerService.pickCropImage(
+    final pickedFile = await imagePickerService.pickCropImage(context: context,
       cropAspectRatio: const CropAspectRatio(ratioX: 16, ratioY: 9),
       imageSource: ImageSource.camera,
     );
@@ -333,7 +333,7 @@ class RegistrationProvider extends ChangeNotifier {
   Future<void> pickCnincImageWithSelfie() async {
     final ImagePickerService imagePickerService = ImagePickerService();
 
-    final pickedFile = await imagePickerService.pickCropImage(
+    final pickedFile = await imagePickerService.pickCropImage(context: context,
       cropAspectRatio: const CropAspectRatio(ratioX: 20, ratioY: 20),
       imageSource: ImageSource.camera,
     );
