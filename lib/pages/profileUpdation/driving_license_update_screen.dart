@@ -1,11 +1,13 @@
 import 'dart:io';
 
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
-import 'package:safir_drivers/pages/profileUpdation/cninc_update_screen.dart'; 
-import 'package:safir_drivers/providers/registration_provider.dart'; 
-import 'package:safir_drivers/utils/lang_helper.dart';
+
+import 'package:safir_drivers/methods/common_method.dart';
+import 'package:safir_drivers/providers/registration_provider.dart';
+import 'package:safir_drivers/utils/app_colors.dart';
 
 class DrivingLicenseUpdateScreen extends StatefulWidget {
   const DrivingLicenseUpdateScreen({super.key});
@@ -18,17 +20,23 @@ class DrivingLicenseUpdateScreen extends StatefulWidget {
 class _DrivingLicenseUpdateScreenState
     extends State<DrivingLicenseUpdateScreen> {
   final _formKey = GlobalKey<FormState>();
+  final CommonMethods commonMethods = CommonMethods();
 
   @override
   Widget build(BuildContext context) {
-    const Color brandColor = Color(0xFF145A41); // رنگ سبز برند سفیر
-
     return Consumer<RegistrationProvider>(
       builder: (context, registrationProvider, child) => Scaffold(
+        backgroundColor: AppColors.background,
         appBar: AppBar(
+          backgroundColor: AppColors.cardBackground,
+          elevation: 0,
           title: Text(
-            tr(context, 'license_screen_title'),
-            style: const TextStyle(fontFamily: 'IranYekan', fontWeight: FontWeight.bold, fontSize: 16),
+            'license_screen_title'.tr(),
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
           ),
           centerTitle: true,
           leading: TextButton(
@@ -36,8 +44,11 @@ class _DrivingLicenseUpdateScreenState
               Navigator.pop(context);
             },
             child: Text(
-              tr(context, 'close'),
-              style: const TextStyle(fontFamily: 'IranYekan', color: Colors.black87, fontWeight: FontWeight.bold),
+              'close'.tr(),
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
           leadingWidth: 70,
@@ -51,30 +62,33 @@ class _DrivingLicenseUpdateScreenState
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // بارگذاری روی لایسنس
-                  _buildImagePickerFront(
-                      context,
-                      tr(context, 'license_front_hint'),
-                      registrationProvider.drivingLicenseFrontImage,
-                      () => registrationProvider
-                          .pickAndCropDrivingLicenseImage(true)),
+                  _buildImagePicker(
+                    context,
+                    'license_front_hint'.tr(),
+                    registrationProvider.drivingLicenseFrontImage,
+                    'assets/auth/license-front.png',
+                    () => registrationProvider
+                        .pickAndCropDrivingLicenseImage(true),
+                  ),
                   const SizedBox(height: 16),
 
                   // بارگذاری پشت لایسنس
-                  _buildImagePickerBack(
-                      context,
-                      tr(context, 'license_back_hint'),
-                      registrationProvider.drivingLicenseBackImage,
-                      () => registrationProvider
-                          .pickAndCropDrivingLicenseImage(false)),
+                  _buildImagePicker(
+                    context,
+                    'license_back_hint'.tr(),
+                    registrationProvider.drivingLicenseBackImage,
+                    'assets/auth/license-back.png',
+                    () => registrationProvider
+                        .pickAndCropDrivingLicenseImage(false),
+                  ),
                   const SizedBox(height: 16),
 
                   // فیلد شماره لایسنس
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.black12),
-                      borderRadius: BorderRadius.circular(15),
-                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      color: AppColors.cardBackground,
                       boxShadow: const [
                         BoxShadow(
                           color: Colors.black12,
@@ -86,24 +100,23 @@ class _DrivingLicenseUpdateScreenState
                     child: TextFormField(
                       controller: registrationProvider.drivingLicenseController,
                       decoration: InputDecoration(
-                        labelText: tr(context, 'license_number_label'),
-                        helperText: tr(context, 'license_number_helper'),
-                        helperStyle: const TextStyle(fontFamily: 'IranYekan', fontSize: 11),
-                        labelStyle: const TextStyle(fontFamily: 'IranYekan', fontSize: 13),
+                        labelText: 'license_number_label'.tr(),
+                        helperText: 'license_number_helper'.tr(),
+                        helperStyle: const TextStyle(fontSize: 11),
+                        labelStyle: const TextStyle(fontSize: 13),
                         border: const OutlineInputBorder(
                           borderRadius: BorderRadius.all(
                             Radius.circular(12),
                           ),
-                          borderSide: BorderSide(),
                         ),
                       ),
                       keyboardType: TextInputType.text,
                       validator: (value) {
                         if (value == null || value.isEmpty) {
-                          return tr(context, 'err_license_required');
+                          return 'err_license_required'.tr();
                         }
                         if (!registrationProvider.licenseRegExp.hasMatch(value)) {
-                          return tr(context, 'err_license_format');
+                          return 'err_license_format'.tr();
                         }
                         return null;
                       },
@@ -116,10 +129,10 @@ class _DrivingLicenseUpdateScreenState
                   // دکمه به‌روزرسانی
                   SizedBox(
                     width: MediaQuery.of(context).size.width * 0.9,
-                    height: 50,
+                    height: 52,
                     child: ElevatedButton(
                       onPressed: registrationProvider.isFormValidDrivingLicnese &&
-                              registrationProvider.isLoading == false
+                              !registrationProvider.isLoading
                           ? () async {
                               if (_formKey.currentState?.validate() == true) {
                                 try {
@@ -128,16 +141,18 @@ class _DrivingLicenseUpdateScreenState
 
                                   if (context.mounted) {
                                     commonMethods.displaySnackBar(
-                                        tr(context, 'vehicle_update_success'), context);
+                                      'license_update_success'.tr(),
+                                      context,
+                                    );
                                   }
                                 } catch (e) {
-                                  print("Error while saving data: $e");
+                                  debugPrint("Error while saving data: $e");
                                 }
                               }
                             }
                           : null,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: brandColor,
+                        backgroundColor: AppColors.primaryBrand,
                         disabledBackgroundColor: Colors.grey.shade400,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -148,8 +163,12 @@ class _DrivingLicenseUpdateScreenState
                               color: Colors.white,
                             )
                           : Text(
-                              tr(context, 'update_docs'),
-                              style: const TextStyle(fontFamily: 'IranYekan', color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                              'update_docs'.tr(),
+                              style: const TextStyle(
+                                color: AppColors.buttonText,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                              ),
                             ),
                     ),
                   ),
@@ -161,106 +180,85 @@ class _DrivingLicenseUpdateScreenState
       ),
     );
   }
-}
 
-Widget _buildImagePickerFront(BuildContext context, String label,
-    XFile? imageFile, VoidCallback onPressed) {
-  return Container(
-    decoration: BoxDecoration(
-      border: Border.all(color: Colors.black12),
-      borderRadius: BorderRadius.circular(15),
-      color: Colors.white,
-      boxShadow: const [
-        BoxShadow(color: Colors.black12, offset: Offset(0, 2), blurRadius: 6.0),
-      ],
-    ),
-    child: Column(
-      children: [
-        const SizedBox(height: 16),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: Text(
-            label,
-            style: const TextStyle(fontFamily: 'IranYekan', fontSize: 13, fontWeight: FontWeight.w500),
-            textAlign: TextAlign.center,
+  Widget _buildImagePicker(
+    BuildContext context,
+    String label,
+    XFile? imageFile,
+    String placeholderAsset,
+    VoidCallback onPressed,
+  ) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.cardBackground,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [
+          BoxShadow(
+            color: Colors.black12,
+            offset: Offset(0, 2),
+            blurRadius: 6.0,
           ),
-        ),
-        const SizedBox(height: 16),
-        imageFile != null
-            ? ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.file(File(imageFile.path), height: 150, width: 240, fit: BoxFit.cover),
-              )
-            : Image.asset('assets/auth/license-front.png', height: 150, width: 240, fit: BoxFit.contain),
-        const SizedBox(height: 16),
-        Container(
-          width: 180,
-          height: 42,
-          decoration: BoxDecoration(
-              border: Border.all(color: const Color(0xFF145A41)),
-              borderRadius: BorderRadius.circular(12)),
-          child: TextButton.icon(
-            onPressed: onPressed,
-            icon: const Icon(Icons.camera_alt, color: Color(0xFF145A41), size: 18),
-            label: Text(
-              tr(context, 'car_img_take_photo'),
-              style: const TextStyle(fontFamily: 'IranYekan', color: Color(0xFF145A41), fontWeight: FontWeight.bold),
+        ],
+      ),
+      child: Column(
+        children: [
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textPrimary,
+              ),
+              textAlign: TextAlign.center,
             ),
           ),
-        ),
-        const SizedBox(height: 16),
-      ],
-    ),
-  );
-}
-
-Widget _buildImagePickerBack(BuildContext context, String label,
-    XFile? imageFile, VoidCallback onPressed) {
-  return Container(
-    decoration: BoxDecoration(
-      border: Border.all(color: Colors.black12),
-      borderRadius: BorderRadius.circular(15),
-      color: Colors.white,
-      boxShadow: const [
-        BoxShadow(color: Colors.black12, offset: Offset(0, 2), blurRadius: 6.0),
-      ],
-    ),
-    child: Column(
-      children: [
-        const SizedBox(height: 16),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: Text(
-            label,
-            style: const TextStyle(fontFamily: 'IranYekan', fontSize: 13, fontWeight: FontWeight.w500),
-            textAlign: TextAlign.center,
-          ),
-        ),
-        const SizedBox(height: 16),
-        imageFile != null
-            ? ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.file(File(imageFile.path), height: 150, width: 240, fit: BoxFit.cover),
-              )
-            : Image.asset('assets/auth/license-back.png', height: 150, width: 240, fit: BoxFit.contain),
-        const SizedBox(height: 16),
-        Container(
-          width: 180,
-          height: 42,
-          decoration: BoxDecoration(
-              border: Border.all(color: const Color(0xFF145A41)),
-              borderRadius: BorderRadius.circular(12)),
-          child: TextButton.icon(
-            onPressed: onPressed,
-            icon: const Icon(Icons.camera_alt, color: Color(0xFF145A41), size: 18),
-            label: Text(
-              tr(context, 'car_img_take_photo'),
-              style: const TextStyle(fontFamily: 'IranYekan', color: Color(0xFF145A41), fontWeight: FontWeight.bold),
+          const SizedBox(height: 16),
+          imageFile != null
+              ? ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Image.file(
+                    File(imageFile.path),
+                    height: 150,
+                    width: 240,
+                    fit: BoxFit.cover,
+                  ),
+                )
+              : Image.asset(
+                  placeholderAsset,
+                  height: 150,
+                  width: 240,
+                  fit: BoxFit.contain,
+                ),
+          const SizedBox(height: 16),
+          Container(
+            width: 180,
+            height: 42,
+            decoration: BoxDecoration(
+              border: Border.all(color: AppColors.primaryBrand),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: TextButton.icon(
+              onPressed: onPressed,
+              icon: const Icon(
+                Icons.camera_alt,
+                color: AppColors.primaryBrand,
+                size: 18,
+              ),
+              label: Text(
+                'take_photo'.tr(),
+                style: const TextStyle(
+                  color: AppColors.primaryBrand,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: 16),
-      ],
-    ),
-  );
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
 }
