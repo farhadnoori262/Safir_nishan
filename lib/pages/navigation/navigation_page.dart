@@ -295,13 +295,7 @@ class _NavigationPageState extends State<NavigationPage>
   Future<void> _addMapImages() async {
     if (_mapController == null || _iconsAdded) return;
 
-    await NavigationMapPainters.addCanvasImage(
-      _mapController!,
-      _driverIconName,
-      NavigationMapPainters.drawDriverArrow,
-      width: 120,
-      height: 120,
-    );
+    await _addDriverArrowImage();
 
     await NavigationMapPainters.addCanvasImage(
       _mapController!,
