@@ -330,7 +330,7 @@ class RegistrationProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> pickCnincImageWithSelfie() async {
+  Future<void> pickCnincImageWithSelfie(BuildContext context) async {
     final ImagePickerService imagePickerService = ImagePickerService();
 
     final pickedFile = await imagePickerService.pickCropImage(context: context,
