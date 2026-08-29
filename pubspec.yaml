@@ -86,5 +86,5 @@ flutter:
     - assets/translations/
     - assets/map/style.json
     - assets/audio/fa/
-    - assets/images/
+    - assets/images/navigation_arrow.png
     - assets/fonts/ # 👈 اضافه کردن پوشه فونت به بخش assets
