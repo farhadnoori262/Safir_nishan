@@ -68,7 +68,7 @@ class _VehicleRegistrationUpdateScreenState
                     registrationProvider.vehicleRegistrationFrontImage,
                     'assets/auth/cnic-front.png',
                     () => registrationProvider
-                        .pickAndCropVehicleRegistrationImages(true),
+                        .pickAndCropVehicleRegistrationImages(context, true),
                   ),
                   const SizedBox(height: 16),
 
@@ -79,7 +79,7 @@ class _VehicleRegistrationUpdateScreenState
                     registrationProvider.vehicleRegistrationBackImage,
                     'assets/auth/cnic-back.png',
                     () => registrationProvider
-                        .pickAndCropVehicleRegistrationImages(false),
+                        .pickAndCropVehicleRegistrationImages(context, false),
                   ),
                   const SizedBox(height: 24),
 
