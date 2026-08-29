@@ -571,27 +571,29 @@ class _NavigationPageState extends State<NavigationPage>
   }
 
   Future<void> _drawRoute(List<LatLng> points) async {
-    if (_mapController == null || points.length < 2) return;
+  if (_mapController == null || points.length < 2) return;
 
-    await _mapController!.clearLines();
+  await _mapController!.clearLines();
 
-    await _mapController!.addLine(
-       LineOptions(
-        geometry: points,
-        lineColor: '#145A41',
-        lineWidth: 14.0,
-        lineOpacity: 0.90,
-      ),
-    );
+  // حاشیهٔ تیره برای جدا شدن مسیر از خیابان‌ها
+  await _mapController!.addLine(
+    LineOptions(
+      geometry: points,
+      lineColor: '#07553D',
+      lineWidth: 18.0,
+      lineOpacity: 0.96,
+    ),
+  );
 
-    await _mapController!.addLine(
-       LineOptions(
-        geometry: points,
-        lineColor: '#22C55E',
-        lineWidth: 8.0,
-        lineOpacity: 0.70,
-      ),
-    );
+  // مسیر اصلی سبز و واضح
+  await _mapController!.addLine(
+    LineOptions(
+      geometry: points,
+      lineColor: '#19B879',
+      lineWidth: 11.0,
+      lineOpacity: 1.0,
+    ),
+  );
   }
 
   Future<void> _drawRouteDecorations(
