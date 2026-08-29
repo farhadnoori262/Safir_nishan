@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
 
 class NavigationControls extends StatelessWidget {
-  final bool isMuted;
+  final bool isNavigating;
+  final VoidCallback onResetNorth;
+  final VoidCallback onShowFullRoute;
+  final VoidCallback onGoToStart;
   final VoidCallback onMyLocation;
-  final VoidCallback onShowRoute;
-  final VoidCallback onToggleMute;
-  final VoidCallback onExit;
 
   const NavigationControls({
     super.key,
-    required this.isMuted,
+    required this.isNavigating,
+    required this.onResetNorth,
+    required this.onShowFullRoute,
+    required this.onGoToStart,
     required this.onMyLocation,
-    required this.onShowRoute,
-    required this.onToggleMute,
-    required this.onExit,
   });
 
   @override
@@ -22,30 +22,31 @@ class NavigationControls extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         _MapControlButton(
+          tooltip: 'شمال',
+          icon: Icons.navigation_rounded,
+          iconColor: Colors.redAccent,
+          onPressed: onResetNorth,
+        ),
+        const SizedBox(height: 10),
+        if (isNavigating) ...[
+          _MapControlButton(
+            tooltip: 'نمایش کل مسیر',
+            icon: Icons.alt_route_rounded,
+            onPressed: onShowFullRoute,
+          ),
+          const SizedBox(height: 10),
+          _MapControlButton(
+            tooltip: 'بازگشت به آغاز مسیر',
+            icon: Icons.home_outlined,
+            onPressed: onGoToStart,
+          ),
+          const SizedBox(height: 10),
+        ],
+        _MapControlButton(
           tooltip: 'موقعیت من',
           icon: Icons.my_location_rounded,
+          iconColor: const Color(0xFF168A61),
           onPressed: onMyLocation,
-        ),
-        const SizedBox(height: 10),
-        _MapControlButton(
-          tooltip: 'نمایش کل مسیر',
-          icon: Icons.alt_route_rounded,
-          onPressed: onShowRoute,
-        ),
-        const SizedBox(height: 10),
-        _MapControlButton(
-          tooltip: isMuted ? 'روشن کردن صدا' : 'قطع کردن صدا',
-          icon: isMuted
-              ? Icons.volume_off_rounded
-              : Icons.volume_up_rounded,
-          onPressed: onToggleMute,
-        ),
-        const SizedBox(height: 10),
-        _MapControlButton(
-          tooltip: 'خروج از مسیریابی',
-          icon: Icons.close_rounded,
-          iconColor: const Color(0xFFE53935),
-          onPressed: onExit,
         ),
       ],
     );
