@@ -317,6 +317,53 @@ class _NavigationPageState extends State<NavigationPage>
       width: 100,
       height: 124,
     );
+    await NavigationMapPainters.addCanvasImage(
+  _mapController!,
+  _leftTurnIconName,
+  (canvas, size) => NavigationMapPainters.drawTurnArrow(
+    canvas,
+    size,
+    direction: TurnDirection.left,
+  ),
+  width: 96,
+  height: 96,
+);
+
+await NavigationMapPainters.addCanvasImage(
+  _mapController!,
+  _rightTurnIconName,
+  (canvas, size) => NavigationMapPainters.drawTurnArrow(
+    canvas,
+    size,
+    direction: TurnDirection.right,
+  ),
+  width: 96,
+  height: 96,
+);
+
+await NavigationMapPainters.addCanvasImage(
+  _mapController!,
+  _straightIconName,
+  (canvas, size) => NavigationMapPainters.drawTurnArrow(
+    canvas,
+    size,
+    direction: TurnDirection.straight,
+  ),
+  width: 96,
+  height: 96,
+);
+
+await NavigationMapPainters.addCanvasImage(
+  _mapController!,
+  _uTurnIconName,
+  (canvas, size) => NavigationMapPainters.drawTurnArrow(
+    canvas,
+    size,
+    direction: TurnDirection.uTurn,
+  ),
+  width: 96,
+  height: 96,
+);
 
     _iconsAdded = true;
   }
