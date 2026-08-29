@@ -172,7 +172,7 @@ class _DestinationSearchSheetState extends State<DestinationSearchSheet> {
                     hintText: 'کجا می‌روید؟',
                     prefixIcon: const Icon(
                       Icons.search_rounded,
-                      color: SafirColors.primary,
+                      color: SafirColors.primaryBrand,
                     ),
                     suffixIcon: _searchController.text.isNotEmpty
                         ? IconButton(
@@ -205,7 +205,7 @@ class _DestinationSearchSheetState extends State<DestinationSearchSheet> {
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
                       borderSide: const BorderSide(
-                        color: SafirColors.primary,
+                        color: SafirColors.primaryBrand,
                         width: 1.4,
                       ),
                     ),
@@ -217,7 +217,7 @@ class _DestinationSearchSheetState extends State<DestinationSearchSheet> {
                     padding: EdgeInsets.symmetric(vertical: 24),
                     child: Center(
                       child: CircularProgressIndicator(
-                        color: SafirColors.primary,
+                        color: SafirColors.primaryBrand,
                       ),
                     ),
                   )
@@ -256,7 +256,7 @@ class _DestinationSearchSheetState extends State<DestinationSearchSheet> {
                       children: [
                         const Icon(
                           Icons.location_on_rounded,
-                          color: SafirColors.primary,
+                          color: SafirColors.primaryBrand,
                         ),
                         const SizedBox(width: 10),
                         Expanded(
@@ -307,7 +307,7 @@ class _DestinationSearchSheetState extends State<DestinationSearchSheet> {
                       ),
                       style: ElevatedButton.styleFrom(
                         elevation: 0,
-                        backgroundColor: SafirColors.primary,
+                        backgroundColor: SafirColors.primaryBrand,
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
@@ -342,7 +342,7 @@ class _SearchHint extends StatelessWidget {
         children: [
           Icon(
             Icons.tips_and_updates_outlined,
-            color: SafirColors.primary,
+            color: SafirColors.primaryBrand,
           ),
           SizedBox(width: 10),
           Expanded(
@@ -396,7 +396,7 @@ class _PlaceResultTile extends StatelessWidget {
                 ),
                 child: const Icon(
                   Icons.place_outlined,
-                  color: SafirColors.primary,
+                  color: SafirColors.primaryBrand,
                 ),
               ),
               const SizedBox(width: 12),
