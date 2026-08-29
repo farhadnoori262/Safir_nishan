@@ -278,6 +278,19 @@ class _NavigationPageState extends State<NavigationPage>
       _showCurrentLocationMarker(moveCamera: false);
     }
   }
+  
+  Future<void> _addDriverArrowImage() async {
+  if (_mapController == null) return;
+
+  final ByteData imageBytes = await rootBundle.load(
+    'assets/images/navigation_arrow.png',
+  );
+
+  await _mapController!.addImage(
+    _driverIconName,
+    imageBytes.buffer.asUint8List(),
+  );
+}
 
   Future<void> _addMapImages() async {
     if (_mapController == null || _iconsAdded) return;
