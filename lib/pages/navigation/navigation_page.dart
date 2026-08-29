@@ -881,7 +881,7 @@ await NavigationMapPainters.addCanvasImage(
     _isProgrammaticCameraMove = true;
 
     try {
-      final LatLng offsetTarget = _getOffsetTarget(location, heading, 55.0);
+      final LatLng offsetTarget = _getOffsetTarget(location, heading, 115.0);
 
       await _mapController!.animateCamera(
         CameraUpdate.newCameraPosition(
