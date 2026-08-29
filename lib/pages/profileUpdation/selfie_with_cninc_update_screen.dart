@@ -63,7 +63,7 @@ class _SelfieWithCnincUpdateScreenState
                   context,
                   'selfie_label'.tr(),
                   registrationProvider.cnicWithSelfieImage,
-                  registrationProvider.pickCnincImageWithSelfie,
+                  () => registrationProvider.pickCnincImageWithSelfie(context),
                   'selfie_description'.tr(),
                 ),
                 const SizedBox(height: 24),
