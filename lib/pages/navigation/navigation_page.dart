@@ -630,18 +630,6 @@ class _NavigationPageState extends State<NavigationPage>
 
       final stepSegment = _extractManeuverSegment(step.location, routePoints);
 
-      if (stepSegment.length >= 2) {
-        final maneuverLine = await _mapController!.addLine(
-          LineOptions(
-            geometry: stepSegment,
-            lineColor: '#FFFFFF',
-            lineWidth: 10.0,
-            lineOpacity: 0.95,
-          ),
-        );
-        _turnLines.add(maneuverLine);
-      }
-
       final symbol = await _mapController!.addSymbol(
         SymbolOptions(
           geometry: step.location,
