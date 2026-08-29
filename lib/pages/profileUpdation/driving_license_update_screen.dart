@@ -68,7 +68,7 @@ class _DrivingLicenseUpdateScreenState
                     registrationProvider.drivingLicenseFrontImage,
                     'assets/auth/license-front.png',
                     () => registrationProvider
-                        .pickAndCropDrivingLicenseImage(true),
+                        .pickAndCropDrivingLicenseImage(context, true),
                   ),
                   const SizedBox(height: 16),
 
@@ -79,7 +79,7 @@ class _DrivingLicenseUpdateScreenState
                     registrationProvider.drivingLicenseBackImage,
                     'assets/auth/license-back.png',
                     () => registrationProvider
-                        .pickAndCropDrivingLicenseImage(false),
+                        .pickAndCropDrivingLicenseImage(context, false),
                   ),
                   const SizedBox(height: 16),
 
