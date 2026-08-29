@@ -1103,8 +1103,6 @@ await NavigationMapPainters.addCanvasImage(
               target: _startLocation,
               zoom: 16.0,
             ),
-            myLocationEnabled: true,
-            myLocationTrackingMode: MyLocationTrackingMode.tracking,
             trackCameraPosition: true,
           ),
 
