@@ -16,6 +16,7 @@ import '../../services/place_search_service.dart';
 import '../../utils/app_colors.dart';
 import '../../widgets/navigation/destination_search_sheet.dart';
 import 'navigation_map_painters.dart';
+import 'widgets/navigation_controls.dart';
 
 class NavigationPage extends StatefulWidget {
   final LatLng? currentLocation;
