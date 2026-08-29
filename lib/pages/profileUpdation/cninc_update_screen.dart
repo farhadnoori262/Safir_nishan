@@ -65,7 +65,7 @@ class _CnincUpdateScreenState extends State<CnincUpdateScreen> {
                     'cnic_front_hint'.tr(),
                     registrationProvider.cnincFrontImage,
                     'assets/auth/cnic-front.png',
-                    () => registrationProvider.pickAndCropCnincImage(true),
+                    () => registrationProvider.pickAndCropCnincImage(context, true),
                   ),
                   const SizedBox(height: 16),
 
@@ -75,7 +75,7 @@ class _CnincUpdateScreenState extends State<CnincUpdateScreen> {
                     'cnic_back_hint'.tr(),
                     registrationProvider.cnincBackImage,
                     'assets/auth/cnic-back.png',
-                    () => registrationProvider.pickAndCropCnincImage(false),
+                    () => registrationProvider.pickAndCropCnincImage(context, false),
                   ),
                   const SizedBox(height: 16),
 
