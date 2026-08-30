@@ -51,6 +51,7 @@ class StepInstruction {
 
 class NavigationController extends ChangeNotifier {
   static const double _snapToRouteDistanceMeters = 40.0;
+  static const double _hardSnapCutoffMeters = 90.0;
   static const double _rerouteDistanceMeters = 55.0;
   static const double _announceDistanceMeters = 70.0;
   static const double _stepReachedDistanceMeters = 16.0;
@@ -195,9 +196,24 @@ class NavigationController extends ChangeNotifier {
     _lastMatchedSegmentIndex = routeMatch.segmentIndex;
 
     if (routeMatch.distance <= _snapToRouteDistanceMeters) {
+      // نزدیک به مسیر: کاملاً بچسب به خط
       snappedDriverLocation = routeMatch.point;
       driverRouteBearing = routeMatch.bearing;
+    } else if (routeMatch.distance <= _hardSnapCutoffMeters) {
+      // فاصله متوسط (نویز GPS شهری): بین نقطه خام و نقطه روی خط ترکیب کن
+      // تا جهش ناگهانی فلش رخ نده
+      final blendFactor = (routeMatch.distance - _snapToRouteDistanceMeters) /
+          (_hardSnapCutoffMeters - _snapToRouteDistanceMeters);
+
+      snappedDriverLocation = LatLng(
+        routeMatch.point.latitude +
+            ((driverLocation.latitude - routeMatch.point.latitude) * blendFactor),
+        routeMatch.point.longitude +
+            ((driverLocation.longitude - routeMatch.point.longitude) * blendFactor),
+      );
+      driverRouteBearing = routeMatch.bearing;
     } else {
+      // فاصله زیاد: احتمالاً مسیر واقعاً عوض شده، موقعیت خام را نشان بده
       snappedDriverLocation = driverLocation;
     }
 
