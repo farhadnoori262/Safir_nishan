@@ -1,10 +1,10 @@
 import 'dart:math' as math;
-import 'dart:ui' as ui;
 
 import 'package:geolocator/geolocator.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 
 import '../../../controllers/navigation_controller.dart';
+import '../navigation_map_painters.dart';
 
 class NavigationRouteArrow {
   NavigationRouteArrow._();
@@ -31,6 +31,23 @@ class NavigationRouteArrow {
 
       default:
         return straightIconName;
+    }
+  }
+
+  static TurnDirection _getTurnDirection(String modifier) {
+    switch (modifier) {
+      case 'left':
+      case 'slight left':
+      case 'sharp left':
+        return TurnDirection.left;
+      case 'right':
+      case 'slight right':
+      case 'sharp right':
+        return TurnDirection.right;
+      case 'uturn':
+        return TurnDirection.uTurn;
+      default:
+        return TurnDirection.straight;
     }
   }
 
@@ -110,15 +127,30 @@ class NavigationRouteArrow {
 
       if (streetName.isEmpty) continue;
 
+      // ساخت تابلوی کپسولی پویا با اسم خیابان + آیکون جهت
+      final bannerImageKey = 'safir-banner-${step.location.latitude}-${step.location.longitude}';
+      final direction = _getTurnDirection(step.modifier);
+
+      await NavigationMapPainters.addCanvasImage(
+        controller,
+        bannerImageKey,
+        (canvas, size) => NavigationMapPainters.drawStepBanner(
+          canvas,
+          size,
+          streetName: streetName,
+          direction: direction,
+        ),
+        width: 320,
+        height: 110,
+      );
+
       final streetLabel = await controller.addSymbol(
         SymbolOptions(
           geometry: step.location,
-          textField: streetName,
-          textSize: 12.5,
-          textColor: '#FFFFFF',
-          textHaloColor: '#07553D',
-          textHaloWidth: 2.5,
-          textOffset: const ui.Offset(0, -2.6),
+          iconImage: bannerImageKey,
+          iconSize: 0.85,
+          iconAnchor: 'bottom', // نقطه اتکای پایه تابلو
+          iconPitchAlignment: 'viewport', // همواره رو به دوربین باقی بماند
         ),
       );
 
