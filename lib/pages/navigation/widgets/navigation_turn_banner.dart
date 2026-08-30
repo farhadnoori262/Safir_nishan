@@ -32,10 +32,11 @@ class NavigationTurnBanner extends StatelessWidget {
       left: 16,
       right: 16,
       child: SafeArea(
+        bottom: false,
         child: Directionality(
           textDirection: TextDirection.rtl,
           child: Container(
-            padding: const EdgeInsets.fromLTRB(10, 10, 12, 10),
+            padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
             decoration: BoxDecoration(
               color: AppColors.primaryBrand,
               borderRadius: BorderRadius.circular(18),
@@ -49,33 +50,25 @@ class NavigationTurnBanner extends StatelessWidget {
             ),
             child: Row(
               children: [
-                IconButton(
-                  tooltip: 'پایان مسیریابی',
-                  onPressed: onStopNavigation,
-                  icon: const Icon(
-                    Icons.close_rounded,
-                    color: AppColors.buttonText,
-                  ),
-                ),
                 Container(
-                  width: 1,
-                  height: 36,
-                  color: AppColors.buttonText.withOpacity(0.28),
-                ),
-                IconButton(
-                  tooltip: 'راهنمای صوتی',
-                  onPressed: controller.toggleVoice,
-                  icon: Icon(
-                    controller.isVoiceEnabled
-                        ? Icons.volume_up_rounded
-                        : Icons.volume_off_rounded,
+                  width: 52,
+                  height: 52,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.16),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(
+                    controller.currentTurnIcon,
                     color: AppColors.buttonText,
+                    size: 38,
                   ),
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
                         _distanceText(),
@@ -89,7 +82,9 @@ class NavigationTurnBanner extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        controller.navigationInstruction,
+                        controller.navigationInstruction.isEmpty
+                            ? 'route_preparing'.tr()
+                            : controller.navigationInstruction,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -101,19 +96,17 @@ class NavigationTurnBanner extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(width: 12),
-                Container(
-                  width: 52,
-                  height: 52,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.16),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(
-                    controller.currentTurnIcon,
+                const SizedBox(width: 8),
+                IconButton(
+                  tooltip: controller.isVoiceEnabled
+                      ? 'خاموش کردن راهنمای صوتی'
+                      : 'روشن کردن راهنمای صوتی',
+                  onPressed: controller.toggleVoice,
+                  icon: Icon(
+                    controller.isVoiceEnabled
+                        ? Icons.volume_up_rounded
+                        : Icons.volume_off_rounded,
                     color: AppColors.buttonText,
-                    size: 38,
                   ),
                 ),
               ],
