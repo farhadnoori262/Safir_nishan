@@ -500,11 +500,7 @@ class _NavigationPageState extends State<NavigationPage>
     await NavigationRouteArrow.drawDecorations(
       controller: _mapController!,
       navigationController: navigationController,
-      destination: _selectedDestination!,
-      destinationIconName: _destinationIconName,
-      destinationSymbol: _destinationSymbol,
       turnSymbols: _turnSymbols,
-      setDestinationSymbol: (symbol) => _destinationSymbol = symbol,
     );
   }
 
