@@ -59,7 +59,7 @@ class NavigationRouteArrow {
       }
     }
 
-    final startIndex = closestIndex > 0 ? closestIndex - 1 : closestIndex;
+    final startIndex = closestIndex;
     final endIndex = closestIndex < points.length - 1
         ? closestIndex + 1
         : closestIndex;
@@ -96,6 +96,9 @@ class NavigationRouteArrow {
             step.location,
             routePoints,
           ),
+          iconAnchor: 'center',
+          iconPitchAlignment: 'map',
+          iconRotationAlignment: 'map',
         ),
       );
 
