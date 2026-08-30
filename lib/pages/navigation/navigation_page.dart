@@ -1,10 +1,8 @@
 import 'dart:async';
-import 'dart:typed_data';
 import 'dart:math' as math;
 
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 import 'package:provider/provider.dart';
@@ -16,7 +14,13 @@ import '../../services/place_search_service.dart';
 import '../../utils/app_colors.dart';
 import '../../widgets/navigation/destination_search_sheet.dart';
 import 'navigation_map_painters.dart';
+
+import 'navigation_route_style.dart';
+import 'widgets/navigation_bottom_panel.dart';
 import 'widgets/navigation_controls.dart';
+import 'widgets/navigation_driver_marker.dart';
+import 'widgets/navigation_route_arrow.dart';
+import 'widgets/navigation_turn_banner.dart';
 
 class NavigationPage extends StatefulWidget {
   final LatLng? currentLocation;
@@ -38,15 +42,8 @@ class NavigationPage extends StatefulWidget {
 
 class _NavigationPageState extends State<NavigationPage>
     with SingleTickerProviderStateMixin {
-  static const String _driverIconName = 'safir-driver-arrow';
   static const String _destinationIconName = 'safir-destination-pin';
-  static const String _currentLocationIconName =
-      'safir-current-location-pulse';
-  static const String _leftTurnIconName = 'safir-turn-left';
-  static const String _rightTurnIconName = 'safir-turn-right';
-  static const String _straightIconName = 'safir-turn-straight';
-  static const String _uTurnIconName = 'safir-turn-uturn';
-
+  static const String _currentLocationIconName = 'safir-current-location-pulse';
   static const LatLng _fallbackLocation = LatLng(34.5553, 69.2075);
 
   MapLibreMapController? _mapController;
@@ -77,20 +74,6 @@ class _NavigationPageState extends State<NavigationPage>
 
   int _lastRouteVersion = 0;
 
-  /// 🌙 متد هوشمند تشخیص حالت تاریک نقشه بر اساس ساعت دستگاه
-  String get _currentMapStyle {
-    final hour = DateTime.now().hour;
-    final isNight = hour >= 19 || hour < 6;
-
-    if (isNight) {
-      // استایل تاریک استاندارد شب
-      return 'https://tiles.stadiamaps.com/styles/alidade_smooth_dark.json';
-    } else {
-      // استایل اختصاصی و رنگی خودتان برای روز
-      return 'assets/map/style.json';
-    }
-  }
-
   LatLng get _startLocation =>
       widget.pickupLocation ??
       _currentLocation ??
@@ -100,7 +83,6 @@ class _NavigationPageState extends State<NavigationPage>
   @override
   void initState() {
     super.initState();
-
     _currentLocation = widget.currentLocation;
 
     _pulseController = AnimationController(
@@ -122,7 +104,6 @@ class _NavigationPageState extends State<NavigationPage>
 
   void _onMapCreated(MapLibreMapController controller) async {
     _mapController = controller;
-
     await controller.updateMyLocationTrackingMode(
       MyLocationTrackingMode.tracking,
     );
@@ -132,9 +113,7 @@ class _NavigationPageState extends State<NavigationPage>
     if (!mounted) return;
 
     _mapStyleReady = true;
-
-    final navigationController =
-        Provider.of<NavigationController>(context, listen: false);
+    final navigationController = Provider.of<NavigationController>(context, listen: false);
 
     if (!_controllerListenerAdded) {
       navigationController.addListener(_navigationControllerChanged);
@@ -152,11 +131,7 @@ class _NavigationPageState extends State<NavigationPage>
   }
 
   Future<void> _checkAndStartDriverTrip() async {
-    if (!widget.isDriverTrip || widget.dropoffLocation == null) {
-      return;
-    }
-
-    if (_navigationStarted) {
+    if (!widget.isDriverTrip || widget.dropoffLocation == null || _navigationStarted) {
       return;
     }
 
@@ -233,14 +208,10 @@ class _NavigationPageState extends State<NavigationPage>
 
   Future<void> _handleLocationUpdate(Position position) async {
     if (!mounted || _isUpdatingMap) return;
-
     _isUpdatingMap = true;
 
     try {
-      final rawLocation = LatLng(
-        position.latitude,
-        position.longitude,
-      );
+      final rawLocation = LatLng(position.latitude, position.longitude);
 
       if (mounted) {
         setState(() {
@@ -249,8 +220,7 @@ class _NavigationPageState extends State<NavigationPage>
         });
       }
 
-      final navigationController =
-          Provider.of<NavigationController>(context, listen: false);
+      final navigationController = Provider.of<NavigationController>(context, listen: false);
 
       if (_navigationStarted && navigationController.isNavigating) {
         navigationController.updateDriverPosition(
@@ -258,8 +228,7 @@ class _NavigationPageState extends State<NavigationPage>
           langCode: context.locale.languageCode,
         );
 
-        final driverLocation =
-            navigationController.snappedDriverLocation ?? rawLocation;
+        final driverLocation = navigationController.snappedDriverLocation ?? rawLocation;
 
         await _updateDriverMarker(
           driverLocation,
@@ -279,24 +248,11 @@ class _NavigationPageState extends State<NavigationPage>
       _showCurrentLocationMarker(moveCamera: false);
     }
   }
-  
-  Future<void> _addDriverArrowImage() async {
-  if (_mapController == null) return;
-
-  final ByteData imageBytes = await rootBundle.load(
-    'assets/images/navigation_arrow.png',
-  );
-
-  await _mapController!.addImage(
-    _driverIconName,
-    imageBytes.buffer.asUint8List(),
-  );
-}
 
   Future<void> _addMapImages() async {
     if (_mapController == null || _iconsAdded) return;
 
-    await _addDriverArrowImage();
+    await NavigationDriverMarker.addDriverArrowImage(_mapController!);
 
     await NavigationMapPainters.addCanvasImage(
       _mapController!,
@@ -318,76 +274,70 @@ class _NavigationPageState extends State<NavigationPage>
       width: 100,
       height: 124,
     );
+
     await NavigationMapPainters.addCanvasImage(
-  _mapController!,
-  _leftTurnIconName,
-  (canvas, size) => NavigationMapPainters.drawTurnArrow(
-    canvas,
-    size,
-    direction: TurnDirection.left,
-  ),
-  width: 96,
-  height: 96,
-);
+      _mapController!,
+      NavigationRouteArrow.leftTurnIconName,
+      (canvas, size) => NavigationMapPainters.drawTurnArrow(
+        canvas,
+        size,
+        direction: TurnDirection.left,
+      ),
+      width: 96,
+      height: 96,
+    );
 
-await NavigationMapPainters.addCanvasImage(
-  _mapController!,
-  _rightTurnIconName,
-  (canvas, size) => NavigationMapPainters.drawTurnArrow(
-    canvas,
-    size,
-    direction: TurnDirection.right,
-  ),
-  width: 96,
-  height: 96,
-);
+    await NavigationMapPainters.addCanvasImage(
+      _mapController!,
+      NavigationRouteArrow.rightTurnIconName,
+      (canvas, size) => NavigationMapPainters.drawTurnArrow(
+        canvas,
+        size,
+        direction: TurnDirection.right,
+      ),
+      width: 96,
+      height: 96,
+    );
 
-await NavigationMapPainters.addCanvasImage(
-  _mapController!,
-  _straightIconName,
-  (canvas, size) => NavigationMapPainters.drawTurnArrow(
-    canvas,
-    size,
-    direction: TurnDirection.straight,
-  ),
-  width: 96,
-  height: 96,
-);
+    await NavigationMapPainters.addCanvasImage(
+      _mapController!,
+      NavigationRouteArrow.straightIconName,
+      (canvas, size) => NavigationMapPainters.drawTurnArrow(
+        canvas,
+        size,
+        direction: TurnDirection.straight,
+      ),
+      width: 96,
+      height: 96,
+    );
 
-await NavigationMapPainters.addCanvasImage(
-  _mapController!,
-  _uTurnIconName,
-  (canvas, size) => NavigationMapPainters.drawTurnArrow(
-    canvas,
-    size,
-    direction: TurnDirection.uTurn,
-  ),
-  width: 96,
-  height: 96,
-);
+    await NavigationMapPainters.addCanvasImage(
+      _mapController!,
+      NavigationRouteArrow.uTurnIconName,
+      (canvas, size) => NavigationMapPainters.drawTurnArrow(
+        canvas,
+        size,
+        direction: TurnDirection.uTurn,
+      ),
+      width: 96,
+      height: 96,
+    );
 
     _iconsAdded = true;
   }
 
-  Future<void> _onPlaceSelected(
-    PlaceSearchResult place,
-  ) async {
+  Future<void> _onPlaceSelected(PlaceSearchResult place) async {
     if (!mounted) return;
 
     setState(() {
       _selectedPlace = place;
-      _selectedDestination = LatLng(
-        place.latitude,
-        place.longitude,
-      );
+      _selectedDestination = LatLng(place.latitude, place.longitude);
     });
 
     await _showSelectedDestinationMarker(moveCamera: true);
   }
 
-  Future<void> _selectDestinationFromMap(
-    LatLng coordinates,
-  ) async {
+  Future<void> _selectDestinationFromMap(LatLng coordinates) async {
     final temporaryPlace = PlaceSearchResult(
       title: 'getting_address'.tr(),
       address: 'please_wait'.tr(),
@@ -398,7 +348,6 @@ await NavigationMapPainters.addCanvasImage(
     await _onPlaceSelected(temporaryPlace);
 
     final placeSearchService = PlaceSearchService();
-
     final realPlace = await placeSearchService.reverseGeocode(
       coordinates.latitude,
       coordinates.longitude,
@@ -406,22 +355,15 @@ await NavigationMapPainters.addCanvasImage(
     );
 
     if (!mounted || realPlace == null) {
-      if (mounted) {
-        _showMessage('address_not_found'.tr());
-      }
+      if (mounted) _showMessage('address_not_found'.tr());
       return;
     }
 
     await _onPlaceSelected(realPlace);
   }
 
-  Future<void> _showSelectedDestinationMarker({
-    required bool moveCamera,
-  }) async {
-    if (!_mapStyleReady ||
-        !_iconsAdded ||
-        _mapController == null ||
-        _selectedDestination == null) {
+  Future<void> _showSelectedDestinationMarker({required bool moveCamera}) async {
+    if (!_mapStyleReady || !_iconsAdded || _mapController == null || _selectedDestination == null) {
       return;
     }
 
@@ -434,10 +376,7 @@ await NavigationMapPainters.addCanvasImage(
     if (_destinationSymbol == null) {
       _destinationSymbol = await _mapController!.addSymbol(options);
     } else {
-      await _mapController!.updateSymbol(
-        _destinationSymbol!,
-        options,
-      );
+      await _mapController!.updateSymbol(_destinationSymbol!, options);
     }
 
     await _mapController!.setSymbolIconAllowOverlap(true);
@@ -446,37 +385,22 @@ await NavigationMapPainters.addCanvasImage(
     if (!moveCamera) return;
 
     _isProgrammaticCameraMove = true;
-
     try {
       await _mapController!.animateCamera(
         CameraUpdate.newCameraPosition(
-          CameraPosition(
-            target: _selectedDestination!,
-            zoom: 16.5,
-          ),
+          CameraPosition(target: _selectedDestination!, zoom: 16.5),
         ),
         duration: const Duration(milliseconds: 550),
       );
     } finally {
-      Future.delayed(
-        const Duration(milliseconds: 700),
-        () {
-          if (mounted) {
-            _isProgrammaticCameraMove = false;
-          }
-        },
-      );
+      Future.delayed(const Duration(milliseconds: 700), () {
+        if (mounted) _isProgrammaticCameraMove = false;
+      });
     }
   }
 
-  Future<void> _showCurrentLocationMarker({
-    required bool moveCamera,
-  }) async {
-    if (!_mapStyleReady ||
-        !_iconsAdded ||
-        _mapController == null ||
-        _currentLocation == null ||
-        _navigationStarted) {
+  Future<void> _showCurrentLocationMarker({required bool moveCamera}) async {
+    if (!_mapStyleReady || !_iconsAdded || _mapController == null || _currentLocation == null || _navigationStarted) {
       return;
     }
 
@@ -487,13 +411,9 @@ await NavigationMapPainters.addCanvasImage(
     );
 
     if (_currentLocationSymbol == null) {
-      _currentLocationSymbol =
-          await _mapController!.addSymbol(options);
+      _currentLocationSymbol = await _mapController!.addSymbol(options);
     } else {
-      await _mapController!.updateSymbol(
-        _currentLocationSymbol!,
-        options,
-      );
+      await _mapController!.updateSymbol(_currentLocationSymbol!, options);
     }
 
     await _mapController!.setSymbolIconAllowOverlap(true);
@@ -501,11 +421,7 @@ await NavigationMapPainters.addCanvasImage(
 
     if (!moveCamera) return;
 
-    await _moveCameraToLocation(
-      _currentLocation!,
-      zoom: 16.5,
-      tilt: 35.0,
-    );
+    await _moveCameraToLocation(_currentLocation!, zoom: 16.5, tilt: 35.0);
   }
 
   Future<void> _confirmDestination() async {
@@ -513,17 +429,12 @@ await NavigationMapPainters.addCanvasImage(
       _showMessage('select_destination_first'.tr());
       return;
     }
-
     if (_navigationStarted) return;
-
     await _startNavigation();
   }
 
   Future<void> _startNavigation() async {
-    if (!_mapStyleReady ||
-        _mapController == null ||
-        _selectedDestination == null ||
-        _navigationStarted) {
+    if (!_mapStyleReady || _mapController == null || _selectedDestination == null || _navigationStarted) {
       return;
     }
 
@@ -532,8 +443,7 @@ await NavigationMapPainters.addCanvasImage(
       _cameraFollowing = true;
     });
 
-    final navigationController =
-        Provider.of<NavigationController>(context, listen: false);
+    final navigationController = Provider.of<NavigationController>(context, listen: false);
 
     final routePoints = await navigationController.startNavigation(
       _startLocation,
@@ -548,7 +458,6 @@ await NavigationMapPainters.addCanvasImage(
           _cameraFollowing = false;
         });
       }
-
       _showMessage('route_not_found_check_internet'.tr());
       return;
     }
@@ -560,7 +469,7 @@ await NavigationMapPainters.addCanvasImage(
       _currentLocationSymbol = null;
     }
 
-    await _drawRoute(routePoints);
+    await NavigationRouteStyle.drawRoute(_mapController!, routePoints);
     await _drawRouteDecorations(navigationController);
 
     await _updateDriverMarker(
@@ -570,38 +479,8 @@ await NavigationMapPainters.addCanvasImage(
     );
   }
 
-  Future<void> _drawRoute(List<LatLng> points) async {
-  if (_mapController == null || points.length < 2) return;
-
-  await _mapController!.clearLines();
-
-  // حاشیهٔ تیره برای جدا شدن مسیر از خیابان‌ها
-  await _mapController!.addLine(
-    LineOptions(
-      geometry: points,
-      lineColor: '#07553D',
-      lineWidth: 18.0,
-      lineOpacity: 0.96,
-    ),
-  );
-
-  // مسیر اصلی سبز و واضح
-  await _mapController!.addLine(
-    LineOptions(
-      geometry: points,
-      lineColor: '#19B879',
-      lineWidth: 11.0,
-      lineOpacity: 1.0,
-    ),
-  );
-  }
-
-  Future<void> _drawRouteDecorations(
-    NavigationController navigationController,
-  ) async {
-    if (_mapController == null || _selectedDestination == null) {
-      return;
-    }
+  Future<void> _drawRouteDecorations(NavigationController navigationController) async {
+    if (_mapController == null || _selectedDestination == null) return;
 
     await _clearRouteDecorations(keepDestination: true);
 
@@ -618,156 +497,18 @@ await NavigationMapPainters.addCanvasImage(
     await _mapController!.setSymbolIconAllowOverlap(true);
     await _mapController!.setSymbolIconIgnorePlacement(true);
 
-    final routePoints = navigationController.currentRoutePoints;
-
-    for (var index = 0;
-        index < navigationController.routeSteps.length;
-        index++) {
-      final step = navigationController.routeSteps[index];
-
-      if (step.distance < 18) continue;
-      if (index == 0 && step.modifier == 'straight') continue;
-
-      final stepSegment = _extractManeuverSegment(step.location, routePoints);
-
-      final symbol = await _mapController!.addSymbol(
-        SymbolOptions(
-          geometry: step.location,
-          iconImage: _turnIconName(step.modifier),
-          iconSize: 0.44,
-          iconRotate: _routeBearingAt(
-            step.location,
-            routePoints,
-          ),
-        ),
-      );
-
-      _turnSymbols.add(symbol);
-
-      final streetName = step.streetName.isNotEmpty
-          ? step.streetName
-          : step.instruction;
-
-      if (streetName.isNotEmpty) {
-        final labelSymbol = await _mapController!.addSymbol(
-          SymbolOptions(
-            geometry: step.location,
-            textField: streetName,
-            textSize: 12.0,
-            textColor: '#FFFFFF',
-            textHaloColor: '#145A41',
-            textHaloWidth: 2.0,
-            textOffset: const Offset(0, -2.0),
-          ),
-        );
-
-        _turnSymbols.add(labelSymbol);
-      }
-    }
+    await NavigationRouteArrow.drawDecorations(
+      controller: _mapController!,
+      navigationController: navigationController,
+      destination: _selectedDestination!,
+      destinationIconName: _destinationIconName,
+      destinationSymbol: _destinationSymbol,
+      turnSymbols: _turnSymbols,
+      setDestinationSymbol: (symbol) => _destinationSymbol = symbol,
+    );
   }
 
-  List<LatLng> _extractManeuverSegment(LatLng turnPoint, List<LatLng> points) {
-    if (points.length < 2) return [];
-
-    int closestIndex = 0;
-    double minDistance = double.infinity;
-
-    for (int i = 0; i < points.length; i++) {
-      final dist = Geolocator.distanceBetween(
-        turnPoint.latitude,
-        turnPoint.longitude,
-        points[i].latitude,
-        points[i].longitude,
-      );
-      if (dist < minDistance) {
-        minDistance = dist;
-        closestIndex = i;
-      }
-    }
-
-    final int startIndex = math.max(0, closestIndex - 2);
-    final int endIndex = math.min(points.length - 1, closestIndex + 2);
-
-    return points.sublist(startIndex, endIndex + 1);
-  }
-
-  String _turnIconName(String modifier) {
-    switch (modifier) {
-      case 'left':
-      case 'slight left':
-      case 'sharp left':
-        return _leftTurnIconName;
-
-      case 'right':
-      case 'slight right':
-      case 'sharp right':
-        return _rightTurnIconName;
-
-      case 'uturn':
-        return _uTurnIconName;
-
-      default:
-        return _straightIconName;
-    }
-  }
-
-  double _routeBearingAt(
-    LatLng location,
-    List<LatLng> points,
-  ) {
-    if (points.length < 2) return 0.0;
-
-    var closestIndex = 0;
-    var closestDistance = double.infinity;
-
-    for (var index = 0; index < points.length; index++) {
-      final point = points[index];
-
-      final distance = Geolocator.distanceBetween(
-        location.latitude,
-        location.longitude,
-        point.latitude,
-        point.longitude,
-      );
-
-      if (distance < closestDistance) {
-        closestDistance = distance;
-        closestIndex = index;
-      }
-    }
-
-    final previousIndex =
-        closestIndex > 0 ? closestIndex - 1 : closestIndex;
-
-    final nextIndex = closestIndex < points.length - 1
-        ? closestIndex + 1
-        : closestIndex;
-
-    final start = points[previousIndex];
-    final end = points[nextIndex];
-
-    final startLatitude = start.latitude * math.pi / 180.0;
-    final endLatitude = end.latitude * math.pi / 180.0;
-
-    final longitudeDifference =
-        (end.longitude - start.longitude) * math.pi / 180.0;
-
-    final y = math.sin(longitudeDifference) * math.cos(endLatitude);
-
-    final x =
-        (math.cos(startLatitude) * math.sin(endLatitude)) -
-            (math.sin(startLatitude) *
-                math.cos(endLatitude) *
-                math.cos(longitudeDifference));
-
-    final heading = math.atan2(y, x) * 180.0 / math.pi;
-
-    return (heading + 360.0) % 360.0;
-  }
-
-  Future<void> _clearRouteDecorations({
-    bool keepDestination = false,
-  }) async {
+  Future<void> _clearRouteDecorations({bool keepDestination = false}) async {
     if (_mapController == null) return;
 
     for (final symbol in _turnSymbols) {
@@ -787,18 +528,13 @@ await NavigationMapPainters.addCanvasImage(
   }
 
   void _navigationControllerChanged() {
-    if (!mounted ||
-        !_mapStyleReady ||
-        _mapController == null ||
-        !_navigationStarted) {
+    if (!mounted || !_mapStyleReady || _mapController == null || !_navigationStarted) {
       return;
     }
 
-    final navigationController =
-        Provider.of<NavigationController>(context, listen: false);
+    final navigationController = Provider.of<NavigationController>(context, listen: false);
 
-    if (navigationController.routeVersion == _lastRouteVersion ||
-        navigationController.currentRoutePoints.isEmpty) {
+    if (navigationController.routeVersion == _lastRouteVersion || navigationController.currentRoutePoints.isEmpty) {
       return;
     }
 
@@ -806,35 +542,9 @@ await NavigationMapPainters.addCanvasImage(
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted || _mapController == null) return;
-
-      await _drawRoute(navigationController.currentRoutePoints);
+      await NavigationRouteStyle.drawRoute(_mapController!, navigationController.currentRoutePoints);
       await _drawRouteDecorations(navigationController);
     });
-  }
-
-  LatLng _getOffsetTarget(LatLng driverLoc, double bearing, double distanceInMeters) {
-    const double earthRadius = 6371000.0;
-    final double radBearing = bearing * (math.pi / 180.0);
-    final double latRad = driverLoc.latitude * (math.pi / 180.0);
-    final double lngRad = driverLoc.longitude * (math.pi / 180.0);
-
-    final double angularDistance = distanceInMeters / earthRadius;
-
-    final double targetLatRad = math.asin(
-      math.sin(latRad) * math.cos(angularDistance) +
-          math.cos(latRad) * math.sin(angularDistance) * math.cos(radBearing),
-    );
-
-    final double targetLngRad = lngRad +
-        math.atan2(
-          math.sin(radBearing) * math.sin(angularDistance) * math.cos(latRad),
-          math.cos(angularDistance) - math.sin(latRad) * math.sin(targetLatRad),
-        );
-
-    return LatLng(
-      targetLatRad * (180.0 / math.pi),
-      targetLngRad * (180.0 / math.pi),
-    );
   }
 
   Future<void> _updateDriverMarker(
@@ -842,47 +552,25 @@ await NavigationMapPainters.addCanvasImage(
     required double heading,
     required bool moveCamera,
   }) async {
-    if (!_mapStyleReady || !_iconsAdded || _mapController == null) {
-      return;
-    }
+    if (!_mapStyleReady || !_iconsAdded || _mapController == null) return;
 
-    final options = SymbolOptions(
-      geometry: location,
-      iconImage: _driverIconName,
-      iconSize: 0.58,
-      iconRotate: heading,
-    );
-
-    if (_driverSymbol == null) {
-      _driverSymbol = await _mapController!.addSymbol(options);
-    } else {
-      await _mapController!.updateSymbol(
-        _driverSymbol!,
-        options,
-      );
-    }
-
-    await _mapController!.setSymbolIconAllowOverlap(true);
-    await _mapController!.setSymbolIconIgnorePlacement(true);
-
-    if (!moveCamera) return;
-
-    await _moveCameraToDriver(
-      location,
+    _driverSymbol = await NavigationDriverMarker.updateMarker(
+      controller: _mapController!,
+      currentSymbol: _driverSymbol,
+      location: location,
       heading: heading,
     );
+
+    if (!moveCamera) return;
+    await _moveCameraToDriver(location, heading: heading);
   }
 
-  Future<void> _moveCameraToDriver(
-    LatLng location, {
-    required double heading,
-  }) async {
+  Future<void> _moveCameraToDriver(LatLng location, {required double heading}) async {
     if (_mapController == null) return;
-
     _isProgrammaticCameraMove = true;
 
     try {
-      final LatLng offsetTarget = _getOffsetTarget(location, heading, 115.0);
+      final LatLng offsetTarget = NavigationDriverMarker.getOffsetTarget(location, heading, 115.0);
 
       await _mapController!.animateCamera(
         CameraUpdate.newCameraPosition(
@@ -899,14 +587,9 @@ await NavigationMapPainters.addCanvasImage(
       await _mapController!.setSymbolIconAllowOverlap(true);
       await _mapController!.setSymbolIconIgnorePlacement(true);
     } finally {
-      Future.delayed(
-        const Duration(milliseconds: 600),
-        () {
-          if (mounted) {
-            _isProgrammaticCameraMove = false;
-          }
-        },
-      );
+      Future.delayed(const Duration(milliseconds: 600), () {
+        if (mounted) _isProgrammaticCameraMove = false;
+      });
     }
   }
 
@@ -916,45 +599,30 @@ await NavigationMapPainters.addCanvasImage(
     required double tilt,
   }) async {
     if (_mapController == null) return;
-
     _isProgrammaticCameraMove = true;
 
     try {
       await _mapController!.animateCamera(
         CameraUpdate.newCameraPosition(
-          CameraPosition(
-            target: location,
-            zoom: zoom,
-            tilt: tilt,
-          ),
+          CameraPosition(target: location, zoom: zoom, tilt: tilt),
         ),
         duration: const Duration(milliseconds: 600),
       );
     } finally {
-      Future.delayed(
-        const Duration(milliseconds: 750),
-        () {
-          if (mounted) {
-            _isProgrammaticCameraMove = false;
-          }
-        },
-      );
+      Future.delayed(const Duration(milliseconds: 750), () {
+        if (mounted) _isProgrammaticCameraMove = false;
+      });
     }
   }
 
   Future<void> _showFullRoute() async {
     if (_mapController == null) return;
-
-    final navigationController =
-        Provider.of<NavigationController>(context, listen: false);
-
+    final navigationController = Provider.of<NavigationController>(context, listen: false);
     final points = navigationController.currentRoutePoints;
 
     if (points.length < 2) return;
 
-    setState(() {
-      _cameraFollowing = false;
-    });
+    setState(() => _cameraFollowing = false);
 
     await _mapController!.animateCamera(
       CameraUpdate.newLatLngBounds(
@@ -969,27 +637,15 @@ await NavigationMapPainters.addCanvasImage(
   }
 
   Future<void> _goToStart() async {
-    setState(() {
-      _cameraFollowing = false;
-    });
-
-    await _moveCameraToLocation(
-      _startLocation,
-      zoom: 17.0,
-      tilt: 35.0,
-    );
+    setState(() => _cameraFollowing = false);
+    await _moveCameraToLocation(_startLocation, zoom: 17.0, tilt: 35.0);
   }
 
   Future<void> _followDriver() async {
-    final navigationController =
-        Provider.of<NavigationController>(context, listen: false);
+    final navigationController = Provider.of<NavigationController>(context, listen: false);
+    final location = navigationController.snappedDriverLocation ?? _startLocation;
 
-    final location =
-        navigationController.snappedDriverLocation ?? _startLocation;
-
-    setState(() {
-      _cameraFollowing = true;
-    });
+    setState(() => _cameraFollowing = true);
 
     await _moveCameraToDriver(
       location,
@@ -999,7 +655,6 @@ await NavigationMapPainters.addCanvasImage(
 
   Future<void> _resetToNorth() async {
     if (_mapController == null) return;
-
     await _mapController!.animateCamera(
       CameraUpdate.bearingTo(0.0),
       duration: const Duration(milliseconds: 500),
@@ -1026,9 +681,7 @@ await NavigationMapPainters.addCanvasImage(
   }
 
   Future<void> _stopNavigation() async {
-    final navigationController =
-        Provider.of<NavigationController>(context, listen: false);
-
+    final navigationController = Provider.of<NavigationController>(context, listen: false);
     navigationController.stopNavigation();
 
     if (_mapController != null) {
@@ -1055,10 +708,7 @@ await NavigationMapPainters.addCanvasImage(
 
   void _showMessage(String message) {
     if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -1066,12 +716,9 @@ await NavigationMapPainters.addCanvasImage(
     _pulseController
       ..removeListener(_updateCurrentLocationPulse)
       ..dispose();
-
     _positionStream?.cancel();
 
-    final navigationController =
-        Provider.of<NavigationController>(context, listen: false);
-
+    final navigationController = Provider.of<NavigationController>(context, listen: false);
     if (_controllerListenerAdded) {
       navigationController.removeListener(_navigationControllerChanged);
     }
@@ -1099,7 +746,7 @@ await NavigationMapPainters.addCanvasImage(
                 });
               }
             },
-            styleString: _currentMapStyle, // 👈 متصل به متد هوشمند تم روز/شب
+            styleString: NavigationRouteStyle.currentMapStyle,
             initialCameraPosition: CameraPosition(
               target: _startLocation,
               zoom: 16.0,
@@ -1123,9 +770,7 @@ await NavigationMapPainters.addCanvasImage(
                       ),
                       child: Text(
                         'getting_your_location'.tr(),
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                        ),
+                        style: const TextStyle(color: AppColors.textPrimary),
                       ),
                     ),
                   ),
@@ -1159,10 +804,7 @@ await NavigationMapPainters.addCanvasImage(
                       ),
                     );
                   },
-                  icon: const Icon(
-                    Icons.person_add_alt_1_rounded,
-                    size: 20,
-                  ),
+                  icon: const Icon(Icons.person_add_alt_1_rounded, size: 20),
                   label: Text(
                     'driver_registration'.tr(),
                     style: const TextStyle(
@@ -1174,60 +816,29 @@ await NavigationMapPainters.addCanvasImage(
               ),
             ),
 
-          Positioned(
-            right: 16,
-            bottom: _navigationStarted ? 140 : 260,
-            child: SafeArea(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _MapActionButton(
-                    icon: Icons.navigation_rounded,
-                    tooltip: 'align_to_north'.tr(),
-                    iconColor: Colors.redAccent,
-                    onPressed: _resetToNorth,
-                  ),
-                  const SizedBox(height: 10),
-                  if (_navigationStarted) ...[
-                    _MapActionButton(
-                      icon: Icons.alt_route_rounded,
-                      tooltip: 'show_full_route'.tr(),
-                      onPressed: _showFullRoute,
-                    ),
-                    const SizedBox(height: 10),
-                    _MapActionButton(
-                      icon: Icons.home_outlined,
-                      tooltip: 'back_to_start'.tr(),
-                      onPressed: _goToStart,
-                    ),
-                    const SizedBox(height: 10),
-                  ],
-                  _MapActionButton(
-                    icon: Icons.my_location_rounded,
-                    tooltip: 'my_location'.tr(),
-                    iconColor: AppColors.primaryButton,
-                    onPressed: () async {
-                      if (_navigationStarted) {
-                        _followDriver();
-                      } else {
-                        if (_mapController != null) {
-                          await _mapController!.updateMyLocationTrackingMode(
-                            MyLocationTrackingMode.tracking,
-                          );
-                        }
-                        if (_currentLocation != null) {
-                          _moveCameraToLocation(
-                            _currentLocation!,
-                            zoom: 16.5,
-                            tilt: 35.0,
-                          );
-                        }
-                      }
-                    },
-                  ),
-                ],
-              ),
-            ),
+          NavigationControls(
+            navigationStarted: _navigationStarted,
+            onResetToNorth: _resetToNorth,
+            onShowFullRoute: _showFullRoute,
+            onGoToStart: _goToStart,
+            onFollowLocation: () async {
+              if (_navigationStarted) {
+                _followDriver();
+              } else {
+                if (_mapController != null) {
+                  await _mapController!.updateMyLocationTrackingMode(
+                    MyLocationTrackingMode.tracking,
+                  );
+                }
+                if (_currentLocation != null) {
+                  _moveCameraToLocation(
+                    _currentLocation!,
+                    zoom: 16.5,
+                    tilt: 35.0,
+                  );
+                }
+              }
+            },
           ),
 
           if (_navigationStarted && !_cameraFollowing)
@@ -1258,76 +869,9 @@ await NavigationMapPainters.addCanvasImage(
               if (!_navigationStarted || !controller.isNavigating) {
                 return const SizedBox.shrink();
               }
-
-              return Positioned(
-                top: 18,
-                left: 68,
-                right: 16,
-                child: SafeArea(
-                  child: Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryBrand,
-                      borderRadius: BorderRadius.circular(18),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Colors.black26,
-                          blurRadius: 10,
-                          offset: Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          controller.currentTurnIcon,
-                          color: AppColors.buttonText,
-                          size: 34,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '${controller.distanceToNextTurn} ${'meters'.tr()}',
-                                style: const TextStyle(
-                                  color: AppColors.buttonText,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              Text(
-                                controller.navigationInstruction,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: AppColors.buttonText,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: controller.toggleVoice,
-                          icon: Icon(
-                            controller.isVoiceEnabled
-                                ? Icons.volume_up_rounded
-                                : Icons.volume_off_rounded,
-                            color: AppColors.buttonText,
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: _stopNavigation,
-                          icon: const Icon(
-                            Icons.close_rounded,
-                            color: AppColors.buttonText,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+              return NavigationTurnBanner(
+                controller: controller,
+                onStopNavigation: _stopNavigation,
               );
             },
           ),
@@ -1338,90 +882,9 @@ await NavigationMapPainters.addCanvasImage(
                 if (!controller.isNavigating) {
                   return const SizedBox.shrink();
                 }
-
-                return Positioned(
-                  bottom: 20,
-                  left: 16,
-                  right: 16,
-                  child: SafeArea(
-                    child: Card(
-                      color: Colors.white,
-                      elevation: 8,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    'route_guide'.tr(),
-                                    style: const TextStyle(
-                                      color: AppColors.textSecondary,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '${controller.distanceToNextTurn} ${'meters'.tr()}',
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.textPrimary,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 3),
-                                  Text(
-                                    controller.navigationInstruction.isEmpty
-                                        ? 'route_preparing'.tr()
-                                        : controller.navigationInstruction,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      color: AppColors.primaryButton,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.redAccent,
-                                foregroundColor: AppColors.buttonText,
-                                elevation: 2,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 18,
-                                  vertical: 10,
-                                ),
-                              ),
-                              onPressed: _stopNavigation,
-                              child: Text(
-                                'end_trip'.tr(),
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
+                return NavigationBottomPanel(
+                  controller: controller,
+                  onStopNavigation: _stopNavigation,
                 );
               },
             ),
@@ -1433,37 +896,6 @@ await NavigationMapPainters.addCanvasImage(
               onConfirmDestination: _confirmDestination,
             ),
         ],
-      ),
-    );
-  }
-}
-
-class _MapActionButton extends StatelessWidget {
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onPressed;
-  final Color? iconColor;
-
-  const _MapActionButton({
-    required this.icon,
-    required this.tooltip,
-    required this.onPressed,
-    this.iconColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      elevation: 5,
-      shape: const CircleBorder(),
-      child: IconButton(
-        tooltip: tooltip,
-        onPressed: onPressed,
-        icon: Icon(
-          icon,
-          color: iconColor ?? AppColors.textPrimary,
-        ),
       ),
     );
   }
