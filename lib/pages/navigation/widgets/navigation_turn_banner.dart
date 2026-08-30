@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
@@ -34,7 +36,7 @@ class NavigationTurnBanner extends StatelessWidget {
       child: SafeArea(
         bottom: false,
         child: Directionality(
-          textDirection: TextDirection.rtl,
+          textDirection: ui.TextDirection.rtl,
           child: Container(
             padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
             decoration: BoxDecoration(
