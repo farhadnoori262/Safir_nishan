@@ -1,158 +1,125 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
+import '../../../controllers/navigation_controller.dart';
+import '../../../utils/app_colors.dart';
+
 class NavigationBottomPanel extends StatelessWidget {
-  final String arrivalTime;
-  final String remainingDistance;
-  final String destinationName;
-  final VoidCallback onEndNavigation;
+  final NavigationController controller;
+  final VoidCallback onStopNavigation;
 
   const NavigationBottomPanel({
     super.key,
-    required this.arrivalTime,
-    required this.remainingDistance,
-    required this.destinationName,
-    required this.onEndNavigation,
+    required this.controller,
+    required this.onStopNavigation,
   });
+
+  String _distanceText() {
+    final meters = controller.distanceToNextTurn;
+
+    if (meters >= 1000) {
+      final kilometers = meters / 1000;
+      return '${kilometers.toStringAsFixed(1)} کیلومتر';
+    }
+
+    return '$meters ${'meters'.tr()}';
+  }
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: Container(
-        margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.18),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
+    return Positioned(
+      bottom: 12,
+      left: 12,
+      right: 12,
+      child: SafeArea(
+        top: false,
         child: Directionality(
           textDirection: TextDirection.rtl,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
+          child: Card(
+            margin: EdgeInsets.zero,
+            color: Colors.white,
+            elevation: 8,
+            shadowColor: Colors.black38,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+              child: Row(
                 children: [
-                  const Icon(
-                    Icons.location_on_outlined,
-                    color: Color(0xFF168A61),
-                    size: 25,
+                  Container(
+                    width: 44,
+                    height: 44,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryButton.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(
+                      Icons.navigation_rounded,
+                      color: AppColors.primaryButton,
+                      size: 26,
+                    ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 10),
                   Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _distanceText(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          controller.navigationInstruction.isEmpty
+                              ? 'route_preparing'.tr()
+                              : controller.navigationInstruction,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  ElevatedButton(
+                    onPressed: onStopNavigation,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFE53935),
+                      foregroundColor: AppColors.buttonText,
+                      elevation: 0,
+                      minimumSize: const Size(78, 44),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(13),
+                      ),
+                    ),
                     child: Text(
-                      destinationName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      'end_trip'.tr(),
                       style: const TextStyle(
-                        color: Color(0xFF202124),
-                        fontSize: 16,
+                        fontSize: 13,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
                   ),
                 ],
               ),
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 12),
-                child: Divider(height: 1),
-              ),
-              Row(
-                children: [
-                  Expanded(
-                    child: _InfoItem(
-                      icon: Icons.schedule_rounded,
-                      title: 'زمان رسیدن',
-                      value: arrivalTime,
-                    ),
-                  ),
-                  Container(
-                    width: 1,
-                    height: 42,
-                    color: const Color(0xFFE5E7EB),
-                  ),
-                  Expanded(
-                    child: _InfoItem(
-                      icon: Icons.route_rounded,
-                      title: 'مسافت باقی‌مانده',
-                      value: remainingDistance,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton.icon(
-                  onPressed: onEndNavigation,
-                  icon: const Icon(Icons.close_rounded),
-                  label: const Text(
-                    'پایان مسیریابی',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFE53935),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(13),
-                    ),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
-    );
-  }
-}
-
-class _InfoItem extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String value;
-
-  const _InfoItem({
-    required this.icon,
-    required this.title,
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Icon(icon, size: 20, color: const Color(0xFF168A61)),
-        const SizedBox(height: 4),
-        Text(
-          title,
-          style: const TextStyle(
-            color: Color(0xFF6B7280),
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          style: const TextStyle(
-            color: Color(0xFF111827),
-            fontSize: 15,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-      ],
     );
   }
 }
