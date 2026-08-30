@@ -23,7 +23,6 @@ class NavigationRouteArrow {
 
       case 'right':
       case 'slight right':
-      case 'sharp right':
         return rightTurnIconName;
 
       case 'uturn':
@@ -104,6 +103,7 @@ class NavigationRouteArrow {
       if (step.distance < 18) continue;
       if (index == 0 && step.modifier == 'straight') continue;
 
+      // آیکون چرخش روی گره‌های مسیر
       final turnSymbol = await controller.addSymbol(
         SymbolOptions(
           geometry: step.location,
@@ -114,7 +114,6 @@ class NavigationRouteArrow {
             routePoints,
           ),
           iconAnchor: 'center',
-          iconRotationAlignment: 'map',
         ),
       );
 
@@ -126,7 +125,7 @@ class NavigationRouteArrow {
 
       if (streetName.isEmpty) continue;
 
-      // ساخت تابلوی کپسولی پویا با اسم خیابان + آیکون جهت
+      // ساخت تابلوی کپسولی بنفش/سبز پویا
       final bannerImageKey = 'safir-banner-${step.location.latitude}-${step.location.longitude}';
       final direction = _getTurnDirection(step.modifier);
 
@@ -143,12 +142,13 @@ class NavigationRouteArrow {
         height: 110,
       );
 
+      // قرار دادن تابلوی کپسولی روی نقشه
       final streetLabel = await controller.addSymbol(
         SymbolOptions(
           geometry: step.location,
           iconImage: bannerImageKey,
           iconSize: 0.85,
-          iconAnchor: 'bottom', // نقطه اتکای پایه تابلو
+          iconAnchor: 'bottom',
         ),
       );
 
