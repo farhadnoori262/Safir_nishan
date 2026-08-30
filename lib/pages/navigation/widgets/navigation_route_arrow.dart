@@ -114,7 +114,6 @@ class NavigationRouteArrow {
             routePoints,
           ),
           iconAnchor: 'center',
-          iconPitchAlignment: 'map',
           iconRotationAlignment: 'map',
         ),
       );
@@ -150,7 +149,6 @@ class NavigationRouteArrow {
           iconImage: bannerImageKey,
           iconSize: 0.85,
           iconAnchor: 'bottom', // نقطه اتکای پایه تابلو
-          iconPitchAlignment: 'viewport', // همواره رو به دوربین باقی بماند
         ),
       );
 
