@@ -27,6 +27,18 @@ class NavigationTurnBanner extends StatelessWidget {
     return '$meters ${'meters'.tr()}';
   }
 
+  String _streetText() {
+    if (controller.currentStreet.isNotEmpty) {
+      return controller.currentStreet;
+    }
+
+    if (controller.navigationInstruction.isNotEmpty) {
+      return controller.navigationInstruction;
+    }
+
+    return 'route_preparing'.tr();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Positioned(
@@ -84,15 +96,15 @@ class NavigationTurnBanner extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        controller.navigationInstruction.isEmpty
-                            ? 'route_preparing'.tr()
-                            : controller.navigationInstruction,
+                        _streetText(),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
+                        textDirection: ui.TextDirection.rtl,
+                        textAlign: TextAlign.right,
                         style: TextStyle(
                           color: AppColors.buttonText.withOpacity(0.92),
                           fontSize: 14,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ],
