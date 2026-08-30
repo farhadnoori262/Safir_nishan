@@ -1,63 +1,151 @@
-import 'package:flutter/material.dart';
+import 'dart:math' as math;
 
-enum RouteArrowDirection {
-  left,
-  right,
-  straight,
-  uTurn,
-}
+import 'package:geolocator/geolocator.dart';
+import 'package:maplibre_gl/maplibre_gl.dart';
 
-class NavigationRouteArrow extends StatelessWidget {
-  final RouteArrowDirection direction;
-  final double size;
+import '../../../controllers/navigation_controller.dart';
 
-  const NavigationRouteArrow({
-    super.key,
-    required this.direction,
-    this.size = 56,
-  });
+class NavigationRouteArrow {
+  NavigationRouteArrow._();
 
-  IconData get _icon {
-    switch (direction) {
-      case RouteArrowDirection.left:
-        return Icons.turn_left_rounded;
-      case RouteArrowDirection.right:
-        return Icons.turn_right_rounded;
-      case RouteArrowDirection.straight:
-        return Icons.straight_rounded;
-      case RouteArrowDirection.uTurn:
-        return Icons.u_turn_left_rounded;
+  static const String leftTurnIconName = 'safir-turn-left';
+  static const String rightTurnIconName = 'safir-turn-right';
+  static const String straightIconName = 'safir-turn-straight';
+  static const String uTurnIconName = 'safir-turn-uturn';
+
+  static String getTurnIconName(String modifier) {
+    switch (modifier) {
+      case 'left':
+      case 'slight left':
+      case 'sharp left':
+        return leftTurnIconName;
+
+      case 'right':
+      case 'slight right':
+      case 'sharp right':
+        return rightTurnIconName;
+
+      case 'uturn':
+        return uTurnIconName;
+
+      default:
+        return straightIconName;
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: Container(
-        width: size,
-        height: size,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: const Color(0xFF168A61),
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: Colors.white,
-            width: 3,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.25),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Icon(
-          _icon,
-          color: Colors.white,
-          size: size * 0.65,
-        ),
-      ),
+  static double getRouteBearingAt(
+    LatLng location,
+    List<LatLng> points,
+  ) {
+    if (points.length < 2) return 0.0;
+
+    var closestIndex = 0;
+    var closestDistance = double.infinity;
+
+    for (var index = 0; index < points.length; index++) {
+      final point = points[index];
+
+      final distance = Geolocator.distanceBetween(
+        location.latitude,
+        location.longitude,
+        point.latitude,
+        point.longitude,
+      );
+
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        closestIndex = index;
+      }
+    }
+
+    final startIndex = closestIndex > 0 ? closestIndex - 1 : closestIndex;
+    final endIndex = closestIndex < points.length - 1
+        ? closestIndex + 1
+        : closestIndex;
+
+    return _bearingBetween(
+      points[startIndex],
+      points[endIndex],
     );
+  }
+
+  static Future<void> drawDecorations({
+    required MapLibreMapController controller,
+    required NavigationController navigationController,
+    required List<Symbol> turnSymbols,
+  }) async {
+    final routePoints = navigationController.currentRoutePoints;
+
+    if (routePoints.length < 2) return;
+
+    for (var index = 0;
+        index < navigationController.routeSteps.length;
+        index++) {
+      final step = navigationController.routeSteps[index];
+
+      if (step.distance < 18) continue;
+      if (index == 0 && step.modifier == 'straight') continue;
+
+      final turnSymbol = await controller.addSymbol(
+        SymbolOptions(
+          geometry: step.location,
+          iconImage: getTurnIconName(step.modifier),
+          iconSize: 0.52,
+          iconRotate: getRouteBearingAt(
+            step.location,
+            routePoints,
+          ),
+        ),
+      );
+
+      turnSymbols.add(turnSymbol);
+
+      final streetName = step.streetName.isNotEmpty
+          ? step.streetName
+          : step.instruction;
+
+      if (streetName.isEmpty) continue;
+
+      final streetLabel = await controller.addSymbol(
+        SymbolOptions(
+          geometry: step.location,
+          textField: streetName,
+          textSize: 12.5,
+          textColor: '#FFFFFF',
+          textHaloColor: '#07553D',
+          textHaloWidth: 2.5,
+          textOffset: const Offset(0, -2.6),
+        ),
+      );
+
+      turnSymbols.add(streetLabel);
+    }
+
+    await controller.setSymbolIconAllowOverlap(true);
+    await controller.setSymbolIconIgnorePlacement(true);
+  }
+
+  static double _bearingBetween(
+    LatLng start,
+    LatLng end,
+  ) {
+    if (start.latitude == end.latitude && start.longitude == end.longitude) {
+      return 0.0;
+    }
+
+    final startLatitude = start.latitude * math.pi / 180.0;
+    final endLatitude = end.latitude * math.pi / 180.0;
+    final longitudeDifference =
+        (end.longitude - start.longitude) * math.pi / 180.0;
+
+    final y = math.sin(longitudeDifference) * math.cos(endLatitude);
+    final x = (math.cos(startLatitude) * math.sin(endLatitude)) -
+        (math.sin(startLatitude) *
+            math.cos(endLatitude) *
+            math.cos(longitudeDifference));
+
+    final bearing = math.atan2(y, x) * 180.0 / math.pi;
+
+    return (bearing + 360.0) % 360.0;
   }
 }
