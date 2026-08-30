@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:geolocator/geolocator.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
@@ -114,7 +115,7 @@ class NavigationRouteArrow {
           textColor: '#FFFFFF',
           textHaloColor: '#07553D',
           textHaloWidth: 2.5,
-          textOffset: const Offset(0, -2.6),
+          textOffset: const ui.Offset(0, -2.6),
         ),
       );
 
