@@ -61,27 +61,18 @@ class NavigationDriverMarker {
     required LatLng location,
     required double heading,
   }) async {
-    const optionsBase = SymbolOptions(
-      iconImage: driverIconName,
-      iconSize: 0.76,
-      iconAnchor: 'top',
-    );
-
     final options = SymbolOptions(
       geometry: location,
-      iconImage: optionsBase.iconImage,
-      iconSize: optionsBase.iconSize,
-      iconAnchor: optionsBase.iconAnchor,
+      iconImage: driverIconName,
+      iconSize: 0.76,
       iconRotate: heading,
     );
 
-    final symbol = currentSymbol == null
-        ? await controller.addSymbol(options)
-        : await controller.updateSymbol(currentSymbol, options);
+    if (currentSymbol == null) {
+      return controller.addSymbol(options);
+    }
 
-    await controller.setSymbolIconAllowOverlap(true);
-    await controller.setSymbolIconIgnorePlacement(true);
-
-    return symbol;
+    await controller.updateSymbol(currentSymbol, options);
+    return currentSymbol;
   }
 }
