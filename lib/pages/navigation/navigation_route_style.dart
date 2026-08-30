@@ -21,24 +21,20 @@ class NavigationRouteStyle {
     await controller.clearLines();
 
     await controller.addLine(
-      const LineOptions(
+      LineOptions(
         geometry: points,
         lineColor: '#07553D',
         lineWidth: 18.0,
         lineOpacity: 0.96,
-        lineCap: 'round',
-        lineJoin: 'round',
       ),
     );
 
     await controller.addLine(
-      const LineOptions(
+      LineOptions(
         geometry: points,
         lineColor: '#19B879',
         lineWidth: 11.0,
         lineOpacity: 1.0,
-        lineCap: 'round',
-        lineJoin: 'round',
       ),
     );
   }
