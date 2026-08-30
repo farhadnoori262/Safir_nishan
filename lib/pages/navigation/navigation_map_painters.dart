@@ -203,6 +203,9 @@ class NavigationMapPainters {
     canvas.drawCircle(center, 8, Paint()..color = AppColors.primaryButton);
   }
 
+  /// آیکون فلش راننده - این تابع در حال حاضر مستقیم استفاده نمی‌شود
+  /// (فلش واقعی از فایل navigation_arrow.png بارگذاری می‌شود)
+  /// اما برای درستی و استفاده احتمالی آینده، حول مرکز کاملاً متقارن شد.
   static void drawDriverArrow(Canvas canvas, Size size) {
     if (_cachedDriverImage != null) {
       final srcRect = Rect.fromLTWH(
@@ -229,14 +232,33 @@ class NavigationMapPainters {
       });
     }
 
+    // نکته: مختصات به‌صورت نسبی از مرکز (center) و به‌شکل کاملاً قرینه
+    // (mirror) نسبت به محور عمودی رسم می‌شود تا آیکون دقیقاً حول
+    // center.dx متقارن باشد و anchor نقشه درست روی نوک/مرکز شکل بیفتد.
     final center = Offset(size.width / 2, size.height / 2);
+    const double tipOffsetY = 8.0;
+    const double bottomOffsetY = 19.0;
+    const double notchOffsetY = 15.0;
+    const double sideOffsetX = 27.0;
+    const double edgeOffsetX = 18.0;
+
     final path = Path()
-      ..moveTo(center.dx, 8)
-      ..lineTo(size.width - 18, size.height - 19)
-      ..quadraticBezierTo(size.width - 16, size.height - 10, size.width - 27, size.height - 15)
+      ..moveTo(center.dx, tipOffsetY)
+      ..lineTo(size.width - edgeOffsetX, size.height - bottomOffsetY)
+      ..quadraticBezierTo(
+        size.width - (edgeOffsetX - 2),
+        size.height - 10,
+        size.width - sideOffsetX,
+        size.height - notchOffsetY,
+      )
       ..lineTo(center.dx, size.height - 35)
-      ..lineTo(27, size.height - 15)
-      ..quadraticBezierTo(16, size.height - 10, 18, size.height - 19)
+      ..lineTo(sideOffsetX, size.height - notchOffsetY)
+      ..quadraticBezierTo(
+        edgeOffsetX - 2,
+        size.height - 10,
+        edgeOffsetX,
+        size.height - bottomOffsetY,
+      )
       ..close();
 
     final shadowPaint = Paint()
