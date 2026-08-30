@@ -38,6 +38,141 @@ class NavigationMapPainters {
     await controller.addImage(name, bytes.buffer.asUint8List());
   }
 
+  /// متد جدید جهت رسم تابلوی کپسولی کامل (آیکون پیچ + اسم خیابان) با تم سبز پروژه
+  static void drawStepBanner(
+    Canvas canvas,
+    Size size, {
+    required String streetName,
+    required TurnDirection direction,
+  }) {
+    const double paddingX = 20.0;
+    const double bannerHeight = 64.0;
+    const double borderRadius = 32.0;
+    const double triangleHeight = 12.0;
+
+    final center = Offset(size.width / 2, size.height / 2);
+
+    // ۱. آماده‌سازی متن
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: streetName,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 22,
+          fontWeight: FontWeight.bold,
+          fontFamily: 'IRANSans', // یا فونت پروژه شما
+        ),
+      ),
+      textDirection: TextDirection.rtl,
+    )..layout();
+
+    final double bannerWidth = textPainter.width + 100.0;
+    final double left = center.dx - (bannerWidth / 2);
+    final double top = center.dy - (bannerHeight / 2) - (triangleHeight / 2);
+    final double right = left + bannerWidth;
+    final double bottom = top + bannerHeight;
+
+    final bannerRect = RRect.fromLTRBR(
+      left,
+      top,
+      right,
+      bottom,
+      const Radius.circular(borderRadius),
+    );
+
+    // ۲. مسیر تابلوی کپسولی + مثلث پایین (پین)
+    final path = Path()..addRRect(bannerRect);
+
+    final trianglePath = Path()
+      ..moveTo(center.dx - 12, bottom - 2)
+      ..lineTo(center.dx, bottom + triangleHeight)
+      ..lineTo(center.dx + 12, bottom - 2)
+      ..close();
+
+    final fullPath = Path.combine(PathOperation.union, path, trianglePath);
+
+    // سایه تابلو
+    final shadowPaint = Paint()
+      ..color = Colors.black.withOpacity(0.3)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+    canvas.drawPath(fullPath.shift(const Offset(0, 4)), shadowPaint);
+
+    // پس‌زمینه اصلی سبز
+    final bgPaint = Paint()
+      ..color = const Color(0xFF07553D)
+      ..style = PaintingStyle.fill;
+    canvas.drawPath(fullPath, bgPaint);
+
+    // حاشیه سفید نازک دور تابلو
+    final borderPaint = Paint()
+      ..color = Colors.white.withOpacity(0.8)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5;
+    canvas.drawPath(fullPath, borderPaint);
+
+    // ۳. رسم متن خیابان
+    final textOffset = Offset(
+      left + paddingX + 36,
+      top + (bannerHeight - textPainter.height) / 2,
+    );
+    textPainter.paint(canvas, textOffset);
+
+    // ۴. رسم آیکون فلش سفید در سمت راست تابلو
+    canvas.save();
+    final iconCenter = Offset(right - paddingX - 18, top + (bannerHeight / 2));
+    canvas.translate(iconCenter.dx - 20, iconCenter.dy - 20);
+
+    _drawInnerWhiteArrow(canvas, const Size(40, 40), direction);
+    canvas.restore();
+  }
+
+  /// آیکون فلش تک‌رنگ سفید برای داخل تابلو
+  static void _drawInnerWhiteArrow(Canvas canvas, Size size, TurnDirection direction) {
+    final paint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill
+      ..isAntiAlias = true;
+
+    final path = Path();
+    final center = Offset(size.width / 2, size.height / 2);
+
+    if (direction == TurnDirection.left) {
+      path
+        ..moveTo(center.dx - 10, center.dy - 12)
+        ..lineTo(center.dx - 20, center.dy)
+        ..lineTo(center.dx - 10, center.dy + 12)
+        ..lineTo(center.dx - 10, center.dy + 4)
+        ..lineTo(center.dx + 10, center.dy + 4)
+        ..cubicTo(center.dx + 14, center.dy + 4, center.dx + 16, center.dy - 2, center.dx + 16, center.dy - 6)
+        ..lineTo(center.dx + 10, center.dy - 6)
+        ..lineTo(center.dx - 10, center.dy - 6)
+        ..close();
+    } else if (direction == TurnDirection.right) {
+      path
+        ..moveTo(center.dx + 10, center.dy - 12)
+        ..lineTo(center.dx + 20, center.dy)
+        ..lineTo(center.dx + 10, center.dy + 12)
+        ..lineTo(center.dx + 10, center.dy + 4)
+        ..lineTo(center.dx - 10, center.dy + 4)
+        ..cubicTo(center.dx - 14, center.dy + 4, center.dx - 16, center.dy - 2, center.dx - 16, center.dy - 6)
+        ..lineTo(center.dx - 10, center.dy - 6)
+        ..lineTo(center.dx + 10, center.dy - 6)
+        ..close();
+    } else {
+      path
+        ..moveTo(center.dx, center.dy - 16)
+        ..lineTo(center.dx - 12, center.dy + 2)
+        ..lineTo(center.dx - 4, center.dy + 2)
+        ..lineTo(center.dx - 4, center.dy + 14)
+        ..lineTo(center.dx + 4, center.dy + 14)
+        ..lineTo(center.dx + 4, center.dy + 2)
+        ..lineTo(center.dx + 12, center.dy + 2)
+        ..close();
+    }
+
+    canvas.drawPath(path, paint);
+  }
+
   static void drawCurrentLocationPulse(
     Canvas canvas,
     Size size,
