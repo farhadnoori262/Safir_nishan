@@ -1,79 +1,124 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
+import '../../../controllers/navigation_controller.dart';
+import '../../../utils/app_colors.dart';
+
 class NavigationTurnBanner extends StatelessWidget {
-  final IconData icon;
-  final String distanceText;
-  final String streetName;
-  final VoidCallback? onClose;
+  final NavigationController controller;
+  final VoidCallback onStopNavigation;
 
   const NavigationTurnBanner({
     super.key,
-    required this.icon,
-    required this.distanceText,
-    required this.streetName,
-    this.onClose,
+    required this.controller,
+    required this.onStopNavigation,
   });
+
+  String _distanceText() {
+    final meters = controller.distanceToNextTurn;
+
+    if (meters >= 1000) {
+      final kilometers = meters / 1000;
+      return '${kilometers.toStringAsFixed(1)} ${'kilometers'.tr()}';
+    }
+
+    return '$meters ${'meters'.tr()}';
+  }
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Container(
-        margin: const EdgeInsets.fromLTRB(12, 10, 12, 0),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: const Color(0xFF101114),
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.28),
-              blurRadius: 12,
-              offset: const Offset(0, 5),
-            ),
-          ],
-        ),
-        child: Row(
+    return Positioned(
+      top: 18,
+      left: 16,
+      right: 16,
+      child: SafeArea(
+        child: Directionality(
           textDirection: TextDirection.rtl,
-          children: [
-            Icon(
-              icon,
-              color: Colors.white,
-              size: 48,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(10, 10, 12, 10),
+            decoration: BoxDecoration(
+              color: AppColors.primaryBrand,
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: const [
+                BoxShadow(
+                  color: Colors.black26,
+                  blurRadius: 10,
+                  offset: Offset(0, 4),
+                ),
+              ],
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    distanceText,
-                    textDirection: TextDirection.rtl,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                    ),
+            child: Row(
+              children: [
+                IconButton(
+                  tooltip: 'پایان مسیریابی',
+                  onPressed: onStopNavigation,
+                  icon: const Icon(
+                    Icons.close_rounded,
+                    color: AppColors.buttonText,
                   ),
-                  const SizedBox(height: 3),
-                  Text(
-                    streetName,
-                    textDirection: TextDirection.rtl,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Color(0xFF76B8F3),
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                    ),
+                ),
+                Container(
+                  width: 1,
+                  height: 36,
+                  color: AppColors.buttonText.withOpacity(0.28),
+                ),
+                IconButton(
+                  tooltip: 'راهنمای صوتی',
+                  onPressed: controller.toggleVoice,
+                  icon: Icon(
+                    controller.isVoiceEnabled
+                        ? Icons.volume_up_rounded
+                        : Icons.volume_off_rounded,
+                    color: AppColors.buttonText,
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _distanceText(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.buttonText,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        controller.navigationInstruction,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: AppColors.buttonText.withOpacity(0.92),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Container(
+                  width: 52,
+                  height: 52,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.16),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(
+                    controller.currentTurnIcon,
+                    color: AppColors.buttonText,
+                    size: 38,
+                  ),
+                ),
+              ],
             ),
-            if (onClose != null)
-              IconButton(
-                onPressed: onClose,
-                icon: const Icon(Icons.close, color: Colors.white70),
-              ),
-          ],
+          ),
         ),
       ),
     );
