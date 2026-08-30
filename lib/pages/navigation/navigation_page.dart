@@ -49,7 +49,6 @@ class _NavigationPageState extends State<NavigationPage>
   MapLibreMapController? _mapController;
   StreamSubscription<Position>? _positionStream;
 
-  Symbol? _driverSymbol;
   Symbol? _currentLocationSymbol;
   Symbol? _destinationSymbol;
 
@@ -60,6 +59,11 @@ class _NavigationPageState extends State<NavigationPage>
   LatLng? _selectedDestination;
   LatLng? _currentLocation;
   double _currentAccuracy = 20.0;
+
+  // زاویه واقعی حرکت راننده (heading) و زاویه فعلی چرخش خود نقشه
+  // این دو با هم فلش ثابت روی صفحه را می‌چرخانند (heading-up navigation)
+  double _driverHeading = 0.0;
+  double _currentMapBearing = 0.0;
 
   late final AnimationController _pulseController;
 
@@ -251,8 +255,6 @@ class _NavigationPageState extends State<NavigationPage>
 
   Future<void> _addMapImages() async {
     if (_mapController == null || _iconsAdded) return;
-
-    await NavigationDriverMarker.addDriverArrowImage(_mapController!);
 
     await NavigationMapPainters.addCanvasImage(
       _mapController!,
@@ -543,19 +545,18 @@ class _NavigationPageState extends State<NavigationPage>
     });
   }
 
+  /// به‌جای گذاشتن Symbol روی نقشه، فقط زاویه‌ی حرکت (heading) راننده را
+  /// ذخیره می‌کند تا ویجت فلش ثابت روی صفحه (نه روی نقشه) بچرخد.
   Future<void> _updateDriverMarker(
     LatLng location, {
     required double heading,
     required bool moveCamera,
   }) async {
-    if (!_mapStyleReady || !_iconsAdded || _mapController == null) return;
+    if (!mounted) return;
 
-    _driverSymbol = await NavigationDriverMarker.updateMarker(
-      controller: _mapController!,
-      currentSymbol: _driverSymbol,
-      location: location,
-      heading: heading,
-    );
+    setState(() {
+      _driverHeading = heading;
+    });
 
     if (!moveCamera) return;
     await _moveCameraToDriver(location, heading: heading);
@@ -579,6 +580,14 @@ class _NavigationPageState extends State<NavigationPage>
         ),
         duration: const Duration(milliseconds: 500),
       );
+
+      // نقشه اکنون با همین زاویه چرخیده؛ این مقدار را برای محاسبه‌ی
+      // چرخش نسبیِ فلش ثابت روی صفحه ذخیره می‌کنیم.
+      if (mounted) {
+        setState(() {
+          _currentMapBearing = heading;
+        });
+      }
 
       await _mapController!.setSymbolIconAllowOverlap(true);
       await _mapController!.setSymbolIconIgnorePlacement(true);
@@ -655,6 +664,12 @@ class _NavigationPageState extends State<NavigationPage>
       CameraUpdate.bearingTo(0.0),
       duration: const Duration(milliseconds: 500),
     );
+
+    if (mounted) {
+      setState(() {
+        _currentMapBearing = 0.0;
+      });
+    }
   }
 
   LatLngBounds _boundsFromPoints(List<LatLng> points) {
@@ -683,11 +698,6 @@ class _NavigationPageState extends State<NavigationPage>
     if (_mapController != null) {
       await _mapController!.clearLines();
       await _clearRouteDecorations();
-
-      if (_driverSymbol != null) {
-        await _mapController!.removeSymbol(_driverSymbol!);
-        _driverSymbol = null;
-      }
     }
 
     if (!mounted) return;
@@ -724,6 +734,8 @@ class _NavigationPageState extends State<NavigationPage>
 
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+
     return Scaffold(
       body: Stack(
         children: [
@@ -749,6 +761,42 @@ class _NavigationPageState extends State<NavigationPage>
             ),
             trackCameraPosition: true,
           ),
+
+          // فلش ثابت راننده — روی خود صفحه (نه روی نقشه)، دقیقاً مثل نشان.
+          // فقط نقشه زیرش می‌چرخد؛ خودِ فلش با زاویه‌ی نسبی
+          // (heading واقعی منهای چرخش فعلی نقشه) می‌چرخد تا در حالت
+          // دنبال‌کردن همیشه رو به بالا بماند.
+          if (_navigationStarted)
+            IgnorePointer(
+              child: Positioned(
+                left: 0,
+                right: 0,
+                top: screenHeight * 0.62,
+                child: Center(
+                  child: Transform.rotate(
+                    angle: (_driverHeading - _currentMapBearing) * math.pi / 180.0,
+                    child: Container(
+                      width: 54,
+                      height: 54,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.28),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Image.asset(
+                        'assets/images/navigation_arrow.png',
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
 
           if (_isLoadingLocation)
             Positioned(
