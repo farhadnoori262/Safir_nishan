@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
@@ -51,9 +52,11 @@ class StepInstruction {
 
 class NavigationController extends ChangeNotifier {
   static const double _snapToRouteDistanceMeters = 40.0;
+  static const double _hardSnapCutoffMeters = 90.0;
   static const double _rerouteDistanceMeters = 55.0;
   static const double _announceDistanceMeters = 70.0;
   static const double _stepReachedDistanceMeters = 16.0;
+  static const Duration _routeRequestTimeout = Duration(seconds: 10);
 
   int routeVersion = 0;
 
@@ -195,9 +198,24 @@ class NavigationController extends ChangeNotifier {
     _lastMatchedSegmentIndex = routeMatch.segmentIndex;
 
     if (routeMatch.distance <= _snapToRouteDistanceMeters) {
+      // نزدیک به مسیر: کاملاً بچسب به خط
       snappedDriverLocation = routeMatch.point;
       driverRouteBearing = routeMatch.bearing;
+    } else if (routeMatch.distance <= _hardSnapCutoffMeters) {
+      // فاصله متوسط (نویز GPS شهری): بین نقطه خام و نقطه روی خط ترکیب کن
+      // تا جهش ناگهانی فلش رخ نده
+      final blendFactor = (routeMatch.distance - _snapToRouteDistanceMeters) /
+          (_hardSnapCutoffMeters - _snapToRouteDistanceMeters);
+
+      snappedDriverLocation = LatLng(
+        routeMatch.point.latitude +
+            ((driverLocation.latitude - routeMatch.point.latitude) * blendFactor),
+        routeMatch.point.longitude +
+            ((driverLocation.longitude - routeMatch.point.longitude) * blendFactor),
+      );
+      driverRouteBearing = routeMatch.bearing;
     } else {
+      // فاصله زیاد: احتمالاً مسیر واقعاً عوض شده، موقعیت خام را نشان بده
       snappedDriverLocation = driverLocation;
     }
 
@@ -222,7 +240,7 @@ class NavigationController extends ChangeNotifier {
     );
 
     try {
-      final response = await http.get(url);
+      final response = await http.get(url).timeout(_routeRequestTimeout);
 
       if (response.statusCode != 200) {
         debugPrint('osrm_error_status'.tr(args: [response.statusCode.toString()]));
@@ -248,6 +266,9 @@ class NavigationController extends ChangeNotifier {
       }
 
       return route;
+    } on TimeoutException {
+      debugPrint('osrm_error_timeout'.tr());
+      return null;
     } catch (error) {
       debugPrint('osrm_error_fetch'.tr(args: [error.toString()]));
       return null;
