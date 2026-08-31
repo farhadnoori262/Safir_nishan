@@ -21,10 +21,10 @@ class NavigationTurnBanner extends StatelessWidget {
 
     if (meters >= 1000) {
       final kilometers = meters / 1000;
-      return '${kilometers.toStringAsFixed(1)} کیلومتر';
+      return '${kilometers.toStringAsFixed(1)} ${'kilometers'.tr()}';
     }
 
-    return '$meters متر';
+    return '$meters ${'meters'.tr()}';
   }
 
   String _streetText() {
@@ -88,7 +88,6 @@ class NavigationTurnBanner extends StatelessWidget {
                         _distanceText(),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        textDirection: ui.TextDirection.rtl,
                         style: const TextStyle(
                           color: AppColors.buttonText,
                           fontSize: 17,
