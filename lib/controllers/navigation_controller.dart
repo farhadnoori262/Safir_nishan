@@ -337,7 +337,7 @@ class NavigationController extends ChangeNotifier {
       }
     }
 
-    _steps
+        _steps
       ..clear()
       ..addAll(parsedSteps);
 
@@ -345,4 +345,10 @@ class NavigationController extends ChangeNotifier {
     _lastMatchedSegmentIndex = 0;
     _spokenSteps.clear();
 
-    distanceFromRoute =
+    // مقداردهی صحیح متغیر
+    distanceFromRoute = 0.0;
+
+    _safeNotifyListeners();
+  }
+}
+
