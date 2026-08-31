@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
@@ -50,27 +49,11 @@ class StepInstruction {
   }
 }
 
-class _RouteMatch {
-  final LatLng point;
-  final double distance;
-  final int segmentIndex;
-  final double bearing;
-
-  _RouteMatch({
-    required this.point,
-    required this.distance,
-    required this.segmentIndex,
-    required this.bearing,
-  });
-}
-
 class NavigationController extends ChangeNotifier {
   static const double _snapToRouteDistanceMeters = 40.0;
-  static const double _hardSnapCutoffMeters = 90.0;
   static const double _rerouteDistanceMeters = 55.0;
   static const double _announceDistanceMeters = 70.0;
   static const double _stepReachedDistanceMeters = 16.0;
-  static const Duration _routeRequestTimeout = Duration(seconds: 10);
 
   int routeVersion = 0;
 
@@ -119,19 +102,6 @@ class NavigationController extends ChangeNotifier {
   IconData get currentTurnIcon => _currentTurnIcon;
   List<LatLng> get currentRoutePoints => List.unmodifiable(routePoints);
   List<StepInstruction> get routeSteps => List.unmodifiable(_steps);
-
-  @override
-  void dispose() {
-    _isDisposed = true;
-    super.dispose();
-  }
-
-  void stopNavigation() {
-    isNavigating = false;
-    isRerouting = false;
-    _clearRouteState();
-    _safeNotifyListeners();
-  }
 
   void toggleVoice() {
     _isVoiceEnabled = !_isVoiceEnabled;
@@ -227,17 +197,6 @@ class NavigationController extends ChangeNotifier {
     if (routeMatch.distance <= _snapToRouteDistanceMeters) {
       snappedDriverLocation = routeMatch.point;
       driverRouteBearing = routeMatch.bearing;
-    } else if (routeMatch.distance <= _hardSnapCutoffMeters) {
-      final blendFactor = (routeMatch.distance - _snapToRouteDistanceMeters) /
-          (_hardSnapCutoffMeters - _snapToRouteDistanceMeters);
-
-      snappedDriverLocation = LatLng(
-        routeMatch.point.latitude +
-            ((driverLocation.latitude - routeMatch.point.latitude) * blendFactor),
-        routeMatch.point.longitude +
-            ((driverLocation.longitude - routeMatch.point.longitude) * blendFactor),
-      );
-      driverRouteBearing = routeMatch.bearing;
     } else {
       snappedDriverLocation = driverLocation;
     }
@@ -263,7 +222,7 @@ class NavigationController extends ChangeNotifier {
     );
 
     try {
-      final response = await http.get(url).timeout(_routeRequestTimeout);
+      final response = await http.get(url);
 
       if (response.statusCode != 200) {
         debugPrint('osrm_error_status'.tr(args: [response.statusCode.toString()]));
@@ -289,9 +248,6 @@ class NavigationController extends ChangeNotifier {
       }
 
       return route;
-    } on TimeoutException {
-      debugPrint('osrm_error_timeout'.tr());
-      return null;
     } catch (error) {
       debugPrint('osrm_error_fetch'.tr(args: [error.toString()]));
       return null;
@@ -369,7 +325,299 @@ class NavigationController extends ChangeNotifier {
     _spokenSteps.clear();
 
     distanceFromRoute = 0.0;
+    distanceToNextStep = 0.0;
 
+    if (_steps.isNotEmpty) {
+      _updateCurrentStepInfo(notify: false);
+    } else {
+      currentStreet = '';
+      currentModifier = 'straight';
+      _currentInstruction = 'nav_go_straight'.tr();
+      _currentTurnIcon = Icons.straight_rounded;
+    }
+
+    routeVersion++;
+  }
+
+  void _updateStepProgress() {
+    final currentLocation = snappedDriverLocation;
+
+    if (currentLocation == null ||
+        _steps.isEmpty ||
+        _currentStepIndex >= _steps.length) {
+      return;
+    }
+
+    var step = _steps[_currentStepIndex];
+
+    distanceToNextStep = Geolocator.distanceBetween(
+      currentLocation.latitude,
+      currentLocation.longitude,
+      step.location.latitude,
+      step.location.longitude,
+    );
+
+    if (distanceToNextStep <= _announceDistanceMeters &&
+        !_spokenSteps.contains(_currentStepIndex)) {
+      _spokenSteps.add(_currentStepIndex);
+
+      if (_isVoiceEnabled) {
+        VoiceGuidanceHelper.speakStep(
+          step.modifier,
+          step.streetName,
+          distanceToNextStep.round(),
+          _activeLangCode,
+        );
+      }
+    }
+
+    if (distanceToNextStep <= _stepReachedDistanceMeters &&
+        _currentStepIndex < _steps.length - 1) {
+      _currentStepIndex++;
+      _updateCurrentStepInfo(notify: false);
+
+      step = _steps[_currentStepIndex];
+
+      distanceToNextStep = Geolocator.distanceBetween(
+        currentLocation.latitude,
+        currentLocation.longitude,
+        step.location.latitude,
+        step.location.longitude,
+      );
+    }
+  }
+
+  Future<void> _rerouteFromCurrentLocation(LatLng from) async {
+    final destination = activeDestination;
+
+    if (destination == null || isRerouting || !isNavigating) {
+      return;
+    }
+
+    isRerouting = true;
+    _safeNotifyListeners();
+
+    final route = await _fetchRoute(
+      start: from,
+      destination: destination,
+    );
+
+    if (route != null && isNavigating) {
+      _applyRoute(route);
+
+      if (routePoints.length > 1) {
+        driverRouteBearing = _bearingBetween(
+          routePoints.first,
+          routePoints[1],
+        );
+      }
+    }
+
+    isRerouting = false;
+    _safeNotifyListeners();
+  }
+
+  _RouteMatch _findClosestPointOnRoute(LatLng location) {
+    var closestPoint = routePoints.first;
+    var closestDistance = double.infinity;
+    var closestSegmentIndex = 0;
+    var closestBearing = 0.0;
+
+    final startIndex = math.max(0, _lastMatchedSegmentIndex - 25);
+    final endIndex = math.min(routePoints.length - 2, _lastMatchedSegmentIndex + 100);
+
+    for (var index = startIndex; index <= endIndex; index++) {
+      final segmentStart = routePoints[index];
+      final segmentEnd = routePoints[index + 1];
+
+      final projectedPoint = _projectPointOnSegment(
+        location,
+        segmentStart,
+        segmentEnd,
+      );
+
+      final distance = Geolocator.distanceBetween(
+        location.latitude,
+        location.longitude,
+        projectedPoint.latitude,
+        projectedPoint.longitude,
+      );
+
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        closestPoint = projectedPoint;
+        closestSegmentIndex = index;
+        closestBearing = _bearingBetween(
+          segmentStart,
+          segmentEnd,
+        );
+      }
+    }
+
+    return _RouteMatch(
+      point: closestPoint,
+      distance: closestDistance,
+      segmentIndex: closestSegmentIndex,
+      bearing: closestBearing,
+    );
+  }
+
+  LatLng _projectPointOnSegment(
+    LatLng point,
+    LatLng segmentStart,
+    LatLng segmentEnd,
+  ) {
+    final latitudeRadians = point.latitude * math.pi / 180.0;
+    const metersPerLatitudeDegree = 111132.0;
+    final metersPerLongitudeDegree = 111320.0 * math.cos(latitudeRadians);
+
+    final pointX = point.longitude * metersPerLongitudeDegree;
+    final pointY = point.latitude * metersPerLatitudeDegree;
+
+    final startX = segmentStart.longitude * metersPerLongitudeDegree;
+    final startY = segmentStart.latitude * metersPerLatitudeDegree;
+
+    final endX = segmentEnd.longitude * metersPerLongitudeDegree;
+    final endY = segmentEnd.latitude * metersPerLatitudeDegree;
+
+    final deltaX = endX - startX;
+    final deltaY = endY - startY;
+
+    final lengthSquared = (deltaX * deltaX) + (deltaY * deltaY);
+
+    if (lengthSquared == 0) {
+      return segmentStart;
+    }
+
+    var projection = (((pointX - startX) * deltaX) + ((pointY - startY) * deltaY)) / lengthSquared;
+    projection = projection.clamp(0.0, 1.0).toDouble();
+
+    final projectedX = startX + (projection * deltaX);
+    final projectedY = startY + (projection * deltaY);
+
+    return LatLng(
+      projectedY / metersPerLatitudeDegree,
+      projectedX / metersPerLongitudeDegree,
+    );
+  }
+
+  double _bearingBetween(LatLng start, LatLng end) {
+    final startLatitude = start.latitude * math.pi / 180.0;
+    final endLatitude = end.latitude * math.pi / 180.0;
+    final longitudeDifference = (end.longitude - start.longitude) * math.pi / 180.0;
+
+    final y = math.sin(longitudeDifference) * math.cos(endLatitude);
+    final x = (math.cos(startLatitude) * math.sin(endLatitude)) -
+        (math.sin(startLatitude) * math.cos(endLatitude) * math.cos(longitudeDifference));
+
+    final bearing = math.atan2(y, x) * 180.0 / math.pi;
+
+    return (bearing + 360.0) % 360.0;
+  }
+
+  void _updateCurrentStepInfo({bool notify = true}) {
+    if (_steps.isEmpty || _currentStepIndex >= _steps.length) {
+      return;
+    }
+
+    final step = _steps[_currentStepIndex];
+
+    currentStreet = step.streetName;
+    currentModifier = step.modifier;
+
+    _currentInstruction = step.streetName.isNotEmpty
+        ? step.streetName
+        : _instructionFromModifier(step.modifier);
+
+    _currentTurnIcon = _iconFromModifier(step.modifier);
+
+    if (notify) {
+      _safeNotifyListeners();
+    }
+  }
+
+  String _instructionFromModifier(String modifier) {
+    switch (modifier) {
+      case 'right':
+      case 'slight right':
+      case 'sharp right':
+        return 'nav_turn_right'.tr();
+
+      case 'left':
+      case 'slight left':
+      case 'sharp left':
+        return 'nav_turn_left'.tr();
+
+      case 'uturn':
+        return 'nav_u_turn'.tr();
+
+      default:
+        return 'nav_go_straight'.tr();
+    }
+  }
+
+  IconData _iconFromModifier(String modifier) {
+    switch (modifier) {
+      case 'right':
+      case 'slight right':
+      case 'sharp right':
+        return Icons.turn_right_rounded;
+
+      case 'left':
+      case 'slight left':
+      case 'sharp left':
+        return Icons.turn_left_rounded;
+
+      case 'uturn':
+        return Icons.u_turn_left_rounded;
+
+      default:
+        return Icons.straight_rounded;
+    }
+  }
+
+  void _speakStartInstruction() {
+    if (!_isVoiceEnabled || _steps.isEmpty) return;
+
+    final firstStep = _steps.first;
+
+    VoiceGuidanceHelper.speakStep(
+      firstStep.modifier,
+      firstStep.streetName,
+      0,
+      _activeLangCode,
+    );
+  }
+
+  void _clearRouteState() {
+    _steps.clear();
+    routePoints.clear();
+    _spokenSteps.clear();
+
+    _currentStepIndex = 0;
+    _lastMatchedSegmentIndex = 0;
+
+    distanceFromRoute = 0.0;
+    distanceToNextStep = 0.0;
+    driverRouteBearing = 0.0;
+
+    currentStreet = '';
+    currentModifier = 'straight';
+    _currentInstruction = '';
+    _currentTurnIcon = Icons.straight_rounded;
+  }
+
+  void stopNavigation() {
+    isNavigating = false;
+    isRerouting = false;
+
+    activeDestination = null;
+    rawDriverLocation = null;
+    snappedDriverLocation = null;
+
+    _clearRouteState();
+
+    VoiceGuidanceHelper.stop();
     _safeNotifyListeners();
   }
 
@@ -379,193 +627,24 @@ class NavigationController extends ChangeNotifier {
     }
   }
 
-  void _clearRouteState() {
-    routePoints.clear();
-    _steps.clear();
-    _spokenSteps.clear();
-    _currentStepIndex = 0;
-    _lastMatchedSegmentIndex = 0;
-    _currentInstruction = '';
-    currentStreet = '';
-    currentModifier = 'straight';
-    distanceFromRoute = 0.0;
-    distanceToNextStep = 0.0;
+  @override
+  void dispose() {
+    _isDisposed = true;
+    VoiceGuidanceHelper.stop();
+    super.dispose();
   }
+}
 
-  String _instructionFromModifier(String modifier) {
-    switch (modifier) {
-      case 'left':
-        return 'turn_left'.tr();
-      case 'right':
-        return 'turn_right'.tr();
-      case 'slight left':
-        return 'slight_left'.tr();
-      case 'slight right':
-        return 'slight_right'.tr();
-      case 'sharp left':
-        return 'sharp_left'.tr();
-      case 'sharp right':
-        return 'sharp_right'.tr();
-      case 'uturn':
-        return 'u_turn'.tr();
-      default:
-        return 'go_straight'.tr();
-    }
-  }
+class _RouteMatch {
+  final LatLng point;
+  final double distance;
+  final int segmentIndex;
+  final double bearing;
 
-  double _bearingBetween(LatLng start, LatLng end) {
-    final lat1 = start.latitude * math.pi / 180.0;
-    final lon1 = start.longitude * math.pi / 180.0;
-    final lat2 = end.latitude * math.pi / 180.0;
-    final lon2 = end.longitude * math.pi / 180.0;
-
-    final dLon = lon2 - lon1;
-    final y = math.sin(dLon) * math.cos(lat2);
-    final x = math.cos(lat1) * math.sin(lat2) -
-        math.sin(lat1) * math.cos(lat2) * math.cos(dLon);
-
-    final radians = math.atan2(y, x);
-    return (radians * 180.0 / math.pi + 360.0) % 360.0;
-  }
-
-  void _speakStartInstruction() {
-    if (_steps.isNotEmpty) {
-      speakInstruction('start_navigation'.tr());
-    }
-  }
-
-  /// بهینه‌سازی الگوریتم یافتن نزدیک‌ترین نقطه روی مسیر با پنجره جستجو
-  _RouteMatch _findClosestPointOnRoute(LatLng location) {
-    if (routePoints.length < 2) {
-      return _RouteMatch(
-        point: location,
-        distance: 0.0,
-        segmentIndex: 0,
-        bearing: 0.0,
-      );
-    }
-
-    double minDistance = double.infinity;
-    LatLng closestPoint = routePoints.first;
-    int bestSegmentIndex = _lastMatchedSegmentIndex;
-    double segmentBearing = 0.0;
-
-    // تعریف محدوده متحرک جستجو به جای کل مسیر جهت جلوگیری از پر شدن CPU
-    final int searchStart = math.max(0, _lastMatchedSegmentIndex - 3);
-    final int searchEnd = math.min(routePoints.length - 1, _lastMatchedSegmentIndex + 15);
-
-    for (int i = searchStart; i < searchEnd; i++) {
-      final p1 = routePoints[i];
-      final p2 = routePoints[i + 1];
-
-      final projPoint = _projectPointOnSegment(location, p1, p2);
-      final dist = Geolocator.distanceBetween(
-        location.latitude,
-        location.longitude,
-        projPoint.latitude,
-        projPoint.longitude,
-      );
-
-      if (dist < minDistance) {
-        minDistance = dist;
-        closestPoint = projPoint;
-        bestSegmentIndex = i;
-        segmentBearing = _bearingBetween(p1, p2);
-      }
-    }
-
-    // اگر راننده از محدوده متحرک خارج شد (احتمالاً انحراف از مسیر)، کل مسیر چک می‌شود
-    if (minDistance > _rerouteDistanceMeters) {
-      for (int i = 0; i < routePoints.length - 1; i++) {
-        final p1 = routePoints[i];
-        final p2 = routePoints[i + 1];
-
-        final projPoint = _projectPointOnSegment(location, p1, p2);
-        final dist = Geolocator.distanceBetween(
-          location.latitude,
-          location.longitude,
-          projPoint.latitude,
-          projPoint.longitude,
-        );
-
-        if (dist < minDistance) {
-          minDistance = dist;
-          closestPoint = projPoint;
-          bestSegmentIndex = i;
-          segmentBearing = _bearingBetween(p1, p2);
-        }
-      }
-    }
-
-    return _RouteMatch(
-      point: closestPoint,
-      distance: minDistance,
-      segmentIndex: bestSegmentIndex,
-      bearing: segmentBearing,
-    );
-  }
-
-  /// محاسبه تصویر عمودی موقعیت سفیر روی خط (Projection)
-  LatLng _projectPointOnSegment(LatLng p, LatLng a, LatLng b) {
-    final double l2 = math.pow(b.latitude - a.latitude, 2).toDouble() +
-        math.pow(b.longitude - a.longitude, 2).toDouble();
-    if (l2 == 0) return a;
-
-    double t = ((p.latitude - a.latitude) * (b.latitude - a.latitude) +
-            (p.longitude - a.longitude) * (b.longitude - a.longitude)) /
-        l2;
-    t = t.clamp(0.0, 1.0);
-
-    return LatLng(
-      a.latitude + t * (b.latitude - a.latitude),
-      a.longitude + t * (b.longitude - a.longitude),
-    );
-  }
-
-  void _updateStepProgress() {
-    if (_steps.isEmpty || _currentStepIndex >= _steps.length) return;
-
-    final currentStep = _steps[_currentStepIndex];
-    if (snappedDriverLocation != null) {
-      final distance = Geolocator.distanceBetween(
-        snappedDriverLocation!.latitude,
-        snappedDriverLocation!.longitude,
-        currentStep.location.latitude,
-        currentStep.location.longitude,
-      );
-
-      distanceToNextStep = distance;
-
-      if (distance <= _announceDistanceMeters && !_spokenSteps.contains(_currentStepIndex)) {
-        _spokenSteps.add(_currentStepIndex);
-        speakInstruction(currentStep.instruction);
-      }
-
-      if (distance <= _stepReachedDistanceMeters) {
-        if (_currentStepIndex < _steps.length - 1) {
-          _currentStepIndex++;
-        }
-      }
-    }
-  }
-
-  Future<void> _rerouteFromCurrentLocation(LatLng currentLocation) async {
-    if (isRerouting || activeDestination == null) return;
-
-    isRerouting = true;
-    _safeNotifyListeners();
-
-    final newRoute = await _fetchRoute(
-      start: currentLocation,
-      destination: activeDestination!,
-    );
-
-    if (newRoute != null) {
-      routeVersion++;
-      _applyRoute(newRoute);
-    }
-
-    isRerouting = false;
-    _safeNotifyListeners();
-  }
+  const _RouteMatch({
+    required this.point,
+    required this.distance,
+    required this.segmentIndex,
+    required this.bearing,
+  });
 }
