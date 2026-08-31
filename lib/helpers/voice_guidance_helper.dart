@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 
@@ -43,34 +45,49 @@ class VoiceGuidanceHelper {
       case 'slight right':
       case 'sharp right':
         return 'turn_right.mp3';
-
       case 'left':
       case 'slight left':
       case 'sharp left':
         return 'turn_left.mp3';
-
       case 'uturn':
         return 'u_turn.mp3';
-
       case 'roundabout':
       case 'rotary':
         return 'roundabout.mp3';
-
       case 'arrived':
       case 'destination':
         return 'arrived.mp3';
-
       case 'straight':
       default:
         return 'straight.mp3';
     }
   }
 
-  /// اجرای متد پخش صدا از پوشه assets
+  /// اجرای متد پخش صدا از پوشه assets — صبر می‌کند تا پخش واقعاً کامل شود
+  /// (نه فقط شروع شود)، تا فایل بعدی آن را قطع نکند.
   static Future<void> _playAssetAudio(String assetPath) async {
     try {
+      final completer = Completer<void>();
+      late final StreamSubscription<void> subscription;
+
+      subscription = _audioPlayer.onPlayerComplete.listen((_) {
+        subscription.cancel();
+        if (!completer.isCompleted) completer.complete();
+      });
+
       await _audioPlayer.stop();
       await _audioPlayer.play(AssetSource(assetPath));
+
+      // اگر به هر دلیلی رویداد پایان پخش نرسید (مثلاً فایل خراب)،
+      // حداکثر ۶ ثانیه صبر می‌کنیم و ادامه می‌دهیم تا کل زنجیره گیر نکند.
+      await completer.future.timeout(
+        const Duration(seconds: 6),
+        onTimeout: () {
+          if (!completer.isCompleted) {
+            subscription.cancel();
+          }
+        },
+      );
     } catch (e) {
       debugPrint("خطا در پخش فایل صوتی راهنما ($assetPath): $e");
     }
