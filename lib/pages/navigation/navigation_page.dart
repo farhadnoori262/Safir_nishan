@@ -471,8 +471,9 @@ class _NavigationPageState extends State<NavigationPage> {
     final dotBytes = await _renderIconBytes(_paintDriverDot, const Size(46, 46));
     await _mapController!.addImage(_driverDotIconName, dotBytes);
 
-    final arrowBytes = await _renderIconBytes(_paintDriverArrow, const Size(84, 84));
-    await _mapController!.addImage(_driverArrowIconName, arrowBytes);
+    final ByteData bytes = await rootBundle.load('assets/images/navigation_arrow.png');
+final Uint8List arrowBytes = bytes.buffer.asUint8List();
+await _mapController!.addImage(_driverArrowIconName, arrowBytes);
 
     _iconsAdded = true;
   }
@@ -488,12 +489,13 @@ class _NavigationPageState extends State<NavigationPage> {
     if (_mapController == null || !_iconsAdded) return;
 
     final options = SymbolOptions(
-      geometry: position,
-      iconImage: navigating ? _driverArrowIconName : _driverDotIconName,
-      iconRotate: navigating ? rotate : 0,
-      iconAnchor: "center",
-      iconSize: 1.0,
-    );
+  geometry: position,
+  iconImage: navigating ? _driverArrowIconName : _driverDotIconName,
+  iconRotate: navigating ? rotate : 0,
+  iconAnchor: "center",
+  iconSize: 0.85, // این عدد اندازه فلش را روی نقشه دقیقاً مثل نشان تنظیم می‌کند
+);
+
 
     if (_driverSymbol == null) {
       _driverSymbol = await _mapController!.addSymbol(options);
