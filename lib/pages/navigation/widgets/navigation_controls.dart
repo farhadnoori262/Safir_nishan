@@ -82,8 +82,10 @@ class _MapActionButton extends StatelessWidget {
       elevation: 5,
       shadowColor: Colors.black38,
       shape: const CircleBorder(),
+      clipBehavior: Clip.antiAlias,
       child: IconButton(
         tooltip: tooltip,
+        splashRadius: 24, // اندازه افکت فشردن دکمه
         onPressed: onPressed,
         icon: Icon(
           icon,
