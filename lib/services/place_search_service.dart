@@ -1,7 +1,5 @@
-import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/place_search_result.dart';
@@ -17,9 +15,6 @@ class PlaceSearchService {
     'User-Agent': 'SafirDrivers/1.0 (destination-search)',
     'Accept': 'application/json',
   };
-
-  // کاهش زمان Timeout برای جلوگیری از معلق ماندن درخواست شبکه
-  static const Duration _requestTimeout = Duration(seconds: 4);
 
   Future<List<PlaceSearchResult>> search(
     String query, {
@@ -42,27 +37,13 @@ class PlaceSearchService {
     );
 
     try {
-      final response = await http
-          .get(uri, headers: _headers)
-          .timeout(_requestTimeout);
+      final response = await http.get(uri, headers: _headers);
 
       if (response.statusCode != 200) {
         return [];
       }
 
-      // انتقال پردازش سنگین Parsing به Isolate (جدا از UI Thread) برای جلوگیری از ANR
-      return await compute(_parseSearchResults, response.body);
-    } on TimeoutException {
-      return [];
-    } catch (_) {
-      return [];
-    }
-  }
-
-  // متد استاتیک خارج از ترد اصلی جهت پردازش JSON
-  static List<PlaceSearchResult> _parseSearchResults(String responseBody) {
-    try {
-      final decoded = jsonDecode(responseBody);
+      final decoded = jsonDecode(response.body);
 
       if (decoded is! List) {
         return [];
@@ -97,9 +78,7 @@ class PlaceSearchService {
     );
 
     try {
-      final response = await http
-          .get(uri, headers: _headers)
-          .timeout(_requestTimeout);
+      final response = await http.get(uri, headers: _headers);
 
       if (response.statusCode != 200) {
         return null;
@@ -164,14 +143,12 @@ class PlaceSearchService {
         latitude: latitude,
         longitude: longitude,
       );
-    } on TimeoutException {
-      return null;
     } catch (_) {
       return null;
     }
   }
 
-  static String _firstNonEmpty(List<dynamic> values) {
+  String _firstNonEmpty(List<dynamic> values) {
     for (final value in values) {
       final text = value?.toString().trim() ?? '';
 
@@ -183,7 +160,7 @@ class PlaceSearchService {
     return '';
   }
 
-  static String _joinNonEmpty(List<dynamic> values) {
+  String _joinNonEmpty(List<dynamic> values) {
     final parts = values
         .map((value) => value?.toString().trim() ?? '')
         .where((value) => value.isNotEmpty)
