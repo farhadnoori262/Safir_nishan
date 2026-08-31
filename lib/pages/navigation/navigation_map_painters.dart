@@ -17,6 +17,7 @@ class NavigationMapPainters {
   static ui.Image? _cachedDriverImage;
   static bool _isLoadingImage = false;
 
+  /// اضافه کردن تصویر Canvas به نقشه با مدیریت حجم بایت‌ها
   static Future<void> addCanvasImage(
     MapLibreMapController controller,
     String name,
@@ -31,14 +32,18 @@ class NavigationMapPainters {
     painter(canvas, size);
 
     final picture = recorder.endRecording();
+    // استفاده از toImage جهت رندر رزولوشن دقیق
     final image = await picture.toImage(width, height);
     final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+
+    picture.dispose(); // آزادسازی تصویر جهت جلوگیری از Memory Leak
+    image.dispose();   // آزادسازی حافظه GPU
 
     if (bytes == null) return;
     await controller.addImage(name, bytes.buffer.asUint8List());
   }
 
-  /// متد جدید جهت رسم تابلوی کپسولی کامل (آیکون پیچ + اسم خیابان) با تم سبز پروژه
+  /// متد رسم تابلوی کپسولی کامل (آیکون پیچ + اسم خیابان) با تم سبز پروژه
   static void drawStepBanner(
     Canvas canvas,
     Size size, {
@@ -60,7 +65,7 @@ class NavigationMapPainters {
           color: Colors.white,
           fontSize: 22,
           fontWeight: FontWeight.bold,
-          fontFamily: 'IRANSans', // یا فونت پروژه شما
+          fontFamily: 'IRANSans',
         ),
       ),
       textDirection: TextDirection.rtl,
@@ -173,6 +178,7 @@ class NavigationMapPainters {
     canvas.drawPath(path, paint);
   }
 
+  /// رسم پین موقعیت کنونی
   static void drawCurrentLocationPulse(
     Canvas canvas,
     Size size,
@@ -180,7 +186,8 @@ class NavigationMapPainters {
     double currentAccuracy,
   ) {
     final center = Offset(size.width / 2, size.height / 2);
-    final baseAccuracyRadius = currentAccuracy.clamp(15.0, 60.0);
+    // محدودسازی شعاع انیمیشن جهت عدم تداخل با لایه نقشه
+    final baseAccuracyRadius = currentAccuracy.clamp(12.0, 35.0);
     final animatedRadius = baseAccuracyRadius * (1.0 - pulseValue);
     final outerOpacity = (0.35 * (1.0 - pulseValue)).clamp(0.0, 0.35);
 
@@ -196,16 +203,27 @@ class NavigationMapPainters {
 
     canvas.drawCircle(
       center,
-      18,
+      16,
       Paint()..color = AppColors.primaryButton.withOpacity(0.20),
     );
-    canvas.drawCircle(center, 12, Paint()..color = Colors.white);
-    canvas.drawCircle(center, 8, Paint()..color = AppColors.primaryButton);
+    canvas.drawCircle(center, 10, Paint()..color = Colors.white);
+    canvas.drawCircle(center, 6, Paint()..color = AppColors.primaryButton);
   }
 
-  /// آیکون فلش راننده - این تابع در حال حاضر مستقیم استفاده نمی‌شود
-  /// (فلش واقعی از فایل navigation_arrow.png بارگذاری می‌شود)
-  /// اما برای درستی و استفاده احتمالی آینده، حول مرکز کاملاً متقارن شد.
+  /// پیش‌بارگذاری آیکون راننده برای جلوگیری از هنگ به هنگام رسم
+  static Future<void> preloadDriverImage() async {
+    if (_cachedDriverImage != null || _isLoadingImage) return;
+    _isLoadingImage = true;
+    try {
+      final data = await rootBundle.load('assets/images/driver_arrow.png');
+      final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
+      final frameInfo = await codec.getNextFrame();
+      _cachedDriverImage = frameInfo.image;
+    } catch (_) {
+      _isLoadingImage = false;
+    }
+  }
+
   static void drawDriverArrow(Canvas canvas, Size size) {
     if (_cachedDriverImage != null) {
       final srcRect = Rect.fromLTWH(
@@ -219,22 +237,8 @@ class NavigationMapPainters {
       return;
     }
 
-    if (!_isLoadingImage) {
-      _isLoadingImage = true;
-      rootBundle.load('assets/images/driver_arrow.png').then((data) {
-        ui.instantiateImageCodec(data.buffer.asUint8List()).then((codec) {
-          codec.getNextFrame().then((frameInfo) {
-            _cachedDriverImage = frameInfo.image;
-          });
-        });
-      }).catchError((_) {
-        _isLoadingImage = false;
-      });
-    }
+    preloadDriverImage();
 
-    // نکته: مختصات به‌صورت نسبی از مرکز (center) و به‌شکل کاملاً قرینه
-    // (mirror) نسبت به محور عمودی رسم می‌شود تا آیکون دقیقاً حول
-    // center.dx متقارن باشد و anchor نقشه درست روی نوک/مرکز شکل بیفتد.
     final center = Offset(size.width / 2, size.height / 2);
     const double tipOffsetY = 8.0;
     const double bottomOffsetY = 19.0;
