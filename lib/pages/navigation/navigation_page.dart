@@ -58,13 +58,11 @@ class _NavigationPageState extends State<NavigationPage>
   PlaceSearchResult? _selectedPlace;
   LatLng? _selectedDestination;
   LatLng? _currentLocation;
-  double _currentAccuracy = 20.0;
+  double _currentAccuracy = 5.0; // شعاع استاندارد و ثابت برای جلوگیری از موج بزرگ خطای GPS
 
-  // زاویه واقعی حرکت راننده (heading) و زاویه فعلی چرخش خود نقشه
   double _driverHeading = 0.0;
   double _currentMapBearing = 0.0;
 
-  // زاویه‌ی نرم‌شده برای جلوگیری از پرش ناگهانی هنگام چرخش نقشه/فلش
   double _smoothedHeading = 0.0;
   bool _headingInitialized = false;
 
@@ -109,11 +107,10 @@ class _NavigationPageState extends State<NavigationPage>
     _startLocationTracking();
   }
 
-  void _onMapCreated(MapLibreMapController controller) async {
+  void _onMapCreated(MapLibreMapController controller) {
     _mapController = controller;
-    await controller.updateMyLocationTrackingMode(
-      MyLocationTrackingMode.tracking,
-    );
+    // غیرفعال‌سازی مپ‌تراکینگ نیتیو برای جلوگیری از رسم پین دوم و دایره‌های موج‌دار
+    controller.updateMyLocationTrackingMode(MyLocationTrackingMode.none);
   }
 
   Future<void> _onStyleLoaded() async {
@@ -223,7 +220,8 @@ class _NavigationPageState extends State<NavigationPage>
       if (mounted) {
         setState(() {
           _currentLocation = rawLocation;
-          _currentAccuracy = position.accuracy;
+          // محدود کردن دقت به حداکثر ۱۰ متر جهت جلوگیری از کشیده شدن انیمیشن موجی به کل صفحه
+          _currentAccuracy = position.accuracy.clamp(2.0, 10.0);
         });
       }
 
@@ -268,8 +266,8 @@ class _NavigationPageState extends State<NavigationPage>
         _pulseController.value,
         _currentAccuracy,
       ),
-      width: 220,
-      height: 220,
+      width: 120, // سایز بهینه کانواس برای جلوگیری از بزرگ شدن بیش از حد موج
+      height: 120,
     );
 
     await NavigationMapPainters.addCanvasImage(
@@ -412,7 +410,7 @@ class _NavigationPageState extends State<NavigationPage>
     final options = SymbolOptions(
       geometry: _currentLocation!,
       iconImage: _currentLocationIconName,
-      iconSize: 0.85,
+      iconSize: 0.65, // اندازه‌ی کاملاً متناسب پین
     );
 
     if (_currentLocationSymbol == null) {
@@ -443,8 +441,6 @@ class _NavigationPageState extends State<NavigationPage>
       return;
     }
 
-    // شروع مسیریابی جدید: زاویه‌ی نرم‌شده باید از نو تنظیم شود، نه
-    // ادامه‌ی زاویه‌ی سفر قبلی
     _headingInitialized = false;
 
     setState(() {
@@ -552,8 +548,6 @@ class _NavigationPageState extends State<NavigationPage>
     });
   }
 
-  /// کوتاه‌ترین اختلاف زاویه‌ای بین دو جهت (برای جلوگیری از چرخش
-  /// اضافی، مثلاً چرخیدن ۳۵۰ درجه به‌جای ۱۰-).
   double _shortestAngleDiff(double from, double to) {
     double diff = (to - from) % 360.0;
     if (diff > 180.0) diff -= 360.0;
@@ -561,9 +555,6 @@ class _NavigationPageState extends State<NavigationPage>
     return diff;
   }
 
-  /// نرم‌کردن زاویه‌ی چرخش (heading smoothing) — به‌جای پرش ناگهانی
-  /// به زاویه‌ی جدید، هر بار فقط بخشی از فاصله را طی می‌کند تا چرخش
-  /// نقشه و فلش کاملاً روان و بدون تکان دیده شود.
   double _smoothHeadingUpdate(double targetHeading) {
     if (!_headingInitialized) {
       _headingInitialized = true;
@@ -578,9 +569,6 @@ class _NavigationPageState extends State<NavigationPage>
     return _smoothedHeading;
   }
 
-  /// به‌جای گذاشتن Symbol روی نقشه، فقط زاویه‌ی حرکت (heading) راننده را
-  /// به‌صورت نرم‌شده ذخیره می‌کند تا ویجت فلش ثابت روی صفحه (نه روی
-  /// نقشه) و همچنین دوربین، بدون پرش و روان بچرخند.
   Future<void> _updateDriverMarker(
     LatLng location, {
     required double heading,
@@ -617,8 +605,6 @@ class _NavigationPageState extends State<NavigationPage>
         duration: const Duration(milliseconds: 450),
       );
 
-      // نقشه اکنون با همین زاویه چرخیده؛ این مقدار را برای محاسبه‌ی
-      // چرخش نسبیِ فلش ثابت روی صفحه ذخیره می‌کنیم.
       if (mounted) {
         setState(() {
           _currentMapBearing = heading;
@@ -802,11 +788,10 @@ class _NavigationPageState extends State<NavigationPage>
               target: _startLocation,
               zoom: 16.0,
             ),
+            myLocationEnabled: false, // غیرفعال‌سازی مکان‌یابی نیتیو جهت حذف لایه اضافی
             trackCameraPosition: true,
           ),
 
-          // فلش ثابت راننده — روی خود صفحه (نه روی نقشه)، دقیقاً مثل نشان.
-          // با زاویه‌ی نرم‌شده (smoothed) می‌چرخد تا چرخش کاملاً روان باشد.
           if (_navigationStarted)
             IgnorePointer(
               child: Positioned(
@@ -920,11 +905,6 @@ class _NavigationPageState extends State<NavigationPage>
               if (_navigationStarted) {
                 _followDriver();
               } else {
-                if (_mapController != null) {
-                  await _mapController!.updateMyLocationTrackingMode(
-                    MyLocationTrackingMode.tracking,
-                  );
-                }
                 if (_currentLocation != null) {
                   _moveCameraToLocation(
                     _currentLocation!,
