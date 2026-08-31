@@ -58,7 +58,7 @@ class _NavigationPageState extends State<NavigationPage>
   PlaceSearchResult? _selectedPlace;
   LatLng? _selectedDestination;
   LatLng? _currentLocation;
-  double _currentAccuracy = 5.0; // شعاع استاندارد و ثابت برای جلوگیری از موج بزرگ خطای GPS
+  double _currentAccuracy = 5.0;
 
   double _driverHeading = 0.0;
   double _currentMapBearing = 0.0;
@@ -76,6 +76,7 @@ class _NavigationPageState extends State<NavigationPage>
   bool _isUpdatingMap = false;
   bool _isProgrammaticCameraMove = false;
   bool _isLoadingLocation = true;
+  bool _isMapDragging = false; // جهت کنترل انیمیشن پرش پین وسط نقشه
 
   int _lastRouteVersion = 0;
 
@@ -109,7 +110,6 @@ class _NavigationPageState extends State<NavigationPage>
 
   void _onMapCreated(MapLibreMapController controller) {
     _mapController = controller;
-    // غیرفعال‌سازی مپ‌تراکینگ نیتیو برای جلوگیری از رسم پین دوم و دایره‌های موج‌دار
     controller.updateMyLocationTrackingMode(MyLocationTrackingMode.none);
   }
 
@@ -220,7 +220,6 @@ class _NavigationPageState extends State<NavigationPage>
       if (mounted) {
         setState(() {
           _currentLocation = rawLocation;
-          // محدود کردن دقت به حداکثر ۱۰ متر جهت جلوگیری از کشیده شدن انیمیشن موجی به کل صفحه
           _currentAccuracy = position.accuracy.clamp(2.0, 10.0);
         });
       }
@@ -266,7 +265,7 @@ class _NavigationPageState extends State<NavigationPage>
         _pulseController.value,
         _currentAccuracy,
       ),
-      width: 120, // سایز بهینه کانواس برای جلوگیری از بزرگ شدن بیش از حد موج
+      width: 120,
       height: 120,
     );
 
@@ -274,8 +273,8 @@ class _NavigationPageState extends State<NavigationPage>
       _mapController!,
       _destinationIconName,
       NavigationMapPainters.drawDestinationPin,
-      width: 100,
-      height: 124,
+      width: 120,
+      height: 140, // بزرگ‌تر کردن کانواس پین مقصد
     );
 
     await NavigationMapPainters.addCanvasImage(
@@ -373,7 +372,7 @@ class _NavigationPageState extends State<NavigationPage>
     final options = SymbolOptions(
       geometry: _selectedDestination!,
       iconImage: _destinationIconName,
-      iconSize: 0.70,
+      iconSize: 1.10, // بزرگ‌سازی مقیاس آیکون پین
     );
 
     if (_destinationSymbol == null) {
@@ -410,7 +409,7 @@ class _NavigationPageState extends State<NavigationPage>
     final options = SymbolOptions(
       geometry: _currentLocation!,
       iconImage: _currentLocationIconName,
-      iconSize: 0.65, // اندازه‌ی کاملاً متناسب پین
+      iconSize: 0.75,
     );
 
     if (_currentLocationSymbol == null) {
@@ -494,7 +493,7 @@ class _NavigationPageState extends State<NavigationPage>
         SymbolOptions(
           geometry: _selectedDestination!,
           iconImage: _destinationIconName,
-          iconSize: 0.70,
+          iconSize: 1.10,
         ),
       );
     }
@@ -776,11 +775,25 @@ class _NavigationPageState extends State<NavigationPage>
                 _selectDestinationFromMap(coordinates);
               }
             },
+            onCameraMoveStarted: () {
+              if (!_isProgrammaticCameraMove && !_navigationStarted) {
+                setState(() => _isMapDragging = true);
+              }
+            },
             onCameraIdle: () {
               if (!_isProgrammaticCameraMove && mounted) {
                 setState(() {
                   _cameraFollowing = false;
+                  _isMapDragging = false;
                 });
+                
+                // به‌روزرسانی اتوماتیک موقعیت مرکز نقشه در صورت نبود مقصد انتخاب شده
+                if (!_navigationStarted && _selectedDestination == null && _mapController != null) {
+                  final target = _mapController!.cameraPosition?.target;
+                  if (target != null) {
+                    _selectDestinationFromMap(target);
+                  }
+                }
               }
             },
             styleString: NavigationRouteStyle.currentMapStyle,
@@ -788,9 +801,58 @@ class _NavigationPageState extends State<NavigationPage>
               target: _startLocation,
               zoom: 16.0,
             ),
-            myLocationEnabled: false, // غیرفعال‌سازی مکان‌یابی نیتیو جهت حذف لایه اضافی
+            myLocationEnabled: false,
             trackCameraPosition: true,
           ),
+
+          // ویجت پین مرکز نقشه (اصلی و انیمیشن‌دار)
+          if (!_navigationStarted && _selectedDestination == null)
+            IgnorePointer(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 35),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    transform: Matrix4.translationValues(
+                        0, _isMapDragging ? -12 : 0, 0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: SafirColors.primaryBrand,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(
+                                    _isMapDragging ? 0.35 : 0.18),
+                                blurRadius: _isMapDragging ? 12 : 6,
+                                offset: Offset(0, _isMapDragging ? 8 : 3),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.location_on_rounded,
+                            color: Colors.white,
+                            size: 32,
+                          ),
+                        ),
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 150),
+                          width: _isMapDragging ? 12 : 6,
+                          height: _isMapDragging ? 4 : 3,
+                          decoration: BoxDecoration(
+                            color: Colors.black26,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
 
           if (_navigationStarted)
             IgnorePointer(
