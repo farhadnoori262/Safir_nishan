@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
@@ -18,7 +17,6 @@ import 'navigation_map_painters.dart';
 import 'navigation_route_style.dart';
 import 'widgets/navigation_bottom_panel.dart';
 import 'widgets/navigation_controls.dart';
-import 'widgets/navigation_driver_marker.dart';
 import 'widgets/navigation_route_arrow.dart';
 import 'widgets/navigation_turn_banner.dart';
 
@@ -40,17 +38,13 @@ class NavigationPage extends StatefulWidget {
   State<NavigationPage> createState() => _NavigationPageState();
 }
 
-class _NavigationPageState extends State<NavigationPage>
-    with SingleTickerProviderStateMixin {
+class _NavigationPageState extends State<NavigationPage> {
   static const String _destinationIconName = 'safir-destination-pin';
-  static const String _currentLocationIconName = 'safir-current-location-pulse';
   static const LatLng _fallbackLocation = LatLng(34.5553, 69.2075);
 
   MapLibreMapController? _mapController;
   StreamSubscription<Position>? _positionStream;
 
-  Symbol? _driverSymbol;
-  Symbol? _currentLocationSymbol;
   Symbol? _destinationSymbol;
 
   final List<Symbol> _turnSymbols = [];
@@ -59,9 +53,6 @@ class _NavigationPageState extends State<NavigationPage>
   PlaceSearchResult? _selectedPlace;
   LatLng? _selectedDestination;
   LatLng? _currentLocation;
-  double _currentAccuracy = 20.0;
-
-  late final AnimationController _pulseController;
 
   bool _mapStyleReady = false;
   bool _iconsAdded = false;
@@ -85,12 +76,6 @@ class _NavigationPageState extends State<NavigationPage>
     super.initState();
     _currentLocation = widget.currentLocation;
 
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 2),
-    )..repeat();
-
-    _pulseController.addListener(_updateCurrentLocationPulse);
     Future.delayed(const Duration(seconds: 3), () {
       if (mounted && _isLoadingLocation) {
         setState(() {
@@ -104,8 +89,18 @@ class _NavigationPageState extends State<NavigationPage>
 
   void _onMapCreated(MapLibreMapController controller) async {
     _mapController = controller;
+
+    // فعال‌سازی تعقیب اولیه دوربین
     await controller.updateMyLocationTrackingMode(
       MyLocationTrackingMode.tracking,
+    );
+
+    // ۱. قبل از انتخاب مقصد: دایره استاندارد نیتیو با شعاع قطب‌نما
+    await controller.showMyLocationWithConfig(
+      const MyLocationComponentConfig(
+        myLocationEnabled: true,
+        myLocationRenderMode: MyLocationRenderMode.compass, // دایره چرخنده با قطب‌نما
+      ),
     );
   }
 
@@ -121,7 +116,6 @@ class _NavigationPageState extends State<NavigationPage>
     }
 
     await _addMapImages();
-    await _showCurrentLocationMarker(moveCamera: false);
 
     if (_selectedDestination != null) {
       await _showSelectedDestinationMarker(moveCamera: false);
@@ -216,7 +210,6 @@ class _NavigationPageState extends State<NavigationPage>
       if (mounted) {
         setState(() {
           _currentLocation = rawLocation;
-          _currentAccuracy = position.accuracy;
         });
       }
 
@@ -230,42 +223,20 @@ class _NavigationPageState extends State<NavigationPage>
 
         final driverLocation = navigationController.snappedDriverLocation ?? rawLocation;
 
-        await _updateDriverMarker(
-          driverLocation,
-          heading: navigationController.driverRouteBearing,
-          moveCamera: _cameraFollowing,
-        );
-      } else {
-        await _showCurrentLocationMarker(moveCamera: false);
+        if (_cameraFollowing) {
+          await _moveCameraToDriver(
+            driverLocation,
+            heading: navigationController.driverRouteBearing,
+          );
+        }
       }
     } finally {
       _isUpdatingMap = false;
     }
   }
 
-  void _updateCurrentLocationPulse() {
-    if (!_navigationStarted) {
-      _showCurrentLocationMarker(moveCamera: false);
-    }
-  }
-
   Future<void> _addMapImages() async {
     if (_mapController == null || _iconsAdded) return;
-
-    await NavigationDriverMarker.addDriverArrowImage(_mapController!);
-
-    await NavigationMapPainters.addCanvasImage(
-      _mapController!,
-      _currentLocationIconName,
-      (canvas, size) => NavigationMapPainters.drawCurrentLocationPulse(
-        canvas,
-        size,
-        _pulseController.value,
-        _currentAccuracy,
-      ),
-      width: 180,
-      height: 180,
-    );
 
     await NavigationMapPainters.addCanvasImage(
       _mapController!,
@@ -399,31 +370,6 @@ class _NavigationPageState extends State<NavigationPage>
     }
   }
 
-  Future<void> _showCurrentLocationMarker({required bool moveCamera}) async {
-    if (!_mapStyleReady || !_iconsAdded || _mapController == null || _currentLocation == null || _navigationStarted) {
-      return;
-    }
-
-    final options = SymbolOptions(
-      geometry: _currentLocation!,
-      iconImage: _currentLocationIconName,
-      iconSize: 0.72,
-    );
-
-    if (_currentLocationSymbol == null) {
-      _currentLocationSymbol = await _mapController!.addSymbol(options);
-    } else {
-      await _mapController!.updateSymbol(_currentLocationSymbol!, options);
-    }
-
-    await _mapController!.setSymbolIconAllowOverlap(true);
-    await _mapController!.setSymbolIconIgnorePlacement(true);
-
-    if (!moveCamera) return;
-
-    await _moveCameraToLocation(_currentLocation!, zoom: 16.5, tilt: 35.0);
-  }
-
   Future<void> _confirmDestination() async {
     if (_selectedDestination == null) {
       _showMessage('select_destination_first'.tr());
@@ -464,18 +410,25 @@ class _NavigationPageState extends State<NavigationPage>
 
     _lastRouteVersion = navigationController.routeVersion;
 
-    if (_currentLocationSymbol != null) {
-      await _mapController!.removeSymbol(_currentLocationSymbol!);
-      _currentLocationSymbol = null;
-    }
+    // ۲. بعد از انتخاب مقصد: تبدیل پین به حالت GPS (جهت‌دار نیتیو)
+    await _mapController!.showMyLocationWithConfig(
+      const MyLocationComponentConfig(
+        myLocationEnabled: true,
+        myLocationRenderMode: MyLocationRenderMode.GPS, // حالت قفل روی جهت خیابان
+      ),
+    );
+
+    await _mapController!.updateMyLocationTrackingMode(
+      MyLocationTrackingMode.trackingGPS,
+    );
 
     await NavigationRouteStyle.drawRoute(_mapController!, routePoints);
     await _drawRouteDecorations(navigationController);
 
-    await _updateDriverMarker(
-      navigationController.snappedDriverLocation ?? _startLocation,
+    final driverLocation = navigationController.snappedDriverLocation ?? _startLocation;
+    await _moveCameraToDriver(
+      driverLocation,
       heading: navigationController.driverRouteBearing,
-      moveCamera: true,
     );
   }
 
@@ -543,35 +496,15 @@ class _NavigationPageState extends State<NavigationPage>
     });
   }
 
-  Future<void> _updateDriverMarker(
-    LatLng location, {
-    required double heading,
-    required bool moveCamera,
-  }) async {
-    if (!_mapStyleReady || !_iconsAdded || _mapController == null) return;
-
-    _driverSymbol = await NavigationDriverMarker.updateMarker(
-      controller: _mapController!,
-      currentSymbol: _driverSymbol,
-      location: location,
-      heading: heading,
-    );
-
-    if (!moveCamera) return;
-    await _moveCameraToDriver(location, heading: heading);
-  }
-
   Future<void> _moveCameraToDriver(LatLng location, {required double heading}) async {
     if (_mapController == null) return;
     _isProgrammaticCameraMove = true;
 
     try {
-      final LatLng offsetTarget = NavigationDriverMarker.getOffsetTarget(location, heading, 115.0);
-
       await _mapController!.animateCamera(
         CameraUpdate.newCameraPosition(
           CameraPosition(
-            target: offsetTarget,
+            target: location,
             zoom: 17.6,
             bearing: heading,
             tilt: 58.0,
@@ -579,9 +512,6 @@ class _NavigationPageState extends State<NavigationPage>
         ),
         duration: const Duration(milliseconds: 500),
       );
-
-      await _mapController!.setSymbolIconAllowOverlap(true);
-      await _mapController!.setSymbolIconIgnorePlacement(true);
     } finally {
       Future.delayed(const Duration(milliseconds: 600), () {
         if (mounted) _isProgrammaticCameraMove = false;
@@ -684,10 +614,16 @@ class _NavigationPageState extends State<NavigationPage>
       await _mapController!.clearLines();
       await _clearRouteDecorations();
 
-      if (_driverSymbol != null) {
-        await _mapController!.removeSymbol(_driverSymbol!);
-        _driverSymbol = null;
-      }
+      // بازگشت به حالت دایره قطب‌نما هنگام خروج از مسیریابی
+      await _mapController!.showMyLocationWithConfig(
+        const MyLocationComponentConfig(
+          myLocationEnabled: true,
+          myLocationRenderMode: MyLocationRenderMode.compass,
+        ),
+      );
+      await _mapController!.updateMyLocationTrackingMode(
+        MyLocationTrackingMode.tracking,
+      );
     }
 
     if (!mounted) return;
@@ -698,8 +634,6 @@ class _NavigationPageState extends State<NavigationPage>
       _selectedPlace = null;
       _selectedDestination = null;
     });
-
-    await _showCurrentLocationMarker(moveCamera: false);
   }
 
   void _showMessage(String message) {
@@ -709,9 +643,6 @@ class _NavigationPageState extends State<NavigationPage>
 
   @override
   void dispose() {
-    _pulseController
-      ..removeListener(_updateCurrentLocationPulse)
-      ..dispose();
     _positionStream?.cancel();
 
     final navigationController = Provider.of<NavigationController>(context, listen: false);
