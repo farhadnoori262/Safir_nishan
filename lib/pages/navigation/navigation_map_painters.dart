@@ -17,7 +17,6 @@ class NavigationMapPainters {
   static ui.Image? _cachedDriverImage;
   static bool _isLoadingImage = false;
 
-  /// اضافه کردن تصویر Canvas به نقشه با مدیریت حجم بایت‌ها
   static Future<void> addCanvasImage(
     MapLibreMapController controller,
     String name,
@@ -32,18 +31,14 @@ class NavigationMapPainters {
     painter(canvas, size);
 
     final picture = recorder.endRecording();
-    // استفاده از toImage جهت رندر رزولوشن دقیق
     final image = await picture.toImage(width, height);
     final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-
-    picture.dispose(); // آزادسازی تصویر جهت جلوگیری از Memory Leak
-    image.dispose();   // آزادسازی حافظه GPU
 
     if (bytes == null) return;
     await controller.addImage(name, bytes.buffer.asUint8List());
   }
 
-  /// متد رسم تابلوی کپسولی کامل (آیکون پیچ + اسم خیابان) با تم سبز پروژه
+  /// متد جدید جهت رسم تابلوی کپسولی کامل (آیکون پیچ + اسم خیابان) با تم سبز پروژه
   static void drawStepBanner(
     Canvas canvas,
     Size size, {
@@ -65,7 +60,7 @@ class NavigationMapPainters {
           color: Colors.white,
           fontSize: 22,
           fontWeight: FontWeight.bold,
-          fontFamily: 'IRANSans',
+          fontFamily: 'IRANSans', // یا فونت پروژه شما
         ),
       ),
       textDirection: TextDirection.rtl,
@@ -178,7 +173,6 @@ class NavigationMapPainters {
     canvas.drawPath(path, paint);
   }
 
-  /// رسم پین موقعیت کنونی
   static void drawCurrentLocationPulse(
     Canvas canvas,
     Size size,
@@ -186,8 +180,7 @@ class NavigationMapPainters {
     double currentAccuracy,
   ) {
     final center = Offset(size.width / 2, size.height / 2);
-    // محدودسازی شعاع انیمیشن جهت عدم تداخل با لایه نقشه
-    final baseAccuracyRadius = currentAccuracy.clamp(12.0, 35.0);
+    final baseAccuracyRadius = currentAccuracy.clamp(15.0, 60.0);
     final animatedRadius = baseAccuracyRadius * (1.0 - pulseValue);
     final outerOpacity = (0.35 * (1.0 - pulseValue)).clamp(0.0, 0.35);
 
@@ -203,25 +196,11 @@ class NavigationMapPainters {
 
     canvas.drawCircle(
       center,
-      16,
+      18,
       Paint()..color = AppColors.primaryButton.withOpacity(0.20),
     );
-    canvas.drawCircle(center, 10, Paint()..color = Colors.white);
-    canvas.drawCircle(center, 6, Paint()..color = AppColors.primaryButton);
-  }
-
-  /// پیش‌بارگذاری آیکون راننده برای جلوگیری از هنگ به هنگام رسم
-  static Future<void> preloadDriverImage() async {
-    if (_cachedDriverImage != null || _isLoadingImage) return;
-    _isLoadingImage = true;
-    try {
-      final data = await rootBundle.load('assets/images/driver_arrow.png');
-      final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
-      final frameInfo = await codec.getNextFrame();
-      _cachedDriverImage = frameInfo.image;
-    } catch (_) {
-      _isLoadingImage = false;
-    }
+    canvas.drawCircle(center, 12, Paint()..color = Colors.white);
+    canvas.drawCircle(center, 8, Paint()..color = AppColors.primaryButton);
   }
 
   static void drawDriverArrow(Canvas canvas, Size size) {
@@ -237,32 +216,27 @@ class NavigationMapPainters {
       return;
     }
 
-    preloadDriverImage();
+    if (!_isLoadingImage) {
+      _isLoadingImage = true;
+      rootBundle.load('assets/images/driver_arrow.png').then((data) {
+        ui.instantiateImageCodec(data.buffer.asUint8List()).then((codec) {
+          codec.getNextFrame().then((frameInfo) {
+            _cachedDriverImage = frameInfo.image;
+          });
+        });
+      }).catchError((_) {
+        _isLoadingImage = false;
+      });
+    }
 
     final center = Offset(size.width / 2, size.height / 2);
-    const double tipOffsetY = 8.0;
-    const double bottomOffsetY = 19.0;
-    const double notchOffsetY = 15.0;
-    const double sideOffsetX = 27.0;
-    const double edgeOffsetX = 18.0;
-
     final path = Path()
-      ..moveTo(center.dx, tipOffsetY)
-      ..lineTo(size.width - edgeOffsetX, size.height - bottomOffsetY)
-      ..quadraticBezierTo(
-        size.width - (edgeOffsetX - 2),
-        size.height - 10,
-        size.width - sideOffsetX,
-        size.height - notchOffsetY,
-      )
+      ..moveTo(center.dx, 8)
+      ..lineTo(size.width - 18, size.height - 19)
+      ..quadraticBezierTo(size.width - 16, size.height - 10, size.width - 27, size.height - 15)
       ..lineTo(center.dx, size.height - 35)
-      ..lineTo(sideOffsetX, size.height - notchOffsetY)
-      ..quadraticBezierTo(
-        edgeOffsetX - 2,
-        size.height - 10,
-        edgeOffsetX,
-        size.height - bottomOffsetY,
-      )
+      ..lineTo(27, size.height - 15)
+      ..quadraticBezierTo(16, size.height - 10, 18, size.height - 19)
       ..close();
 
     final shadowPaint = Paint()
