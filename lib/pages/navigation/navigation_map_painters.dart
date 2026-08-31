@@ -173,36 +173,58 @@ class NavigationMapPainters {
     canvas.drawPath(path, paint);
   }
 
+  /// نشانگر موقعیت فعلی (مبدا) — طرح آبی استاندارد GPS با هاله‌ی دقت
+  /// و موج پویا. اندازه‌ی بزرگ‌تر برای دیده‌شدن بهتر روی نقشه.
   static void drawCurrentLocationPulse(
     Canvas canvas,
     Size size,
     double pulseValue,
     double currentAccuracy,
   ) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final baseAccuracyRadius = currentAccuracy.clamp(15.0, 60.0);
-    final animatedRadius = baseAccuracyRadius * (1.0 - pulseValue);
-    final outerOpacity = (0.35 * (1.0 - pulseValue)).clamp(0.0, 0.35);
+    const Color gpsBlue = Color(0xFF1A73E8);
 
-    if (animatedRadius > 5) {
-      canvas.drawCircle(
-        center,
-        animatedRadius,
-        Paint()
-          ..color = AppColors.primaryButton.withOpacity(outerOpacity)
-          ..style = PaintingStyle.fill,
-      );
-    }
+    final center = Offset(size.width / 2, size.height / 2);
+    final baseAccuracyRadius = currentAccuracy.clamp(20.0, 75.0);
+
+    // هاله‌ی ثابت دقت GPS — همیشه نمایان است، نه فقط در حال پالس
+    canvas.drawCircle(
+      center,
+      baseAccuracyRadius,
+      Paint()
+        ..color = gpsBlue.withOpacity(0.14)
+        ..style = PaintingStyle.fill,
+    );
+
+    // موج پویا (پالس) که به بیرون گسترش می‌یابد و محو می‌شود
+    final animatedRadius = baseAccuracyRadius * (0.4 + (0.6 * pulseValue));
+    final pulseOpacity = (0.30 * (1.0 - pulseValue)).clamp(0.0, 0.30);
 
     canvas.drawCircle(
       center,
-      18,
-      Paint()..color = AppColors.primaryButton.withOpacity(0.20),
+      animatedRadius,
+      Paint()
+        ..color = gpsBlue.withOpacity(pulseOpacity)
+        ..style = PaintingStyle.fill,
     );
-    canvas.drawCircle(center, 12, Paint()..color = Colors.white);
-    canvas.drawCircle(center, 8, Paint()..color = AppColors.primaryButton);
+
+    // سایه‌ی زیر دایره مرکزی برای عمق بصری
+    canvas.drawCircle(
+      center,
+      17,
+      Paint()
+        ..color = Colors.black.withOpacity(0.20)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
+    );
+
+    // حلقه‌ی سفید ضخیم دور نقطه مرکزی (بزرگ‌تر از قبل)
+    canvas.drawCircle(center, 15, Paint()..color = Colors.white);
+
+    // نقطه‌ی مرکزی آبی — رنگ استاندارد نشانگر موقعیت GPS
+    canvas.drawCircle(center, 10, Paint()..color = gpsBlue);
   }
 
+  /// آیکون فلش راننده - این تابع در حال حاضر مستقیم استفاده نمی‌شود
+  /// (فلش واقعی از فایل navigation_arrow.png بارگذاری می‌شود)
   static void drawDriverArrow(Canvas canvas, Size size) {
     if (_cachedDriverImage != null) {
       final srcRect = Rect.fromLTWH(
@@ -230,13 +252,29 @@ class NavigationMapPainters {
     }
 
     final center = Offset(size.width / 2, size.height / 2);
+    const double tipOffsetY = 8.0;
+    const double bottomOffsetY = 19.0;
+    const double notchOffsetY = 15.0;
+    const double sideOffsetX = 27.0;
+    const double edgeOffsetX = 18.0;
+
     final path = Path()
-      ..moveTo(center.dx, 8)
-      ..lineTo(size.width - 18, size.height - 19)
-      ..quadraticBezierTo(size.width - 16, size.height - 10, size.width - 27, size.height - 15)
+      ..moveTo(center.dx, tipOffsetY)
+      ..lineTo(size.width - edgeOffsetX, size.height - bottomOffsetY)
+      ..quadraticBezierTo(
+        size.width - (edgeOffsetX - 2),
+        size.height - 10,
+        size.width - sideOffsetX,
+        size.height - notchOffsetY,
+      )
       ..lineTo(center.dx, size.height - 35)
-      ..lineTo(27, size.height - 15)
-      ..quadraticBezierTo(16, size.height - 10, 18, size.height - 19)
+      ..lineTo(sideOffsetX, size.height - notchOffsetY)
+      ..quadraticBezierTo(
+        edgeOffsetX - 2,
+        size.height - 10,
+        edgeOffsetX,
+        size.height - bottomOffsetY,
+      )
       ..close();
 
     final shadowPaint = Paint()
