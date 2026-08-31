@@ -225,12 +225,9 @@ class NavigationController extends ChangeNotifier {
     _lastMatchedSegmentIndex = routeMatch.segmentIndex;
 
     if (routeMatch.distance <= _snapToRouteDistanceMeters) {
-      // نزدیک به مسیر: کاملاً بچسب به خط
       snappedDriverLocation = routeMatch.point;
       driverRouteBearing = routeMatch.bearing;
     } else if (routeMatch.distance <= _hardSnapCutoffMeters) {
-      // فاصله متوسط (نویز GPS شهری): بین نقطه خام و نقطه روی خط ترکیب کن
-      // تا جهش ناگهانی فلش رخ نده
       final blendFactor = (routeMatch.distance - _snapToRouteDistanceMeters) /
           (_hardSnapCutoffMeters - _snapToRouteDistanceMeters);
 
@@ -242,7 +239,6 @@ class NavigationController extends ChangeNotifier {
       );
       driverRouteBearing = routeMatch.bearing;
     } else {
-      // فاصله زیاد: احتمالاً مسیر واقعاً عوض شده، موقعیت خام را نشان بده
       snappedDriverLocation = driverLocation;
     }
 
@@ -438,6 +434,7 @@ class NavigationController extends ChangeNotifier {
     }
   }
 
+  /// بهینه‌سازی الگوریتم یافتن نزدیک‌ترین نقطه روی مسیر با پنجره جستجو
   _RouteMatch _findClosestPointOnRoute(LatLng location) {
     if (routePoints.length < 2) {
       return _RouteMatch(
@@ -450,25 +447,53 @@ class NavigationController extends ChangeNotifier {
 
     double minDistance = double.infinity;
     LatLng closestPoint = routePoints.first;
-    int bestSegmentIndex = 0;
+    int bestSegmentIndex = _lastMatchedSegmentIndex;
     double segmentBearing = 0.0;
 
-    for (int i = 0; i < routePoints.length - 1; i++) {
+    // تعریف محدوده متحرک جستجو به جای کل مسیر جهت جلوگیری از پر شدن CPU
+    final int searchStart = math.max(0, _lastMatchedSegmentIndex - 3);
+    final int searchEnd = math.min(routePoints.length - 1, _lastMatchedSegmentIndex + 15);
+
+    for (int i = searchStart; i < searchEnd; i++) {
       final p1 = routePoints[i];
       final p2 = routePoints[i + 1];
 
+      final projPoint = _projectPointOnSegment(location, p1, p2);
       final dist = Geolocator.distanceBetween(
         location.latitude,
         location.longitude,
-        p1.latitude,
-        p1.longitude,
+        projPoint.latitude,
+        projPoint.longitude,
       );
 
       if (dist < minDistance) {
         minDistance = dist;
-        closestPoint = p1;
+        closestPoint = projPoint;
         bestSegmentIndex = i;
         segmentBearing = _bearingBetween(p1, p2);
+      }
+    }
+
+    // اگر راننده از محدوده متحرک خارج شد (احتمالاً انحراف از مسیر)، کل مسیر چک می‌شود
+    if (minDistance > _rerouteDistanceMeters) {
+      for (int i = 0; i < routePoints.length - 1; i++) {
+        final p1 = routePoints[i];
+        final p2 = routePoints[i + 1];
+
+        final projPoint = _projectPointOnSegment(location, p1, p2);
+        final dist = Geolocator.distanceBetween(
+          location.latitude,
+          location.longitude,
+          projPoint.latitude,
+          projPoint.longitude,
+        );
+
+        if (dist < minDistance) {
+          minDistance = dist;
+          closestPoint = projPoint;
+          bestSegmentIndex = i;
+          segmentBearing = _bearingBetween(p1, p2);
+        }
       }
     }
 
@@ -477,6 +502,23 @@ class NavigationController extends ChangeNotifier {
       distance: minDistance,
       segmentIndex: bestSegmentIndex,
       bearing: segmentBearing,
+    );
+  }
+
+  /// محاسبه تصویر عمودی موقعیت سفیر روی خط (Projection)
+  LatLng _projectPointOnSegment(LatLng p, LatLng a, LatLng b) {
+    final double l2 = math.pow(b.latitude - a.latitude, 2).toDouble() +
+        math.pow(b.longitude - a.longitude, 2).toDouble();
+    if (l2 == 0) return a;
+
+    double t = ((p.latitude - a.latitude) * (b.latitude - a.latitude) +
+            (p.longitude - a.longitude) * (b.longitude - a.longitude)) /
+        l2;
+    t = t.clamp(0.0, 1.0);
+
+    return LatLng(
+      a.latitude + t * (b.latitude - a.latitude),
+      a.longitude + t * (b.longitude - a.longitude),
     );
   }
 
