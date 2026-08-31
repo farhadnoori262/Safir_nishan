@@ -34,7 +34,7 @@ class NavigationBottomPanel extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: Directionality(
-          textDirection: TextDirection.rtl,
+          textDirection: TextDirection.RTL,
           child: Card(
             margin: EdgeInsets.zero,
             color: Colors.white,
@@ -71,7 +71,7 @@ class NavigationBottomPanel extends StatelessWidget {
                           _distanceText(),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          textDirection: TextDirection.rtl,
+                          textDirection: TextDirection.RTL,
                           style: const TextStyle(
                             color: AppColors.textPrimary,
                             fontSize: 17,
@@ -85,7 +85,7 @@ class NavigationBottomPanel extends StatelessWidget {
                               : controller.navigationInstruction,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          textDirection: TextDirection.rtl,
+                          textDirection: TextDirection.RTL,
                           style: const TextStyle(
                             color: AppColors.textSecondary,
                             fontSize: 13,
