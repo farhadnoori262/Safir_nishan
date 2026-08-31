@@ -2,9 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../utils/app_colors.dart';
 import '../../models/place_search_result.dart';
 import '../../services/place_search_service.dart';
-import '../../../utils/app_colors.dart';
 
 class DestinationSearchSheet extends StatefulWidget {
   final ValueChanged<PlaceSearchResult> onPlaceSelected;
@@ -58,38 +58,52 @@ class _DestinationSearchSheetState extends State<DestinationSearchSheet> {
 
     final query = value.trim();
 
+    // به‌روزرسانی وضعیت جهت آیکون پاک کردن و لیست خالی
     if (query.length < 3) {
-      setState(() {
-        _results = [];
-        _isSearching = false;
-      });
+      if (_results.isNotEmpty || _isSearching || _searchController.text.isEmpty) {
+        setState(() {
+          _results = [];
+          _isSearching = false;
+        });
+      }
       return;
     }
 
+    // کاهش زمان دبانس به ۵۰۰ میلی‌ثانیه برای پاسخ‌گویی سریع‌تر و روان‌تر
     _searchDebounce = Timer(
-      const Duration(milliseconds: 1100),
+      const Duration(milliseconds: 500),
       () => _search(query),
     );
   }
 
   Future<void> _search(String query) async {
-    if (!mounted) return;
+    _searchDebounce?.cancel();
+    final cleanQuery = query.trim();
+    if (cleanQuery.length < 3 || !mounted) return;
 
     setState(() {
       _isSearching = true;
     });
 
-    final results = await _placeSearchService.search(
-      query,
-      languageCode: Localizations.localeOf(context).languageCode,
-    );
+    try {
+      final results = await _placeSearchService.search(
+        cleanQuery,
+        languageCode: Localizations.localeOf(context).languageCode,
+      );
 
-    if (!mounted || _searchController.text.trim() != query) return;
+      if (!mounted || _searchController.text.trim() != cleanQuery) return;
 
-    setState(() {
-      _results = results;
-      _isSearching = false;
-    });
+      setState(() {
+        _results = results;
+        _isSearching = false;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isSearching = false;
+        });
+      }
+    }
   }
 
   Future<void> _selectPlace(PlaceSearchResult place) async {
@@ -102,11 +116,16 @@ class _DestinationSearchSheetState extends State<DestinationSearchSheet> {
 
     widget.onPlaceSelected(place);
 
-    await _sheetController.animateTo(
-      0.28,
-      duration: const Duration(milliseconds: 280),
-      curve: Curves.easeOutCubic,
-    );
+    // اجرای انیمیشن شیت پس از بسته شدن کیبورد برای جلوگیری از ANR
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (_sheetController.isAttached) {
+        _sheetController.animateTo(
+          0.28,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 
   @override
@@ -178,9 +197,8 @@ class _DestinationSearchSheetState extends State<DestinationSearchSheet> {
                         ? IconButton(
                             onPressed: () {
                               _searchDebounce?.cancel();
-
+                              _searchController.clear();
                               setState(() {
-                                _searchController.clear();
                                 _results = [];
                                 _isSearching = false;
                               });
@@ -295,6 +313,7 @@ class _DestinationSearchSheetState extends State<DestinationSearchSheet> {
                   const SizedBox(height: 14),
                   SizedBox(
                     height: 54,
+                    width: double.infinity,
                     child: ElevatedButton.icon(
                       onPressed: widget.onConfirmDestination,
                       icon: const Icon(Icons.navigation_rounded),
