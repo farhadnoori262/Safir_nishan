@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter/services.dart';
 
 import '../../controllers/navigation_controller.dart';
 import '../../models/place_search_result.dart';
@@ -243,7 +244,8 @@ class _NavigationPageState extends State<NavigationPage> {
           final projection = _projectOntoRoute(rawLocation, routePoints);
           if (projection != null) {
             lockedLocation = projection.point;
-            lockedBearing = projection.bearing;
+            lockedBearing = (projection.bearing + 180.0) % 360.0;
+
           }
         }
 
@@ -623,8 +625,9 @@ class _NavigationPageState extends State<NavigationPage> {
     // بلافاصله مارکر را روی خودِ نوک ابتدای خط مسیر (که همیشه روی جادّه است)
     // قرار می‌دهیم؛ جهت اولیه هم از همان بخش اول مسیر گرفته می‌شود.
     final initialBearing = routePoints.length >= 2
-        ? _bearingBetween(routePoints[0], routePoints[1])
-        : navigationController.driverRouteBearing;
+    ? (_bearingBetween(routePoints[0], routePoints[1]) + 180.0) % 360.0;
+    : (navigationController.driverRouteBearing + 180.0) % 360.0;
+
 
     final initialLocation = routePoints.first;
 
@@ -705,27 +708,39 @@ class _NavigationPageState extends State<NavigationPage> {
   }
 
   Future<void> _moveCameraToDriver(LatLng location, {required double heading}) async {
-    if (_mapController == null) return;
-    _isProgrammaticCameraMove = true;
+  if (_mapController == null) return;
+  _isProgrammaticCameraMove = true;
 
-    try {
-      await _mapController!.animateCamera(
-        CameraUpdate.newCameraPosition(
-          CameraPosition(
-            target: location,
-            zoom: 17.6,
-            bearing: heading,
-            tilt: 58.0,
-          ),
+  try {
+    await _mapController!.animateCamera(
+      CameraUpdate.newCameraPosition(
+        CameraPosition(
+          target: location,
+          zoom: 18.0,
+          bearing: heading,
+          tilt: 60.0,
         ),
-        duration: const Duration(milliseconds: 500),
-      );
-    } finally {
-      Future.delayed(const Duration(milliseconds: 600), () {
-        if (mounted) _isProgrammaticCameraMove = false;
-      });
-    }
+      ),
+      duration: const Duration(milliseconds: 500),
+    );
+
+    await _mapController!.updateContentInsets(
+      EdgeInsets.only(
+        top: 0,
+        bottom: MediaQuery.of(context).size.height * 0.40,
+        left: 0,
+        right: 0,
+      ),
+      animated: true,
+    );
+  } catch (_) {
+  } finally {
+    Future.delayed(const Duration(milliseconds: 600), () {
+      if (mounted) _isProgrammaticCameraMove = false;
+    });
   }
+}
+
 
   Future<void> _moveCameraToLocation(
     LatLng location, {
