@@ -50,6 +50,20 @@ class StepInstruction {
   }
 }
 
+class _RouteMatch {
+  final LatLng point;
+  final double distance;
+  final int segmentIndex;
+  final double bearing;
+
+  _RouteMatch({
+    required this.point,
+    required this.distance,
+    required this.segmentIndex,
+    required this.bearing,
+  });
+}
+
 class NavigationController extends ChangeNotifier {
   static const double _snapToRouteDistanceMeters = 40.0;
   static const double _hardSnapCutoffMeters = 90.0;
@@ -105,6 +119,19 @@ class NavigationController extends ChangeNotifier {
   IconData get currentTurnIcon => _currentTurnIcon;
   List<LatLng> get currentRoutePoints => List.unmodifiable(routePoints);
   List<StepInstruction> get routeSteps => List.unmodifiable(_steps);
+
+  @override
+  void dispose() {
+    _isDisposed = true;
+    super.dispose();
+  }
+
+  void stopNavigation() {
+    isNavigating = false;
+    isRerouting = false;
+    _clearRouteState();
+    _safeNotifyListeners();
+  }
 
   void toggleVoice() {
     _isVoiceEnabled = !_isVoiceEnabled;
@@ -337,7 +364,7 @@ class NavigationController extends ChangeNotifier {
       }
     }
 
-        _steps
+    _steps
       ..clear()
       ..addAll(parsedSteps);
 
@@ -345,10 +372,158 @@ class NavigationController extends ChangeNotifier {
     _lastMatchedSegmentIndex = 0;
     _spokenSteps.clear();
 
-    // مقداردهی صحیح متغیر
     distanceFromRoute = 0.0;
 
     _safeNotifyListeners();
   }
-}
 
+  void _safeNotifyListeners() {
+    if (!_isDisposed) {
+      notifyListeners();
+    }
+  }
+
+  void _clearRouteState() {
+    routePoints.clear();
+    _steps.clear();
+    _spokenSteps.clear();
+    _currentStepIndex = 0;
+    _lastMatchedSegmentIndex = 0;
+    _currentInstruction = '';
+    currentStreet = '';
+    currentModifier = 'straight';
+    distanceFromRoute = 0.0;
+    distanceToNextStep = 0.0;
+  }
+
+  String _instructionFromModifier(String modifier) {
+    switch (modifier) {
+      case 'left':
+        return 'turn_left'.tr();
+      case 'right':
+        return 'turn_right'.tr();
+      case 'slight left':
+        return 'slight_left'.tr();
+      case 'slight right':
+        return 'slight_right'.tr();
+      case 'sharp left':
+        return 'sharp_left'.tr();
+      case 'sharp right':
+        return 'sharp_right'.tr();
+      case 'uturn':
+        return 'u_turn'.tr();
+      default:
+        return 'go_straight'.tr();
+    }
+  }
+
+  double _bearingBetween(LatLng start, LatLng end) {
+    final lat1 = start.latitude * math.pi / 180.0;
+    final lon1 = start.longitude * math.pi / 180.0;
+    final lat2 = end.latitude * math.pi / 180.0;
+    final lon2 = end.longitude * math.pi / 180.0;
+
+    final dLon = lon2 - lon1;
+    final y = math.sin(dLon) * math.cos(lat2);
+    final x = math.cos(lat1) * math.sin(lat2) -
+        math.sin(lat1) * math.cos(lat2) * math.cos(dLon);
+
+    final radians = math.atan2(y, x);
+    return (radians * 180.0 / math.pi + 360.0) % 360.0;
+  }
+
+  void _speakStartInstruction() {
+    if (_steps.isNotEmpty) {
+      speakInstruction('start_navigation'.tr());
+    }
+  }
+
+  _RouteMatch _findClosestPointOnRoute(LatLng location) {
+    if (routePoints.length < 2) {
+      return _RouteMatch(
+        point: location,
+        distance: 0.0,
+        segmentIndex: 0,
+        bearing: 0.0,
+      );
+    }
+
+    double minDistance = double.infinity;
+    LatLng closestPoint = routePoints.first;
+    int bestSegmentIndex = 0;
+    double segmentBearing = 0.0;
+
+    for (int i = 0; i < routePoints.length - 1; i++) {
+      final p1 = routePoints[i];
+      final p2 = routePoints[i + 1];
+
+      final dist = Geolocator.distanceBetween(
+        location.latitude,
+        location.longitude,
+        p1.latitude,
+        p1.longitude,
+      );
+
+      if (dist < minDistance) {
+        minDistance = dist;
+        closestPoint = p1;
+        bestSegmentIndex = i;
+        segmentBearing = _bearingBetween(p1, p2);
+      }
+    }
+
+    return _RouteMatch(
+      point: closestPoint,
+      distance: minDistance,
+      segmentIndex: bestSegmentIndex,
+      bearing: segmentBearing,
+    );
+  }
+
+  void _updateStepProgress() {
+    if (_steps.isEmpty || _currentStepIndex >= _steps.length) return;
+
+    final currentStep = _steps[_currentStepIndex];
+    if (snappedDriverLocation != null) {
+      final distance = Geolocator.distanceBetween(
+        snappedDriverLocation!.latitude,
+        snappedDriverLocation!.longitude,
+        currentStep.location.latitude,
+        currentStep.location.longitude,
+      );
+
+      distanceToNextStep = distance;
+
+      if (distance <= _announceDistanceMeters && !_spokenSteps.contains(_currentStepIndex)) {
+        _spokenSteps.add(_currentStepIndex);
+        speakInstruction(currentStep.instruction);
+      }
+
+      if (distance <= _stepReachedDistanceMeters) {
+        if (_currentStepIndex < _steps.length - 1) {
+          _currentStepIndex++;
+        }
+      }
+    }
+  }
+
+  Future<void> _rerouteFromCurrentLocation(LatLng currentLocation) async {
+    if (isRerouting || activeDestination == null) return;
+
+    isRerouting = true;
+    _safeNotifyListeners();
+
+    final newRoute = await _fetchRoute(
+      start: currentLocation,
+      destination: activeDestination!,
+    );
+
+    if (newRoute != null) {
+      routeVersion++;
+      _applyRoute(newRoute);
+    }
+
+    isRerouting = false;
+    _safeNotifyListeners();
+  }
+}
