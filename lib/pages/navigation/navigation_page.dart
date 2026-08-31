@@ -727,14 +727,14 @@ await _mapController!.addImage(_driverArrowIconName, arrowBytes);
     );
 
     await _mapController!.updateContentInsets(
-      EdgeInsets.only(
-        top: 0,
-        bottom: MediaQuery.of(context).size.height * 0.40,
-        left: 0,
-        right: 0,
-      ),
-      animated: true,
-    );
+  EdgeInsets.only(
+    top: 0,
+    bottom: MediaQuery.of(context).size.height * 0.35,
+    left: 0,
+    right: 0,
+  ),
+);
+
   } catch (_) {
   } finally {
     Future.delayed(const Duration(milliseconds: 600), () {
