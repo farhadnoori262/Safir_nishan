@@ -90,17 +90,9 @@ class _NavigationPageState extends State<NavigationPage> {
   void _onMapCreated(MapLibreMapController controller) async {
     _mapController = controller;
 
-    // فعال‌سازی تعقیب اولیه دوربین
+    // ۱. قبل از انتخاب مقصد: فعال‌سازی حالت قطب‌نما روی پین نیتیو استاندارد
     await controller.updateMyLocationTrackingMode(
-      MyLocationTrackingMode.tracking,
-    );
-
-    // ۱. قبل از انتخاب مقصد: دایره استاندارد نیتیو با شعاع قطب‌نما
-    await controller.showMyLocationWithConfig(
-      const MyLocationComponentConfig(
-        myLocationEnabled: true,
-        myLocationRenderMode: MyLocationRenderMode.compass, // دایره چرخنده با قطب‌نما
-      ),
+      MyLocationTrackingMode.trackingCompass,
     );
   }
 
@@ -410,16 +402,9 @@ class _NavigationPageState extends State<NavigationPage> {
 
     _lastRouteVersion = navigationController.routeVersion;
 
-    // ۲. بعد از انتخاب مقصد: تبدیل پین به حالت GPS (جهت‌دار نیتیو)
-    await _mapController!.showMyLocationWithConfig(
-      const MyLocationComponentConfig(
-        myLocationEnabled: true,
-        myLocationRenderMode: MyLocationRenderMode.GPS, // حالت قفل روی جهت خیابان
-      ),
-    );
-
+    // ۲. بعد از انتخاب مقصد: حالت تعقیب موقعیت مکانی
     await _mapController!.updateMyLocationTrackingMode(
-      MyLocationTrackingMode.trackingGPS,
+      MyLocationTrackingMode.tracking,
     );
 
     await NavigationRouteStyle.drawRoute(_mapController!, routePoints);
@@ -614,15 +599,9 @@ class _NavigationPageState extends State<NavigationPage> {
       await _mapController!.clearLines();
       await _clearRouteDecorations();
 
-      // بازگشت به حالت دایره قطب‌نما هنگام خروج از مسیریابی
-      await _mapController!.showMyLocationWithConfig(
-        const MyLocationComponentConfig(
-          myLocationEnabled: true,
-          myLocationRenderMode: MyLocationRenderMode.compass,
-        ),
-      );
+      // بازگشت به حالت قطب‌نما هنگام خروج از مسیریابی
       await _mapController!.updateMyLocationTrackingMode(
-        MyLocationTrackingMode.tracking,
+        MyLocationTrackingMode.trackingCompass,
       );
     }
 
@@ -661,6 +640,8 @@ class _NavigationPageState extends State<NavigationPage> {
           MapLibreMap(
             onMapCreated: _onMapCreated,
             onStyleLoadedCallback: _onStyleLoaded,
+            myLocationEnabled: true, // فعال کردن پین موقعیت مکانی نیتیو
+            myLocationRenderMode: MyLocationRenderMode.compass, // شعاع و دایره قطب‌نما
             onMapLongClick: (point, coordinates) {
               if (!_navigationStarted) {
                 _selectDestinationFromMap(coordinates);
