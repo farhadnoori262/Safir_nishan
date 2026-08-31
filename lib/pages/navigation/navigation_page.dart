@@ -49,6 +49,7 @@ class _NavigationPageState extends State<NavigationPage>
   MapLibreMapController? _mapController;
   StreamSubscription<Position>? _positionStream;
 
+  Symbol? _driverSymbol;
   Symbol? _currentLocationSymbol;
   Symbol? _destinationSymbol;
 
@@ -58,13 +59,7 @@ class _NavigationPageState extends State<NavigationPage>
   PlaceSearchResult? _selectedPlace;
   LatLng? _selectedDestination;
   LatLng? _currentLocation;
-  double _currentAccuracy = 5.0;
-
-  double _driverHeading = 0.0;
-  double _currentMapBearing = 0.0;
-
-  double _smoothedHeading = 0.0;
-  bool _headingInitialized = false;
+  double _currentAccuracy = 20.0;
 
   late final AnimationController _pulseController;
 
@@ -76,7 +71,6 @@ class _NavigationPageState extends State<NavigationPage>
   bool _isUpdatingMap = false;
   bool _isProgrammaticCameraMove = false;
   bool _isLoadingLocation = true;
-  bool _isMapDragging = false; // جهت کنترل انیمیشن پرش پین وسط نقشه
 
   int _lastRouteVersion = 0;
 
@@ -108,9 +102,11 @@ class _NavigationPageState extends State<NavigationPage>
     _startLocationTracking();
   }
 
-  void _onMapCreated(MapLibreMapController controller) {
+  void _onMapCreated(MapLibreMapController controller) async {
     _mapController = controller;
-    controller.updateMyLocationTrackingMode(MyLocationTrackingMode.none);
+    await controller.updateMyLocationTrackingMode(
+      MyLocationTrackingMode.tracking,
+    );
   }
 
   Future<void> _onStyleLoaded() async {
@@ -220,7 +216,7 @@ class _NavigationPageState extends State<NavigationPage>
       if (mounted) {
         setState(() {
           _currentLocation = rawLocation;
-          _currentAccuracy = position.accuracy.clamp(2.0, 10.0);
+          _currentAccuracy = position.accuracy;
         });
       }
 
@@ -256,6 +252,8 @@ class _NavigationPageState extends State<NavigationPage>
   Future<void> _addMapImages() async {
     if (_mapController == null || _iconsAdded) return;
 
+    await NavigationDriverMarker.addDriverArrowImage(_mapController!);
+
     await NavigationMapPainters.addCanvasImage(
       _mapController!,
       _currentLocationIconName,
@@ -265,16 +263,16 @@ class _NavigationPageState extends State<NavigationPage>
         _pulseController.value,
         _currentAccuracy,
       ),
-      width: 120,
-      height: 120,
+      width: 180,
+      height: 180,
     );
 
     await NavigationMapPainters.addCanvasImage(
       _mapController!,
       _destinationIconName,
       NavigationMapPainters.drawDestinationPin,
-      width: 120,
-      height: 140, // بزرگ‌تر کردن کانواس پین مقصد
+      width: 100,
+      height: 124,
     );
 
     await NavigationMapPainters.addCanvasImage(
@@ -372,7 +370,7 @@ class _NavigationPageState extends State<NavigationPage>
     final options = SymbolOptions(
       geometry: _selectedDestination!,
       iconImage: _destinationIconName,
-      iconSize: 1.10, // بزرگ‌سازی مقیاس آیکون پین
+      iconSize: 0.70,
     );
 
     if (_destinationSymbol == null) {
@@ -409,7 +407,7 @@ class _NavigationPageState extends State<NavigationPage>
     final options = SymbolOptions(
       geometry: _currentLocation!,
       iconImage: _currentLocationIconName,
-      iconSize: 0.75,
+      iconSize: 0.72,
     );
 
     if (_currentLocationSymbol == null) {
@@ -439,8 +437,6 @@ class _NavigationPageState extends State<NavigationPage>
     if (!_mapStyleReady || _mapController == null || _selectedDestination == null || _navigationStarted) {
       return;
     }
-
-    _headingInitialized = false;
 
     setState(() {
       _navigationStarted = true;
@@ -493,7 +489,7 @@ class _NavigationPageState extends State<NavigationPage>
         SymbolOptions(
           geometry: _selectedDestination!,
           iconImage: _destinationIconName,
-          iconSize: 1.10,
+          iconSize: 0.70,
         ),
       );
     }
@@ -547,42 +543,22 @@ class _NavigationPageState extends State<NavigationPage>
     });
   }
 
-  double _shortestAngleDiff(double from, double to) {
-    double diff = (to - from) % 360.0;
-    if (diff > 180.0) diff -= 360.0;
-    if (diff < -180.0) diff += 360.0;
-    return diff;
-  }
-
-  double _smoothHeadingUpdate(double targetHeading) {
-    if (!_headingInitialized) {
-      _headingInitialized = true;
-      _smoothedHeading = targetHeading;
-      return _smoothedHeading;
-    }
-
-    const double smoothingFactor = 0.35;
-    final diff = _shortestAngleDiff(_smoothedHeading, targetHeading);
-    _smoothedHeading = (_smoothedHeading + (diff * smoothingFactor) + 360.0) % 360.0;
-
-    return _smoothedHeading;
-  }
-
   Future<void> _updateDriverMarker(
     LatLng location, {
     required double heading,
     required bool moveCamera,
   }) async {
-    if (!mounted) return;
+    if (!_mapStyleReady || !_iconsAdded || _mapController == null) return;
 
-    final smoothed = _smoothHeadingUpdate(heading);
-
-    setState(() {
-      _driverHeading = smoothed;
-    });
+    _driverSymbol = await NavigationDriverMarker.updateMarker(
+      controller: _mapController!,
+      currentSymbol: _driverSymbol,
+      location: location,
+      heading: heading,
+    );
 
     if (!moveCamera) return;
-    await _moveCameraToDriver(location, heading: smoothed);
+    await _moveCameraToDriver(location, heading: heading);
   }
 
   Future<void> _moveCameraToDriver(LatLng location, {required double heading}) async {
@@ -601,19 +577,13 @@ class _NavigationPageState extends State<NavigationPage>
             tilt: 58.0,
           ),
         ),
-        duration: const Duration(milliseconds: 450),
+        duration: const Duration(milliseconds: 500),
       );
-
-      if (mounted) {
-        setState(() {
-          _currentMapBearing = heading;
-        });
-      }
 
       await _mapController!.setSymbolIconAllowOverlap(true);
       await _mapController!.setSymbolIconIgnorePlacement(true);
     } finally {
-      Future.delayed(const Duration(milliseconds: 500), () {
+      Future.delayed(const Duration(milliseconds: 600), () {
         if (mounted) _isProgrammaticCameraMove = false;
       });
     }
@@ -671,16 +641,11 @@ class _NavigationPageState extends State<NavigationPage>
     final navigationController = Provider.of<NavigationController>(context, listen: false);
     final location = navigationController.snappedDriverLocation ?? _startLocation;
 
-    final smoothed = _smoothHeadingUpdate(navigationController.driverRouteBearing);
-
-    setState(() {
-      _cameraFollowing = true;
-      _driverHeading = smoothed;
-    });
+    setState(() => _cameraFollowing = true);
 
     await _moveCameraToDriver(
       location,
-      heading: smoothed,
+      heading: navigationController.driverRouteBearing,
     );
   }
 
@@ -690,12 +655,6 @@ class _NavigationPageState extends State<NavigationPage>
       CameraUpdate.bearingTo(0.0),
       duration: const Duration(milliseconds: 500),
     );
-
-    if (mounted) {
-      setState(() {
-        _currentMapBearing = 0.0;
-      });
-    }
   }
 
   LatLngBounds _boundsFromPoints(List<LatLng> points) {
@@ -724,11 +683,14 @@ class _NavigationPageState extends State<NavigationPage>
     if (_mapController != null) {
       await _mapController!.clearLines();
       await _clearRouteDecorations();
+
+      if (_driverSymbol != null) {
+        await _mapController!.removeSymbol(_driverSymbol!);
+        _driverSymbol = null;
+      }
     }
 
     if (!mounted) return;
-
-    _headingInitialized = false;
 
     setState(() {
       _navigationStarted = false;
@@ -762,8 +724,6 @@ class _NavigationPageState extends State<NavigationPage>
 
   @override
   Widget build(BuildContext context) {
-    final screenHeight = MediaQuery.of(context).size.height;
-
     return Scaffold(
       body: Stack(
         children: [
@@ -775,25 +735,11 @@ class _NavigationPageState extends State<NavigationPage>
                 _selectDestinationFromMap(coordinates);
               }
             },
-            onCameraMove: (position) {
-              if (!_isProgrammaticCameraMove && !_navigationStarted) {
-                setState(() => _isMapDragging = true);
-              }
-            },
             onCameraIdle: () {
               if (!_isProgrammaticCameraMove && mounted) {
                 setState(() {
                   _cameraFollowing = false;
-                  _isMapDragging = false;
                 });
-                
-                // به‌روزرسانی اتوماتیک موقعیت مرکز نقشه در صورت نبود مقصد انتخاب شده
-                if (!_navigationStarted && _selectedDestination == null && _mapController != null) {
-                  final target = _mapController!.cameraPosition?.target;
-                  if (target != null) {
-                    _selectDestinationFromMap(target);
-                  }
-                }
               }
             },
             styleString: NavigationRouteStyle.currentMapStyle,
@@ -801,100 +747,8 @@ class _NavigationPageState extends State<NavigationPage>
               target: _startLocation,
               zoom: 16.0,
             ),
-            myLocationEnabled: false,
             trackCameraPosition: true,
           ),
-
-          // ویجت پین مرکز نقشه (اصلی و انیمیشن‌دار)
-          if (!_navigationStarted && _selectedDestination == null)
-            IgnorePointer(
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 35),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 150),
-                    transform: Matrix4.translationValues(
-                        0, _isMapDragging ? -12 : 0, 0),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: SafirColors.primaryBrand,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(
-                                    _isMapDragging ? 0.35 : 0.18),
-                                blurRadius: _isMapDragging ? 12 : 6,
-                                offset: Offset(0, _isMapDragging ? 8 : 3),
-                              ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.location_on_rounded,
-                            color: Colors.white,
-                            size: 32,
-                          ),
-                        ),
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 150),
-                          width: _isMapDragging ? 12 : 6,
-                          height: _isMapDragging ? 4 : 3,
-                          decoration: BoxDecoration(
-                            color: Colors.black26,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-          if (_navigationStarted)
-            IgnorePointer(
-              child: Positioned(
-                left: 0,
-                right: 0,
-                top: screenHeight * 0.62,
-                child: Center(
-                  child: TweenAnimationBuilder<double>(
-                    tween: Tween<double>(
-                      begin: (_driverHeading - _currentMapBearing) * math.pi / 180.0,
-                      end: (_driverHeading - _currentMapBearing) * math.pi / 180.0,
-                    ),
-                    duration: const Duration(milliseconds: 300),
-                    builder: (context, angle, child) {
-                      return Transform.rotate(
-                        angle: angle,
-                        child: child,
-                      );
-                    },
-                    child: Container(
-                      width: 54,
-                      height: 54,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.28),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Image.asset(
-                        'assets/images/navigation_arrow.png',
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
 
           if (_isLoadingLocation)
             Positioned(
@@ -967,6 +821,11 @@ class _NavigationPageState extends State<NavigationPage>
               if (_navigationStarted) {
                 _followDriver();
               } else {
+                if (_mapController != null) {
+                  await _mapController!.updateMyLocationTrackingMode(
+                    MyLocationTrackingMode.tracking,
+                  );
+                }
                 if (_currentLocation != null) {
                   _moveCameraToLocation(
                     _currentLocation!,
