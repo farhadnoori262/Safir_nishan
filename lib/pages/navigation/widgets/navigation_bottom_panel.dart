@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
@@ -35,7 +34,7 @@ class NavigationBottomPanel extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: Directionality(
-          textDirection: ui.TextDirection.rtl,
+          textDirection: TextDirection.rtl,
           child: Card(
             margin: EdgeInsets.zero,
             color: Colors.white,
@@ -72,7 +71,7 @@ class NavigationBottomPanel extends StatelessWidget {
                           _distanceText(),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          textDirection: ui.TextDirection.rtl,
+                          textDirection: TextDirection.rtl,
                           style: const TextStyle(
                             color: AppColors.textPrimary,
                             fontSize: 17,
@@ -86,7 +85,7 @@ class NavigationBottomPanel extends StatelessWidget {
                               : controller.navigationInstruction,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          textDirection: ui.TextDirection.rtl,
+                          textDirection: TextDirection.rtl,
                           style: const TextStyle(
                             color: AppColors.textSecondary,
                             fontSize: 13,
