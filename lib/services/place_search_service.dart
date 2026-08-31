@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -15,6 +16,8 @@ class PlaceSearchService {
     'User-Agent': 'SafirDrivers/1.0 (destination-search)',
     'Accept': 'application/json',
   };
+
+  static const Duration _requestTimeout = Duration(seconds: 8);
 
   Future<List<PlaceSearchResult>> search(
     String query, {
@@ -37,7 +40,9 @@ class PlaceSearchService {
     );
 
     try {
-      final response = await http.get(uri, headers: _headers);
+      final response = await http
+          .get(uri, headers: _headers)
+          .timeout(_requestTimeout);
 
       if (response.statusCode != 200) {
         return [];
@@ -56,6 +61,8 @@ class PlaceSearchService {
             (place) => place.latitude != 0.0 && place.longitude != 0.0,
           )
           .toList();
+    } on TimeoutException {
+      return [];
     } catch (_) {
       return [];
     }
@@ -78,7 +85,9 @@ class PlaceSearchService {
     );
 
     try {
-      final response = await http.get(uri, headers: _headers);
+      final response = await http
+          .get(uri, headers: _headers)
+          .timeout(_requestTimeout);
 
       if (response.statusCode != 200) {
         return null;
@@ -143,6 +152,8 @@ class PlaceSearchService {
         latitude: latitude,
         longitude: longitude,
       );
+    } on TimeoutException {
+      return null;
     } catch (_) {
       return null;
     }
