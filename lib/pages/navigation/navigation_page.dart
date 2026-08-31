@@ -61,9 +61,12 @@ class _NavigationPageState extends State<NavigationPage>
   double _currentAccuracy = 20.0;
 
   // زاویه واقعی حرکت راننده (heading) و زاویه فعلی چرخش خود نقشه
-  // این دو با هم فلش ثابت روی صفحه را می‌چرخانند (heading-up navigation)
   double _driverHeading = 0.0;
   double _currentMapBearing = 0.0;
+
+  // زاویه‌ی نرم‌شده برای جلوگیری از پرش ناگهانی هنگام چرخش نقشه/فلش
+  double _smoothedHeading = 0.0;
+  bool _headingInitialized = false;
 
   late final AnimationController _pulseController;
 
@@ -265,8 +268,8 @@ class _NavigationPageState extends State<NavigationPage>
         _pulseController.value,
         _currentAccuracy,
       ),
-      width: 180,
-      height: 180,
+      width: 220,
+      height: 220,
     );
 
     await NavigationMapPainters.addCanvasImage(
@@ -409,7 +412,7 @@ class _NavigationPageState extends State<NavigationPage>
     final options = SymbolOptions(
       geometry: _currentLocation!,
       iconImage: _currentLocationIconName,
-      iconSize: 0.72,
+      iconSize: 0.85,
     );
 
     if (_currentLocationSymbol == null) {
@@ -439,6 +442,10 @@ class _NavigationPageState extends State<NavigationPage>
     if (!_mapStyleReady || _mapController == null || _selectedDestination == null || _navigationStarted) {
       return;
     }
+
+    // شروع مسیریابی جدید: زاویه‌ی نرم‌شده باید از نو تنظیم شود، نه
+    // ادامه‌ی زاویه‌ی سفر قبلی
+    _headingInitialized = false;
 
     setState(() {
       _navigationStarted = true;
@@ -545,8 +552,35 @@ class _NavigationPageState extends State<NavigationPage>
     });
   }
 
+  /// کوتاه‌ترین اختلاف زاویه‌ای بین دو جهت (برای جلوگیری از چرخش
+  /// اضافی، مثلاً چرخیدن ۳۵۰ درجه به‌جای ۱۰-).
+  double _shortestAngleDiff(double from, double to) {
+    double diff = (to - from) % 360.0;
+    if (diff > 180.0) diff -= 360.0;
+    if (diff < -180.0) diff += 360.0;
+    return diff;
+  }
+
+  /// نرم‌کردن زاویه‌ی چرخش (heading smoothing) — به‌جای پرش ناگهانی
+  /// به زاویه‌ی جدید، هر بار فقط بخشی از فاصله را طی می‌کند تا چرخش
+  /// نقشه و فلش کاملاً روان و بدون تکان دیده شود.
+  double _smoothHeadingUpdate(double targetHeading) {
+    if (!_headingInitialized) {
+      _headingInitialized = true;
+      _smoothedHeading = targetHeading;
+      return _smoothedHeading;
+    }
+
+    const double smoothingFactor = 0.35;
+    final diff = _shortestAngleDiff(_smoothedHeading, targetHeading);
+    _smoothedHeading = (_smoothedHeading + (diff * smoothingFactor) + 360.0) % 360.0;
+
+    return _smoothedHeading;
+  }
+
   /// به‌جای گذاشتن Symbol روی نقشه، فقط زاویه‌ی حرکت (heading) راننده را
-  /// ذخیره می‌کند تا ویجت فلش ثابت روی صفحه (نه روی نقشه) بچرخد.
+  /// به‌صورت نرم‌شده ذخیره می‌کند تا ویجت فلش ثابت روی صفحه (نه روی
+  /// نقشه) و همچنین دوربین، بدون پرش و روان بچرخند.
   Future<void> _updateDriverMarker(
     LatLng location, {
     required double heading,
@@ -554,12 +588,14 @@ class _NavigationPageState extends State<NavigationPage>
   }) async {
     if (!mounted) return;
 
+    final smoothed = _smoothHeadingUpdate(heading);
+
     setState(() {
-      _driverHeading = heading;
+      _driverHeading = smoothed;
     });
 
     if (!moveCamera) return;
-    await _moveCameraToDriver(location, heading: heading);
+    await _moveCameraToDriver(location, heading: smoothed);
   }
 
   Future<void> _moveCameraToDriver(LatLng location, {required double heading}) async {
@@ -578,7 +614,7 @@ class _NavigationPageState extends State<NavigationPage>
             tilt: 58.0,
           ),
         ),
-        duration: const Duration(milliseconds: 500),
+        duration: const Duration(milliseconds: 450),
       );
 
       // نقشه اکنون با همین زاویه چرخیده؛ این مقدار را برای محاسبه‌ی
@@ -592,7 +628,7 @@ class _NavigationPageState extends State<NavigationPage>
       await _mapController!.setSymbolIconAllowOverlap(true);
       await _mapController!.setSymbolIconIgnorePlacement(true);
     } finally {
-      Future.delayed(const Duration(milliseconds: 600), () {
+      Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted) _isProgrammaticCameraMove = false;
       });
     }
@@ -650,11 +686,16 @@ class _NavigationPageState extends State<NavigationPage>
     final navigationController = Provider.of<NavigationController>(context, listen: false);
     final location = navigationController.snappedDriverLocation ?? _startLocation;
 
-    setState(() => _cameraFollowing = true);
+    final smoothed = _smoothHeadingUpdate(navigationController.driverRouteBearing);
+
+    setState(() {
+      _cameraFollowing = true;
+      _driverHeading = smoothed;
+    });
 
     await _moveCameraToDriver(
       location,
-      heading: navigationController.driverRouteBearing,
+      heading: smoothed,
     );
   }
 
@@ -701,6 +742,8 @@ class _NavigationPageState extends State<NavigationPage>
     }
 
     if (!mounted) return;
+
+    _headingInitialized = false;
 
     setState(() {
       _navigationStarted = false;
@@ -763,9 +806,7 @@ class _NavigationPageState extends State<NavigationPage>
           ),
 
           // فلش ثابت راننده — روی خود صفحه (نه روی نقشه)، دقیقاً مثل نشان.
-          // فقط نقشه زیرش می‌چرخد؛ خودِ فلش با زاویه‌ی نسبی
-          // (heading واقعی منهای چرخش فعلی نقشه) می‌چرخد تا در حالت
-          // دنبال‌کردن همیشه رو به بالا بماند.
+          // با زاویه‌ی نرم‌شده (smoothed) می‌چرخد تا چرخش کاملاً روان باشد.
           if (_navigationStarted)
             IgnorePointer(
               child: Positioned(
@@ -773,8 +814,18 @@ class _NavigationPageState extends State<NavigationPage>
                 right: 0,
                 top: screenHeight * 0.62,
                 child: Center(
-                  child: Transform.rotate(
-                    angle: (_driverHeading - _currentMapBearing) * math.pi / 180.0,
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween<double>(
+                      begin: (_driverHeading - _currentMapBearing) * math.pi / 180.0,
+                      end: (_driverHeading - _currentMapBearing) * math.pi / 180.0,
+                    ),
+                    duration: const Duration(milliseconds: 300),
+                    builder: (context, angle, child) {
+                      return Transform.rotate(
+                        angle: angle,
+                        child: child,
+                      );
+                    },
                     child: Container(
                       width: 54,
                       height: 54,
