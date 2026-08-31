@@ -627,8 +627,9 @@ await _mapController!.addImage(_driverArrowIconName, arrowBytes);
     // بلافاصله مارکر را روی خودِ نوک ابتدای خط مسیر (که همیشه روی جادّه است)
     // قرار می‌دهیم؛ جهت اولیه هم از همان بخش اول مسیر گرفته می‌شود.
     final initialBearing = routePoints.length >= 2
-    ? (_bearingBetween(routePoints[0], routePoints[1]) + 180.0) % 360.0;
-    : (navigationController.driverRouteBearing + 180.0) % 360.0;
+    ? (_bearingBetween(routePoints[0], routePoints[1]) + 180.0) % 360.0
+: (navigationController.driverRouteBearing + 180.0) % 360.0;
+
 
 
     final initialLocation = routePoints.first;
