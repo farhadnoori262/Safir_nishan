@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/place_search_result.dart';
@@ -17,7 +18,8 @@ class PlaceSearchService {
     'Accept': 'application/json',
   };
 
-  static const Duration _requestTimeout = Duration(seconds: 8);
+  // کاهش زمان Timeout برای جلوگیری از معلق ماندن درخواست شبکه
+  static const Duration _requestTimeout = Duration(seconds: 4);
 
   Future<List<PlaceSearchResult>> search(
     String query, {
@@ -48,7 +50,19 @@ class PlaceSearchService {
         return [];
       }
 
-      final decoded = jsonDecode(response.body);
+      // انتقال پردازش سنگین Parsing به Isolate (جدا از UI Thread) برای جلوگیری از ANR
+      return await compute(_parseSearchResults, response.body);
+    } on TimeoutException {
+      return [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  // متد استاتیک خارج از ترد اصلی جهت پردازش JSON
+  static List<PlaceSearchResult> _parseSearchResults(String responseBody) {
+    try {
+      final decoded = jsonDecode(responseBody);
 
       if (decoded is! List) {
         return [];
@@ -61,8 +75,6 @@ class PlaceSearchService {
             (place) => place.latitude != 0.0 && place.longitude != 0.0,
           )
           .toList();
-    } on TimeoutException {
-      return [];
     } catch (_) {
       return [];
     }
@@ -159,7 +171,7 @@ class PlaceSearchService {
     }
   }
 
-  String _firstNonEmpty(List<dynamic> values) {
+  static String _firstNonEmpty(List<dynamic> values) {
     for (final value in values) {
       final text = value?.toString().trim() ?? '';
 
@@ -171,7 +183,7 @@ class PlaceSearchService {
     return '';
   }
 
-  String _joinNonEmpty(List<dynamic> values) {
+  static String _joinNonEmpty(List<dynamic> values) {
     final parts = values
         .map((value) => value?.toString().trim() ?? '')
         .where((value) => value.isNotEmpty)
