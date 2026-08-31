@@ -775,7 +775,7 @@ class _NavigationPageState extends State<NavigationPage>
                 _selectDestinationFromMap(coordinates);
               }
             },
-            onCameraMove: () {
+            onCameraMove: (position) {
               if (!_isProgrammaticCameraMove && !_navigationStarted) {
                 setState(() => _isMapDragging = true);
               }
