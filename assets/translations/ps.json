@@ -176,7 +176,7 @@
   "chat_type_hint": "خپل پیغام ولیکئ...",
   "network_error_msg": "له سرور سره اړیکه ټینګه نشوه. مهرباني وکړئ خپل انټرنیټ وګورئ.",
   "retry": "بیا هڅه کول",
-  "nav_home": "کور",
+  "nav_home": "اصلي صفحه",
   "nav_earnings": "عایدات",
   "nav_trips": "سفرونه",
   "nav_profile": "پروفایل",
@@ -264,32 +264,21 @@
   "no_bid_offer": "بې له وړاندیزه",
   "btn_accept_trip": "سفر منل",
   "btn_decline_trip": "سفر رد کول",
-  {
   "settings_title": "سټینګز",
   "settings_language": "د اپلیکیشن ژبه",
   "select_language_title": "ژبه وټاکئ",
   "btn_confirm": "تایید",
   "lang_change_success": "ژبه په بریالیتوب سره بدله شوه",
-  {
   "offline_title": "تاسو آفلاین یاست",
   "offline_subtitle": "د نویو سفرونو ترلاسه کولو پیل لپاره، لاندې تڼۍ کښېکاږئ.",
   "online_title": "تاسو آنلاین یاست او د سفر ترلاسه کولو ته چمتو یاست",
   "online_subtitle": "ستاسو په ساحه کې د غوښتنې ثبتېدو سمدستي، خبرتیا لیږل کیږي.",
   "change_to_online_title": "آنلاین حالت ته تغییر",
   "change_to_online_desc": "په آنلاین کېدو سره، تاسو به د نویو سفرونو غوښتنې ترلاسه کړئ.",
-  "btn_confirm": "تایید",
   "btn_cancel": "لغوه کول",
   "passenger": "سپرلی",
   "active_trip": "جاري فعال سفر",
   "chat_with_passenger": "له سپرلي سره چټ",
   "go_offline": "آفلاین کېدل",
-  "go_online": "آنلاین کېدل",
-  "nav_home": "اصلي صفحه",
-  "nav_earnings": "عایدات",
-  "nav_trips": "سفرونه",
-  "nav_profile": "پروفایل"
-}
-
-}
-
+  "go_online": "آنلاین کېدل"
 }
