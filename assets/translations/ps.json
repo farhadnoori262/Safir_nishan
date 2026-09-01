@@ -252,5 +252,16 @@
   "plate_province": "د پلیټ ولایت",
   "plate_category": "د پلیټ توری",
   "required_field": "دا خانې ډکول اړین دي",
-  "save_and_continue": "خوندي کول او دوام"
+  "save_and_continue": "خوندي کول او دوام",
+  "vehicle_image_hint": "مهرباني وکړئ د خپل موټر انځور په روښانه ډول داخل کړئ",
+  "take_photo_camera": "په کامرې عکس اخیستل",
+  "confirm_and_save": "تایید او خوندي کول",
+  "title_new_trip_request": "د نوي سفر غوښتنه",
+  "label_pickup_location": "مبدأ",
+  "label_dropoff_location": "منزل",
+  "label_standard_fare": "معیاري کرایه",
+  "label_passenger_bid": "د مسافر وړاندیز",
+  "no_bid_offer": "بې له وړاندیزه",
+  "btn_accept_trip": "سفر منل",
+  "btn_decline_trip": "سفر رد کول"
 }
