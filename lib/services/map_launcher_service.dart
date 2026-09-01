@@ -1,24 +1,31 @@
 import 'package:url_launcher/url_launcher.dart';
 
 class MapLauncherService {
-  /// باز کردن گوگل مپس یا مسیریاب‌های دیگر بر اساس مختصات مبدأ و مقصد
+  /// باز کردن مستقیم مسیریاب گوگل مپس به سمت مقصد
   static Future<void> openExternalMap({
     required double destLat,
     required double destLng,
-    double? originLat,
-    double? originLng,
   }) async {
-    // لینک استاندارد Google Maps Navigation
-    final String googleMapsUrl = originLat != null && originLng != null
-        ? 'https://www.google.com/maps/dir/?api=1&origin=$originLat,$originLng&destination=$destLat,$destLng&travelmode=driving'
-        : 'https://www.google.com/maps/search/?api=1&query=$destLat,$destLng';
+    // ۱. لینک استاندارد مسیریابی مستقیم (Google Navigation Intent)
+    final Uri googleMapsAppUrl = Uri.parse('google.navigation:q=$destLat,$destLng&mode=d');
+    
+    // ۲. لینک پشتیبان وب در صورتی که اپلیکیشن گوگل مپ نصب نباشد
+    final Uri googleMapsWebUrl = Uri.parse(
+      'https://www.google.com/maps/dir/?api=1&destination=$destLat,$destLng&travelmode=driving',
+    );
 
-    final Uri url = Uri.parse(googleMapsUrl);
-
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url, mode: LaunchMode.externalApplication);
-    } else {
-      throw 'Could not launch $googleMapsUrl';
+    try {
+      // ابتدا سعی می‌کند مستقیم اپلیکیشن Google Maps را در حالت مسیریابی باز کند
+      if (await canLaunchUrl(googleMapsAppUrl)) {
+        await launchUrl(googleMapsAppUrl, mode: LaunchMode.externalApplication);
+      } else if (await canLaunchUrl(googleMapsWebUrl)) {
+        await launchUrl(googleMapsWebUrl, mode: LaunchMode.externalApplication);
+      } else {
+        throw 'Could not launch Google Maps';
+      }
+    } catch (e) {
+      // در صورت بروز خطا، باز کردن لینک وب اجباری
+      await launchUrl(googleMapsWebUrl, mode: LaunchMode.externalApplication);
     }
   }
 }
