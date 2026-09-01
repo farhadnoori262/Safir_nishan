@@ -51,23 +51,26 @@ class RegistrationProvider extends ChangeNotifier {
   String _plateCategory = 'ش';
   String _plateType = 'شخصی';
 
-  // گترها و سترهای پلاک
+  // گترها و سترهای پلاک (با به روزرسانی فرم)
   String get plateProvince => _plateProvince;
   String get plateCategory => _plateCategory;
   String get plateType => _plateType;
 
   void setPlateProvince(String val) {
     _plateProvince = val;
+    checkVehicleBasicFormValidity();
     notifyListeners();
   }
 
   void setPlateCategory(String val) {
     _plateCategory = val;
+    checkVehicleBasicFormValidity();
     notifyListeners();
   }
 
   void setPlateType(String val) {
     _plateType = val;
+    checkVehicleBasicFormValidity();
     notifyListeners();
   }
 
@@ -226,7 +229,10 @@ class RegistrationProvider extends ChangeNotifier {
           brandController.text.isNotEmpty &&
           colorController.text.isNotEmpty &&
           numberPlateController.text.isNotEmpty &&
-          productionYearController.text.isNotEmpty;
+          productionYearController.text.isNotEmpty &&
+          _plateProvince.isNotEmpty &&
+          _plateCategory.isNotEmpty &&
+          _plateType.isNotEmpty;
       notifyListeners();
     });
   }
@@ -344,7 +350,6 @@ class RegistrationProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // آپلود عکس به Firebase Storage
   Future<String> uploadImageToFirebaseStorage(XFile? photo, String path, BuildContext context) async {
     if (photo == null) {
       throw Exception(tr(context, 'err_no_image_selected'));
@@ -363,7 +368,6 @@ class RegistrationProvider extends ChangeNotifier {
     return downloadUrl;
   }
 
-  // ذخیره کل اطلاعات راننده در فایربیس
   Future<void> saveUserData(BuildContext context) async {
     if (!isFormValidBasic ||
         !isFormValidCninc ||
@@ -434,6 +438,9 @@ class RegistrationProvider extends ChangeNotifier {
       final userRef =
           _database.ref().child("drivers").child(_auth.currentUser!.uid);
       await userRef.set(driver.toMap());
+      
+      // ذخیره همزمان در متغیرهای سیستم
+      await retrieveCurrentDriverInfo();
       stopLoading();
     } catch (e) {
       stopLoading();
@@ -545,6 +552,7 @@ class RegistrationProvider extends ChangeNotifier {
     }
   }
 
+  // 🛠️ اصلاح شده: ساخت پلاک کامل افغانستان در متغیر کاربری
   Future<void> retrieveCurrentDriverInfo() async {
     try {
       if (_auth.currentUser == null) return;
@@ -565,7 +573,18 @@ class RegistrationProvider extends ChangeNotifier {
         driverPhoto = data['profilePicture'] ?? '';
         carModel = data['vehicleInfo']?['brand'] ?? '';
         carColor = data['vehicleInfo']?['color'] ?? '';
-        carNumber = data['vehicleInfo']?['registrationPlateNumber'] ?? '';
+        
+        // 🇦🇫 ساخت پلاک ترکیبی شیک (ولایت - حرف شماره - نوع پلاک)
+        String rawNumber = data['vehicleInfo']?['registrationPlateNumber'] ?? '';
+        String prov = data['vehicleInfo']?['plateProvince'] ?? '';
+        String cat = data['vehicleInfo']?['plateCategory'] ?? '';
+        String type = data['vehicleInfo']?['plateType'] ?? '';
+
+        if (prov.isNotEmpty && rawNumber.isNotEmpty) {
+          carNumber = "$prov - $cat $rawNumber ($type)";
+        } else {
+          carNumber = rawNumber;
+        }
 
         notifyListeners();
       }
@@ -592,6 +611,7 @@ class RegistrationProvider extends ChangeNotifier {
       final userRef =
           _database.ref().child("drivers").child(_auth.currentUser!.uid);
       await userRef.update(driverData);
+      await retrieveCurrentDriverInfo();
       _isLoading = false;
       notifyListeners();
     } catch (e) {
@@ -668,6 +688,7 @@ class RegistrationProvider extends ChangeNotifier {
     }
   }
 
+  // 🛠️ اصلاح شده: آپدیت کامل فیلدهای پلاک افغانستان
   Future<void> updateVehicleBasicInfo(BuildContext context) async {
     try {
       _isLoading = true;
@@ -688,6 +709,9 @@ class RegistrationProvider extends ChangeNotifier {
           .child(_auth.currentUser!.uid)
           .child("vehicleInfo");
       await userRef.update(vehicleData);
+      
+      // فراخوانی مجدد اطلاعات برای ست شدن در متغیرهای سراسری
+      await retrieveCurrentDriverInfo();
       _isLoading = false;
       notifyListeners();
     } catch (e) {
