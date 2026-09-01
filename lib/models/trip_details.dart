@@ -1,6 +1,6 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:latlong2/latlong2.dart';
+import 'package:latlong2/latlong.dart';
 
 class TripDetails {
   String? tripID;          // شناسه یا آی‌دی منحصربه‌فرد سفر
