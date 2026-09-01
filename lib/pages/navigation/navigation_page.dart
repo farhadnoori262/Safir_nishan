@@ -24,9 +24,6 @@ import 'widgets/navigation_controls.dart';
 import 'widgets/navigation_route_arrow.dart';
 import 'widgets/navigation_turn_banner.dart';
 
-/// نتیجهٔ پروجکشن موقعیت خام GPS روی نزدیک‌ترین بخش از خط مسیر.
-/// point: نقطهٔ چسبیده‌شده به جادّه (snapped).
-/// bearing: راستای واقعی همان بخش از جادّه (بر حسب درجه، نسبت به شمال).
 class _RouteProjection {
   final LatLng point;
   final double bearing;
@@ -70,7 +67,6 @@ class _NavigationPageState extends State<NavigationPage> {
   LatLng? _selectedDestination;
   LatLng? _currentLocation;
 
-  // موقعیت و جهتِ چسبیده‌شده به جادّه (منبع واحد حقیقت برای مارکر و دوربین)
   LatLng? _snappedDriverLocation;
   double _driverBearing = 0.0;
 
@@ -109,7 +105,6 @@ class _NavigationPageState extends State<NavigationPage> {
 
   void _onMapCreated(MapLibreMapController controller) async {
     _mapController = controller;
-    // پین نیتیو دیگر استفاده نمی‌شود؛ مارکر راننده کاملاً دستی مدیریت می‌شود.
   }
 
   Future<void> _onStyleLoaded() async {
@@ -129,7 +124,6 @@ class _NavigationPageState extends State<NavigationPage> {
       await _showSelectedDestinationMarker(moveCamera: false);
     }
 
-    // نمایش اولیهٔ نقطهٔ دایره‌ای (حالت idle) به محض آماده‌شدن نقشه
     if (_currentLocation != null) {
       await _updateDriverMarker(_currentLocation!, navigating: false);
     }
@@ -229,7 +223,6 @@ class _NavigationPageState extends State<NavigationPage> {
       final navigationController = Provider.of<NavigationController>(context, listen: false);
 
       if (_navigationStarted && navigationController.isNavigating) {
-        // به کنترلر هم خبر می‌دهیم (برای ETA، بنر گردش، و غیره)
         navigationController.updateDriverPosition(
           rawLocation,
           langCode: context.locale.languageCode,
@@ -244,9 +237,8 @@ class _NavigationPageState extends State<NavigationPage> {
           final projection = _projectOntoRoute(rawLocation, routePoints);
           if (projection != null) {
             lockedLocation = projection.point;
+            // اصلاح: زاویه راستای جاده بدون افزودن ۱۸۰ درجه اضافی
             lockedBearing = projection.bearing;
-
-
           }
         }
 
@@ -256,24 +248,19 @@ class _NavigationPageState extends State<NavigationPage> {
         await _updateDriverMarker(
           lockedLocation,
           navigating: true,
-          rotate: lockedBearing,
+          rotate: 0, // فلش رو به بالا ثابت می‌ماند
         );
 
         if (_cameraFollowing) {
           await _moveCameraToDriver(lockedLocation, heading: lockedBearing);
         }
       } else {
-        // قبل از شروع ناوبری: فقط دایرهٔ ساده روی مکان خام GPS
         await _updateDriverMarker(rawLocation, navigating: false);
       }
     } finally {
       _isUpdatingMap = false;
     }
   }
-
-  // ---------------------------------------------------------------------
-  // منطق Snap-to-Route (چسباندن موقعیت خام GPS به نزدیک‌ترین نقطهٔ مسیر)
-  // ---------------------------------------------------------------------
 
   _RouteProjection? _projectOntoRoute(LatLng gps, List<LatLng> route) {
     if (route.length < 2) return null;
@@ -299,8 +286,6 @@ class _NavigationPageState extends State<NavigationPage> {
     return _RouteProjection(bestPoint, bestBearing);
   }
 
-  /// نزدیک‌ترین نقطه روی پارهٔ خط [a]-[b] به نقطهٔ [p]
-  /// (با تصویر تخت/planar محلی بر حسب متر، دقت کافی برای فاصله‌های شهری).
   LatLng _closestPointOnSegment(LatLng p, LatLng a, LatLng b) {
     final latRefRad = a.latitude * math.pi / 180.0;
     const metersPerDegLat = 111320.0;
@@ -340,7 +325,6 @@ class _NavigationPageState extends State<NavigationPage> {
     return math.sqrt(dx * dx + dy * dy);
   }
 
-  /// راستای واقعی (bearing) از نقطهٔ a به b، بر حسب درجه نسبت به شمال.
   double _bearingBetween(LatLng a, LatLng b) {
     final lat1 = a.latitude * math.pi / 180.0;
     final lat2 = b.latitude * math.pi / 180.0;
@@ -355,10 +339,6 @@ class _NavigationPageState extends State<NavigationPage> {
 
     return (bearingDeg + 360.0) % 360.0;
   }
-
-  // ---------------------------------------------------------------------
-  // ساخت آیکن‌های مارکر راننده (دایره برای idle، فلش برای navigating)
-  // ---------------------------------------------------------------------
 
   Future<Uint8List> _renderIconBytes(
     void Function(Canvas canvas, Size size) painter,
@@ -384,29 +364,6 @@ class _NavigationPageState extends State<NavigationPage> {
       innerRadius,
       Paint()..color = const Color(0xFF1E88E5),
     );
-  }
-
-  void _paintDriverArrow(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-
-    // فلش رو به بالا (نوک بالا، فرورفتگی در پایین وسط)
-    final path = Path()
-      ..moveTo(w * 0.50, h * 0.06)
-      ..lineTo(w * 0.86, h * 0.88)
-      ..lineTo(w * 0.50, h * 0.66)
-      ..lineTo(w * 0.14, h * 0.88)
-      ..close();
-
-    final outline = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = w * 0.09
-      ..strokeJoin = StrokeJoin.round;
-    canvas.drawPath(path, outline);
-
-    final fill = Paint()..color = const Color(0xFF1E88E5);
-    canvas.drawPath(path, fill);
   }
 
   Future<void> _addMapImages() async {
@@ -468,53 +425,48 @@ class _NavigationPageState extends State<NavigationPage> {
       height: 96,
     );
 
-    // آیکن‌های مارکر راننده (دایره idle + فلش navigating)
     final dotBytes = await _renderIconBytes(_paintDriverDot, const Size(46, 46));
     await _mapController!.addImage(_driverDotIconName, dotBytes);
 
     final ByteData bytes = await rootBundle.load('assets/images/navigation_arrow.png');
-final Uint8List arrowBytes = bytes.buffer.asUint8List();
-await _mapController!.addImage(_driverArrowIconName, arrowBytes);
+    final Uint8List arrowBytes = bytes.buffer.asUint8List();
+    await _mapController!.addImage(_driverArrowIconName, arrowBytes);
 
     _iconsAdded = true;
   }
 
-  /// آپدیت/ایجاد مارکر واحد راننده. همیشه همین یک Symbol را جابه‌جا و
-  /// آیکن/زاویه‌اش را عوض می‌کنیم؛ هرگز Symbol جدید اضافه نمی‌شود
-  /// (تا از چشمک‌زدن/پرش جلوگیری شود).
+  // اصلاح ۳: متد آپدیت مارکر متناظر با زوم و قفل‌شده روی صفحه
   Future<void> _updateDriverMarker(
-  LatLng position, {
-  required bool navigating,
-  double rotate = 0,
-}) async {
-  if (_mapController == null || !_iconsAdded) return;
+    LatLng position, {
+    required bool navigating,
+    double rotate = 0,
+  }) async {
+    if (_mapController == null || !_iconsAdded) return;
 
-  // محاسبه اندازه فلش متناسب با زوم نقشه
-  double dynamicSize = 0.85;
-  if (navigating) {
-    final currentZoom = _mapController!.zoomLevel;
-    dynamicSize = (math.pow(2, currentZoom - 18.0) * 0.85).clamp(0.25, 1.3);
+    double dynamicSize = 0.85;
+    if (navigating) {
+      final currentZoom = _mapController!.zoomLevel;
+      dynamicSize = (math.pow(2, currentZoom - 18.0) * 0.85).clamp(0.25, 1.3);
+    }
+
+    final options = SymbolOptions(
+      geometry: position,
+      iconImage: navigating ? _driverArrowIconName : _driverDotIconName,
+      iconRotate: 0,
+      iconAnchor: "center",
+      iconSize: dynamicSize,
+      iconRotationAlignment: "viewport",
+      iconPitchAlignment: "viewport",
+    );
+
+    if (_driverSymbol == null) {
+      _driverSymbol = await _mapController!.addSymbol(options);
+      await _mapController!.setSymbolIconAllowOverlap(true);
+      await _mapController!.setSymbolIconIgnorePlacement(true);
+    } else {
+      await _mapController!.updateSymbol(_driverSymbol!, options);
+    }
   }
-
-  final options = SymbolOptions(
-    geometry: position,
-    iconImage: navigating ? _driverArrowIconName : _driverDotIconName,
-    iconRotate: 0, // فلش همیشه رو به بالا ثابت می‌ماند
-    iconAnchor: "center",
-    iconSize: dynamicSize,
-    iconRotationAlignment: "viewport",
-    iconPitchAlignment: "viewport",
-  );
-
-  if (_driverSymbol == null) {
-    _driverSymbol = await _mapController!.addSymbol(options);
-    await _mapController!.setSymbolIconAllowOverlap(true);
-    await _mapController!.setSymbolIconIgnorePlacement(true);
-  } else {
-    await _mapController!.updateSymbol(_driverSymbol!, options);
-  }
-}
-
 
   Future<void> _onPlaceSelected(PlaceSearchResult place) async {
     if (!mounted) return;
@@ -632,15 +584,10 @@ await _mapController!.addImage(_driverArrowIconName, arrowBytes);
     await NavigationRouteStyle.drawRoute(_mapController!, routePoints);
     await _drawRouteDecorations(navigationController);
 
-    // --- نقطهٔ کلیدی رفع باگ ---
-    // به‌جای اتکا به مقدار GPS خام (که ممکن است هنوز داخل خانه باشد)،
-    // بلافاصله مارکر را روی خودِ نوک ابتدای خط مسیر (که همیشه روی جادّه است)
-    // قرار می‌دهیم؛ جهت اولیه هم از همان بخش اول مسیر گرفته می‌شود.
+    // اصلاح: زاویه اول بدون ۱۸۰ درجه اضافی
     final initialBearing = routePoints.length >= 2
-    ? (_bearingBetween(routePoints[0], routePoints[1]) + 180.0) % 360.0
-: (navigationController.driverRouteBearing + 180.0) % 360.0;
-
-
+        ? _bearingBetween(routePoints[0], routePoints[1])
+        : navigationController.driverRouteBearing;
 
     final initialLocation = routePoints.first;
 
@@ -720,58 +667,39 @@ await _mapController!.addImage(_driverArrowIconName, arrowBytes);
     });
   }
 
+  // اصلاح ۱: متد یکپارچه و سالم جهت قفل دوربین در ثلث پایینی صفحه
   Future<void> _moveCameraToDriver(LatLng location, {required double heading}) async {
-  if (_mapController == null) return;
-  _isProgrammaticCameraMove = true;
+    if (_mapController == null) return;
+    _isProgrammaticCameraMove = true;
 
-  try {
-    // قفل کردن نقطه تمرکز دوربین در ۳۵٪ پایینی صفحه
-    await _mapController!.updateContentInsets(
-      EdgeInsets.only(
-        top: 0,
-        bottom: MediaQuery.of(context).size.height * 0.35,
-        left: 0,
-        right: 0,
-      ),
-    );
-
-    await _mapController!.animateCamera(
-      CameraUpdate.newCameraPosition(
-        CameraPosition(
-          target: location,
-          zoom: 18.0,
-          bearing: heading,
-          tilt: 55.0,
+    try {
+      await _mapController!.updateContentInsets(
+        EdgeInsets.only(
+          top: 0,
+          bottom: MediaQuery.of(context).size.height * 0.35,
+          left: 0,
+          right: 0,
         ),
-      ),
-      duration: const Duration(milliseconds: 400),
-    );
-  } catch (_) {
-  } finally {
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (mounted) _isProgrammaticCameraMove = false;
-    });
+      );
+
+      await _mapController!.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(
+            target: location,
+            zoom: 18.0,
+            bearing: heading,
+            tilt: 55.0,
+          ),
+        ),
+        duration: const Duration(milliseconds: 400),
+      );
+    } catch (_) {
+    } finally {
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) _isProgrammaticCameraMove = false;
+      });
+    }
   }
-}
-
-
-    await _mapController!.updateContentInsets(
-  EdgeInsets.only(
-    top: 0,
-    bottom: MediaQuery.of(context).size.height * 0.35,
-    left: 0,
-    right: 0,
-  ),
-);
-
-  } catch (_) {
-  } finally {
-    Future.delayed(const Duration(milliseconds: 600), () {
-      if (mounted) _isProgrammaticCameraMove = false;
-    });
-  }
-}
-
 
   Future<void> _moveCameraToLocation(
     LatLng location, {
@@ -864,7 +792,6 @@ await _mapController!.addImage(_driverArrowIconName, arrowBytes);
       await _mapController!.clearLines();
       await _clearRouteDecorations();
 
-      // بازگشت مارکر راننده به حالت دایرهٔ ساده (idle)
       final fallback = _currentLocation ?? _startLocation;
       _snappedDriverLocation = null;
       await _updateDriverMarker(fallback, navigating: false);
@@ -905,7 +832,6 @@ await _mapController!.addImage(_driverArrowIconName, arrowBytes);
           MapLibreMap(
             onMapCreated: _onMapCreated,
             onStyleLoadedCallback: _onStyleLoaded,
-            // پین نیتیو خاموش است؛ مارکر راننده به‌طور کامل دستی (Symbol سفارشی) مدیریت می‌شود
             myLocationEnabled: false,
             onMapLongClick: (point, coordinates) {
               if (!_navigationStarted) {
@@ -917,6 +843,14 @@ await _mapController!.addImage(_driverArrowIconName, arrowBytes);
                 setState(() {
                   _cameraFollowing = false;
                 });
+              }
+              // آپدیت مجدد سایز مارکر هنگام زوم کردن کاربر
+              if (_snappedDriverLocation != null && _navigationStarted) {
+                _updateDriverMarker(
+                  _snappedDriverLocation!,
+                  navigating: true,
+                  rotate: _driverBearing,
+                );
               }
             },
             styleString: NavigationRouteStyle.currentMapStyle,
