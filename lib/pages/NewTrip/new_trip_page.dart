@@ -31,14 +31,18 @@ class _NewTripPageState extends State<NewTripPage> {
   // 🗺️ باز کردن مسیریاب‌های بیرونی (گوگل مپس / نشان)
   Future<void> _openExternalNavigationApp(double lat, double lng) async {
     final Uri neshanUri = Uri.parse('neshan://navi?lat=$lat&lng=$lng');
-    final Uri googleUri = Uri.parse('google.navigation:q=$lat,$lng');
-    final Uri webUri = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lng');
+    final Uri googleUri = Uri.parse('google.navigation:q=$lat,$lng&mode=d');
+    final Uri webUri = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&travelmode=driving');
 
-    if (await canLaunchUrl(neshanUri)) {
-      await launchUrl(neshanUri);
-    } else if (await canLaunchUrl(googleUri)) {
-      await launchUrl(googleUri);
-    } else {
+    try {
+      if (await canLaunchUrl(neshanUri)) {
+        await launchUrl(neshanUri, mode: LaunchMode.externalApplication);
+      } else if (await canLaunchUrl(googleUri)) {
+        await launchUrl(googleUri, mode: LaunchMode.externalApplication);
+      } else {
+        await launchUrl(webUri, mode: LaunchMode.externalApplication);
+      }
+    } catch (e) {
       await launchUrl(webUri, mode: LaunchMode.externalApplication);
     }
   }
@@ -269,16 +273,17 @@ class _NewTripPageState extends State<NewTripPage> {
                             ),
                           ),
                           onPressed: () {
-                            // تعیین هدف مسیریابی (اگر هنوز نرسیده، به مبدأ؛ در غیر این صورت به مقصد)
-                            final targetLatLng = statusOfTrip == "accepted"
-                                ? widget.newTripDetailsInfo?.pickUpLatLng
-                                : widget.newTripDetailsInfo?.dropOffLatLng;
+                            dynamic targetLocation = statusOfTrip == "accepted"
+                                ? (widget.newTripDetailsInfo?.pickUpLatLng ?? widget.newTripDetailsInfo?.pickupLatLng)
+                                : (widget.newTripDetailsInfo?.dropOffLatLng ?? widget.newTripDetailsInfo?.dropoffLatLng);
 
-                            if (targetLatLng != null) {
+                            if (targetLocation != null && targetLocation.latitude != null && targetLocation.longitude != null) {
                               _openExternalNavigationApp(
-                                targetLatLng.latitude,
-                                targetLatLng.longitude,
+                                targetLocation.latitude!,
+                                targetLocation.longitude!,
                               );
+                            } else {
+                              commonMethods.displaySnackBar("مختصات مقصد یافت نشد!", context);
                             }
                           },
                           icon: const Icon(Icons.navigation_rounded, color: Colors.white),
