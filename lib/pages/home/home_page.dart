@@ -8,9 +8,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:safir_drivers/pages/chat_page.dart';
 
-import 'package:safir_drivers/pages/chat/chat_page.dart'; // 📌 مسیر فایل ChatPage خود را چک کنید
+import 'package:safir_drivers/pages/chat_page.dart'; // 📌 مسیر فایل ChatPage خود را چک کنید
 import 'package:safir_drivers/providers/registration_provider.dart'; 
 import 'package:safir_drivers/utils/app_colors.dart';
 import '../../push_notifications/push_notification_system.dart';
