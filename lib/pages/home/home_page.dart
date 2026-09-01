@@ -7,7 +7,9 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import 'package:safir_drivers/pages/chat/chat_page.dart'; // 📌 مسیر فایل ChatPage خود را چک کنید
 import 'package:safir_drivers/providers/registration_provider.dart'; 
 import 'package:safir_drivers/utils/app_colors.dart';
 import '../../push_notifications/push_notification_system.dart';
@@ -22,7 +24,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   Position? currentPositionOfDriver;
   bool isDriverAvailable = false;
-  bool isLoading = false; // برای حالت لودینگ دکمه
+  bool isLoading = false;
 
   StreamSubscription<Position>? positionStreamHomePage;
   StreamSubscription<QuerySnapshot>? tripRequestStream;
@@ -162,6 +164,14 @@ class _HomePageState extends State<HomePage> {
     PushNotificationSystem notificationSystem = PushNotificationSystem();
     notificationSystem.generateDeviceRegistrationToken();
     notificationSystem.startListeningForNewNotification(context);
+  }
+
+  Future<void> _makePhoneCall(String phoneNumber) async {
+    if (phoneNumber.isEmpty) return;
+    final Uri launchUri = Uri(scheme: 'tel', path: phoneNumber);
+    if (await canLaunchUrl(launchUri)) {
+      await launchUrl(launchUri);
+    }
   }
 
   @override
@@ -364,6 +374,8 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final currentUser = FirebaseAuth.instance.currentUser;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -404,6 +416,108 @@ class _HomePageState extends State<HomePage> {
               ),
               const Spacer(),
 
+              // 🚗 بخش نمایش سفر زنده فعال (در صورت قبول شدن درخواست)
+              if (currentUser != null)
+                StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('rides')
+                      .where('driverId', isEqualTo: currentUser.uid)
+                      .where('status', whereIn: ['accepted', 'arrived', 'ontrip'])
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
+                      var tripDoc = snapshot.data!.docs.first;
+                      var tripData = tripDoc.data() as Map<String, dynamic>;
+                      String tripId = tripDoc.id;
+                      String passengerName = tripData['userName'] ?? 'مسافر';
+                      String passengerPhone = tripData['userPhone'] ?? '';
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.cardBackground,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Colors.black12,
+                              blurRadius: 10,
+                              offset: Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                const CircleAvatar(
+                                  backgroundColor: AppColors.primaryBrand,
+                                  child: Icon(Icons.person, color: Colors.white),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        passengerName,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                          color: AppColors.textPrimary,
+                                        ),
+                                      ),
+                                      const Text(
+                                        'سفر فعال جاری',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.green,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                IconButton(
+                                  onPressed: () => _makePhoneCall(passengerPhone),
+                                  icon: const Icon(Icons.phone, color: Colors.green, size: 26),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            ElevatedButton.icon(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => ChatPage(
+                                      tripId: tripId,
+                                      passengerName: passengerName,
+                                      passengerPhone: passengerPhone,
+                                    ),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.chat_bubble_rounded, size: 20),
+                              label: const Text('چت با مسافر'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primaryBrand,
+                                foregroundColor: Colors.white,
+                                minimumSize: const Size(double.infinity, 45),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
+
+              // 🔴 دکمه تغییر وضعیت آنلاین / آفلاین
               Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
