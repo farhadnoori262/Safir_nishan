@@ -5,7 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_geofire/flutter_geofire.dart';
 import 'package:http/http.dart' as http;
-import 'package:maplibre_gl/maplibre_gl.dart';
+import 'package:latlong2/latlong2.dart';
 
 import '../global/global.dart';
 import '../models/direction_details.dart';
