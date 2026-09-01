@@ -44,7 +44,7 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  Future<void> getCurrentLiveLocationOfDriver() async {
+  Future<Position?> getCurrentLiveLocationOfDriver() async {
     try {
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
@@ -56,10 +56,13 @@ class _HomePageState extends State<HomePage> {
       
       currentPositionOfDriver = positionOfUser;
 
-      if (!mounted) return;
-      setState(() {});
+      if (mounted) {
+        setState(() {});
+      }
+      return positionOfUser;
     } catch (e) {
       debugPrint("Error fetching location: $e");
+      return null;
     }
   }
 
@@ -88,6 +91,9 @@ class _HomePageState extends State<HomePage> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
     String uid = user.uid;
+
+    // اگر موقعیت قبلاً گرفته نشده باشد، همین‌جا موقعیت زنده را دریافت می‌کند
+    currentPositionOfDriver ??= await getCurrentLiveLocationOfDriver();
 
     if (currentPositionOfDriver != null) {
       await FirebaseFirestore.instance.collection("onlineDrivers").doc(uid).set({
@@ -255,22 +261,22 @@ class _HomePageState extends State<HomePage> {
                 children: [
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: () {
+                      onPressed: () async {
                         if (!isDriverAvailable) {
-                          goOnlineNow();
+                          await goOnlineNow();
                           setAndGetLocationUpdates();
                           listenForTripRequests();
-                          Navigator.pop(context);
                           if (mounted) {
+                            Navigator.pop(context);
                             setState(() {
                               isDriverAvailable = true;
                             });
                           }
                           _saveDriverStatus(true);
                         } else {
-                          goOfflineNow();
-                          Navigator.pop(context);
+                          await goOfflineNow();
                           if (mounted) {
+                            Navigator.pop(context);
                             setState(() {
                               isDriverAvailable = false;
                             });
@@ -340,7 +346,6 @@ class _HomePageState extends State<HomePage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Spacer(),
-              // آیکون وضعیت راننده
               Icon(
                 isDriverAvailable ? Icons.local_taxi_rounded : Icons.do_not_disturb_on_rounded,
                 size: 90,
@@ -371,7 +376,6 @@ class _HomePageState extends State<HomePage> {
               ),
               const Spacer(),
 
-              // دکمه تغییر وضعیت آنلاین / آفلاین
               Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
