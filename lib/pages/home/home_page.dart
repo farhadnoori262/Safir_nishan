@@ -9,8 +9,8 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'package:safir_drivers/pages/chat_page.dart'; // 📌 مسیر فایل ChatPage خود را چک کنید
-import 'package:safir_drivers/providers/registration_provider.dart'; 
+import 'package:safir_drivers/pages/chat_page.dart';
+import 'package:safir_drivers/providers/registration_provider.dart';
 import 'package:safir_drivers/utils/app_colors.dart';
 import '../../push_notifications/push_notification_system.dart';
 
@@ -44,6 +44,8 @@ class _HomePageState extends State<HomePage> {
           }
         }
       }
+    }, onError: (error) {
+      debugPrint("Error listening for trip requests: $error");
     });
   }
 
@@ -54,9 +56,14 @@ class _HomePageState extends State<HomePage> {
         permission = await Geolocator.requestPermission();
       }
 
+      if (permission == LocationPermission.deniedForever ||
+          permission == LocationPermission.denied) {
+        return null;
+      }
+
       Position positionOfUser = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.bestForNavigation);
-      
+
       currentPositionOfDriver = positionOfUser;
 
       if (mounted) {
@@ -69,7 +76,7 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  _loadDriverStatus() async {
+  Future<void> _loadDriverStatus() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     bool status = prefs.getBool('isDriverAvailable') ?? false;
     if (!mounted) return;
@@ -79,13 +86,13 @@ class _HomePageState extends State<HomePage> {
     });
 
     if (isDriverAvailable) {
-      goOnlineNow();
+      await goOnlineNow();
       setAndGetLocationUpdates();
       listenForTripRequests();
     }
   }
 
-  _saveDriverStatus(bool status) async {
+  Future<void> _saveDriverStatus(bool status) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setBool('isDriverAvailable', status);
   }
@@ -98,13 +105,18 @@ class _HomePageState extends State<HomePage> {
     currentPositionOfDriver ??= await getCurrentLiveLocationOfDriver();
 
     if (currentPositionOfDriver != null) {
-      await FirebaseFirestore.instance.collection("onlineDrivers").doc(uid).set({
+      await FirebaseFirestore.instance
+          .collection("onlineDrivers")
+          .doc(uid)
+          .set({
         "driverId": uid,
         "latitude": currentPositionOfDriver!.latitude,
         "longitude": currentPositionOfDriver!.longitude,
         "last_active": FieldValue.serverTimestamp(),
         "status": "idle",
-      }, SetOptions(merge: true));
+      }, SetOptions(merge: true)).catchError((e) {
+        debugPrint("Error updating onlineDrivers: $e");
+      });
     }
 
     await FirebaseFirestore.instance.collection("drivers").doc(uid).update({
@@ -115,7 +127,7 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  setAndGetLocationUpdates() {
+  void setAndGetLocationUpdates() {
     positionStreamHomePage?.cancel();
     positionStreamHomePage = Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
@@ -130,37 +142,60 @@ class _HomePageState extends State<HomePage> {
       if (isDriverAvailable) {
         final user = FirebaseAuth.instance.currentUser;
         if (user != null) {
-          FirebaseFirestore.instance.collection("onlineDrivers").doc(user.uid).set({
+          FirebaseFirestore.instance
+              .collection("onlineDrivers")
+              .doc(user.uid)
+              .set({
             "driverId": user.uid,
             "latitude": position.latitude,
             "longitude": position.longitude,
             "last_active": FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
+          }, SetOptions(merge: true)).catchError((e) {
+            debugPrint("Error stream location update: $e");
+          });
         }
       }
+    }, onError: (error) {
+      debugPrint("Location stream error: $error");
     });
   }
 
   Future<void> goOfflineNow() async {
+    // ابتدا شنود لکیشن و سفرها قطع می‌شود
+    await positionStreamHomePage?.cancel();
+    positionStreamHomePage = null;
+
+    await tripRequestStream?.cancel();
+    tripRequestStream = null;
+
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       String uid = user.uid;
-      
-      await FirebaseFirestore.instance.collection("onlineDrivers").doc(uid).delete();
 
-      await FirebaseFirestore.instance.collection("drivers").doc(uid).update({
-        "newTripStatus": "offline",
-        "isOnline": false,
-      }).catchError((e) {
-        debugPrint("Error going offline: $e");
-      });
+      try {
+        await FirebaseFirestore.instance
+            .collection("onlineDrivers")
+            .doc(uid)
+            .delete();
+      } catch (e) {
+        debugPrint("Error deleting onlineDriver doc: $e");
+      }
+
+      try {
+        await FirebaseFirestore.instance
+            .collection("drivers")
+            .doc(uid)
+            .update({
+          "newTripStatus": "offline",
+          "isOnline": false,
+        });
+      } catch (e) {
+        debugPrint("Error updating offline status: $e");
+      }
     }
-
-    positionStreamHomePage?.cancel();
-    tripRequestStream?.cancel();
   }
 
-  initializePushNotificationSystem() {
+  void initializePushNotificationSystem() {
     PushNotificationSystem notificationSystem = PushNotificationSystem();
     notificationSystem.generateDeviceRegistrationToken();
     notificationSystem.startListeningForNewNotification(context);
@@ -179,7 +214,7 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     _loadDriverStatus();
     initializePushNotificationSystem();
-    
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         Provider.of<RegistrationProvider>(context, listen: false)
@@ -286,7 +321,7 @@ class _HomePageState extends State<HomePage> {
                                       setAndGetLocationUpdates();
                                       listenForTripRequests();
                                       await _saveDriverStatus(true);
-                                      
+
                                       if (mounted) {
                                         setState(() {
                                           isDriverAvailable = true;
@@ -295,7 +330,7 @@ class _HomePageState extends State<HomePage> {
                                     } else {
                                       await goOfflineNow();
                                       await _saveDriverStatus(false);
-                                      
+
                                       if (mounted) {
                                         setState(() {
                                           isDriverAvailable = false;
@@ -312,8 +347,8 @@ class _HomePageState extends State<HomePage> {
                                   }
                                 },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: isDriverAvailable 
-                                ? Colors.red.shade700 
+                            backgroundColor: isDriverAvailable
+                                ? Colors.red.shade700
                                 : AppColors.primaryButton,
                             foregroundColor: AppColors.buttonText,
                             elevation: 0,
@@ -332,7 +367,7 @@ class _HomePageState extends State<HomePage> {
                                   ),
                                 )
                               : Text(
-                                  'confirm'.tr(),
+                                  'btn_confirm'.tr(),
                                   style: const TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 15,
@@ -343,7 +378,9 @@ class _HomePageState extends State<HomePage> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: OutlinedButton(
-                          onPressed: isLoading ? null : () => Navigator.pop(modalContext),
+                          onPressed: isLoading
+                              ? null
+                              : () => Navigator.pop(modalContext),
                           style: OutlinedButton.styleFrom(
                             side: BorderSide(color: Colors.grey.shade300),
                             shape: RoundedRectangleBorder(
@@ -352,7 +389,7 @@ class _HomePageState extends State<HomePage> {
                             padding: const EdgeInsets.symmetric(vertical: 14),
                           ),
                           child: Text(
-                            'cancel'.tr(),
+                            'btn_cancel'.tr(),
                             style: const TextStyle(
                               color: AppColors.textPrimary,
                               fontWeight: FontWeight.bold,
@@ -387,15 +424,19 @@ class _HomePageState extends State<HomePage> {
             children: [
               const Spacer(),
               Icon(
-                isDriverAvailable ? Icons.local_taxi_rounded : Icons.do_not_disturb_on_rounded,
+                isDriverAvailable
+                    ? Icons.local_taxi_rounded
+                    : Icons.do_not_disturb_on_rounded,
                 size: 90,
-                color: isDriverAvailable ? AppColors.primaryBrand : Colors.grey,
+                color: isDriverAvailable
+                    ? AppColors.primaryBrand
+                    : Colors.grey,
               ),
               const SizedBox(height: 24),
               Text(
                 isDriverAvailable
-                    ? 'شما آنلاین هستید و آماده دریافت سفر'
-                    : 'شما آفلاین هستید',
+                    ? 'online_title'.tr()
+                    : 'offline_title'.tr(),
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 20,
@@ -406,8 +447,8 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(height: 8),
               Text(
                 isDriverAvailable
-                    ? 'به محض ثبت درخواست در محدوده شما، اعلان ارسال می‌شود.'
-                    : 'برای شروع دریافت سفرهای جدید، دکمه زیر را بزنید.',
+                    ? 'online_subtitle'.tr()
+                    : 'offline_subtitle'.tr(),
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 14,
@@ -416,20 +457,22 @@ class _HomePageState extends State<HomePage> {
               ),
               const Spacer(),
 
-              // 🚗 بخش نمایش سفر زنده فعال (در صورت قبول شدن درخواست)
+              // 🚗 بخش نمایش سفر زنده فعال
               if (currentUser != null)
                 StreamBuilder<QuerySnapshot>(
                   stream: FirebaseFirestore.instance
                       .collection('rides')
                       .where('driverId', isEqualTo: currentUser.uid)
-                      .where('status', whereIn: ['accepted', 'arrived', 'ontrip'])
+                      .where('status',
+                          whereIn: ['accepted', 'arrived', 'ontrip'])
                       .snapshots(),
                   builder: (context, snapshot) {
                     if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
                       var tripDoc = snapshot.data!.docs.first;
                       var tripData = tripDoc.data() as Map<String, dynamic>;
                       String tripId = tripDoc.id;
-                      String passengerName = tripData['userName'] ?? 'مسافر';
+                      String passengerName =
+                          tripData['userName'] ?? 'passenger'.tr();
                       String passengerPhone = tripData['userPhone'] ?? '';
 
                       return Container(
@@ -452,12 +495,14 @@ class _HomePageState extends State<HomePage> {
                               children: [
                                 const CircleAvatar(
                                   backgroundColor: AppColors.primaryBrand,
-                                  child: Icon(Icons.person, color: Colors.white),
+                                  child:
+                                      Icon(Icons.person, color: Colors.white),
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         passengerName,
@@ -467,9 +512,9 @@ class _HomePageState extends State<HomePage> {
                                           color: AppColors.textPrimary,
                                         ),
                                       ),
-                                      const Text(
-                                        'سفر فعال جاری',
-                                        style: TextStyle(
+                                      Text(
+                                        'active_trip'.tr(),
+                                        style: const TextStyle(
                                           fontSize: 12,
                                           color: Colors.green,
                                           fontWeight: FontWeight.w600,
@@ -479,8 +524,10 @@ class _HomePageState extends State<HomePage> {
                                   ),
                                 ),
                                 IconButton(
-                                  onPressed: () => _makePhoneCall(passengerPhone),
-                                  icon: const Icon(Icons.phone, color: Colors.green, size: 26),
+                                  onPressed: () =>
+                                      _makePhoneCall(passengerPhone),
+                                  icon: const Icon(Icons.phone,
+                                      color: Colors.green, size: 26),
                                 ),
                               ],
                             ),
@@ -498,8 +545,9 @@ class _HomePageState extends State<HomePage> {
                                   ),
                                 );
                               },
-                              icon: const Icon(Icons.chat_bubble_rounded, size: 20),
-                              label: const Text('چت با مسافر'),
+                              icon: const Icon(Icons.chat_bubble_rounded,
+                                  size: 20),
+                              label: Text('chat_with_passenger'.tr()),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppColors.primaryBrand,
                                 foregroundColor: Colors.white,
@@ -523,7 +571,10 @@ class _HomePageState extends State<HomePage> {
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: (isDriverAvailable ? Colors.red.shade900 : AppColors.primaryBrand).withOpacity(0.25),
+                      color: (isDriverAvailable
+                              ? Colors.red.shade900
+                              : AppColors.primaryBrand)
+                          .withOpacity(0.25),
                       blurRadius: 16,
                       offset: const Offset(0, 6),
                     ),
@@ -532,7 +583,9 @@ class _HomePageState extends State<HomePage> {
                 child: ElevatedButton(
                   onPressed: _showStatusChangeModal,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: isDriverAvailable ? Colors.red.shade600 : AppColors.primaryBrand,
+                    backgroundColor: isDriverAvailable
+                        ? Colors.red.shade600
+                        : AppColors.primaryBrand,
                     foregroundColor: AppColors.buttonText,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
@@ -548,14 +601,16 @@ class _HomePageState extends State<HomePage> {
                         height: 12,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: isDriverAvailable ? Colors.greenAccent : Colors.white70,
+                          color: isDriverAvailable
+                              ? Colors.greenAccent
+                              : Colors.white70,
                         ),
                       ),
                       const SizedBox(width: 12),
                       Text(
-                        isDriverAvailable 
-                            ? 'status_offline_btn'.tr() 
-                            : 'status_online_btn'.tr(),
+                        isDriverAvailable
+                            ? 'go_offline'.tr()
+                            : 'go_online'.tr(),
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 18,
