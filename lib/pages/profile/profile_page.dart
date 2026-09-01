@@ -38,19 +38,17 @@ class _ProfilePageState extends State<ProfilePage> {
         backgroundColor: AppColors.background,
         body: Consumer<RegistrationProvider>(
           builder: (context, regProvider, child) {
-            // 📌 خواندن صحیح داده‌ها از Map<String, dynamic>
-final driver = regProvider.driverInformation; 
+            final driver = regProvider.driverInformation;
 
-String name = (driver['name'] != null && driver['name'].toString().isNotEmpty)
-    ? driver['name'].toString()
-    : "---";
+            String name = (driver['name'] != null && driver['name'].toString().isNotEmpty)
+                ? driver['name'].toString()
+                : "---";
 
-      String phone = driver['phone']?.toString() ?? "---";
-        String email = driver['email']?.toString() ?? "";
-         String addressStr = driver['address']?.toString() ?? "";
-          String photo = driver['photo']?.toString() ?? "";
-          double ratingVal = double.tryParse(driver['rating']?.toString() ?? "5.0") ?? 5.0;
-
+            String phone = driver['phone']?.toString() ?? "---";
+            String email = driver['email']?.toString() ?? "";
+            String addressStr = driver['address']?.toString() ?? "";
+            String photo = driver['photo']?.toString() ?? "";
+            double ratingVal = double.tryParse(driver['rating']?.toString() ?? "5.0") ?? 5.0;
 
             return SingleChildScrollView(
               child: Column(
@@ -191,7 +189,6 @@ String name = (driver['name'] != null && driver['name'].toString().isNotEmpty)
                                   ],
                                   const SizedBox(height: 8),
                                   RatingStars(ratting: ratingVal.toString()),
-
                                 ],
                               ),
                             ),
@@ -373,15 +370,126 @@ String name = (driver['name'] != null && driver['name'].toString().isNotEmpty)
   }
 }
 
-// 🌐 صفحه تنظیمات و انتخاب زبان (دری، پشتو، انگلیسی)
-class SettingsPage extends StatefulWidget {
+// ⚙️ صفحه تنظیمات
+class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
 
   @override
-  State<SettingsPage> createState() => _SettingsPageState();
+  Widget build(BuildContext context) {
+    final isRtl = Directionality.of(context) == TextDirection.rtl;
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: Text(
+          'settings_title'.tr(),
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        centerTitle: true,
+        backgroundColor: AppColors.cardBackground,
+        elevation: 1,
+        iconTheme: const IconThemeData(color: AppColors.textPrimary),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            // 🌐 آپشن تنظیم زبان
+            _buildSettingsTile(
+              context,
+              icon: Icons.language,
+              title: 'settings_language'.tr(),
+              subtitle: _getCurrentLanguageName(context),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const LanguagePage(),
+                  ),
+                );
+              },
+              isRtl: isRtl,
+            ),
+
+            // 📌 برای آپشن‌های بعدی (مثل حالت شب و ...) می‌توانید در اینجا لیست اضافه کنید.
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _getCurrentLanguageName(BuildContext context) {
+    switch (context.locale.languageCode) {
+      case 'fa':
+        return 'دری';
+      case 'ps':
+        return 'پښتو';
+      case 'en':
+      default:
+        return 'English';
+    }
+  }
+
+  Widget _buildSettingsTile(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+    required bool isRtl,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.cardBackground,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: const [
+          BoxShadow(
+            color: Colors.black12,
+            offset: Offset(0, 1),
+            blurRadius: 4.0,
+          ),
+        ],
+      ),
+      child: ListTile(
+        onTap: onTap,
+        leading: Icon(icon, color: AppColors.primaryBrand),
+        title: Text(
+          title,
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+            fontSize: 14,
+          ),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: const TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 12,
+          ),
+        ),
+        trailing: Icon(
+          isRtl ? Icons.chevron_left : Icons.chevron_right,
+          color: AppColors.textSecondary.withOpacity(0.5),
+        ),
+      ),
+    );
+  }
 }
 
-class _SettingsPageState extends State<SettingsPage> {
+// 🌐 صفحه اختصاصی انتخاب زبان
+class LanguagePage extends StatefulWidget {
+  const LanguagePage({super.key});
+
+  @override
+  State<LanguagePage> createState() => _LanguagePageState();
+}
+
+class _LanguagePageState extends State<LanguagePage> {
   late Locale _selectedLocale;
 
   @override
@@ -396,7 +504,7 @@ class _SettingsPageState extends State<SettingsPage> {
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text(
-          'profile_menu_settings'.tr(),
+          'select_language_title'.tr(),
           style: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
@@ -413,9 +521,9 @@ class _SettingsPageState extends State<SettingsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              "انتخاب زبان / ژبه وټاکئ / Select Language",
-              style: TextStyle(
+            Text(
+              'select_language_title'.tr(),
+              style: const TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.bold,
                 color: AppColors.textPrimary,
@@ -425,13 +533,13 @@ class _SettingsPageState extends State<SettingsPage> {
 
             // گزینه زبان دری / فارسی
             _buildLanguageOption(
-              title: "دری (Dari)",
+              title: "دری",
               locale: const Locale('fa'),
             ),
 
             // گزینه زبان پشتو
             _buildLanguageOption(
-              title: "پښتو (Pashto)",
+              title: "پښتو",
               locale: const Locale('ps'),
             ),
 
@@ -451,9 +559,9 @@ class _SettingsPageState extends State<SettingsPage> {
                   await context.setLocale(_selectedLocale);
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text("زبان با موفقیت تغییر کرد"),
-                        duration: Duration(seconds: 2),
+                      SnackBar(
+                        content: Text('lang_change_success'.tr()),
+                        duration: const Duration(seconds: 2),
                       ),
                     );
                     Navigator.pop(context);
@@ -468,9 +576,9 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                   elevation: 0,
                 ),
-                child: const Text(
-                  "تایید / تایید / Confirm",
-                  style: TextStyle(
+                child: Text(
+                  'btn_confirm'.tr(),
+                  style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
                   ),
