@@ -176,7 +176,7 @@
   "chat_type_hint": "پیام خود را بنویسید...",
   "network_error_msg": "ارتباط با سرور برقرار نشد. لطفاً اینترنت خود را بررسی کنید.",
   "retry": "تلاش دوباره",
-  "nav_home": "خانه",
+  "nav_home": "صفحه اصلی",
   "nav_earnings": "درآمدها",
   "nav_trips": "سفرها",
   "nav_profile": "پروفایل",
@@ -264,13 +264,10 @@
   "no_bid_offer": "بدون پیشنهاد",
   "btn_accept_trip": "قبول سفر",
   "btn_decline_trip": "رد سفر",
-  {
   "offline_title": "شما آفلاین هستید",
   "offline_subtitle": "برای شروع دریافت سفرهای جدید، دکمه زیر را بزنید.",
   "online_title": "شما آنلاین هستید و آماده دریافت سفر",
   "online_subtitle": "به محض ثبت درخواست در محدوده شما، اعلان ارسال می‌شود.",
-  "change_to_online_title": "تغییر وضعیت به آنلاین",
-  "change_to_online_desc": "با آنلاین شدن، درخواست‌های سفر جدید را دریافت خواهید کرد.",
   "btn_confirm": "تایید",
   "btn_cancel": "انصراف",
   "passenger": "مسافر",
@@ -278,18 +275,8 @@
   "chat_with_passenger": "چت با مسافر",
   "go_offline": "آفلاین شدن",
   "go_online": "آنلاین شدن",
-  "nav_home": "صفحه اصلی",
-  "nav_earnings": "درآمدها",
-  "nav_trips": "سفرها",
-  "nav_profile": "پروفایل",
-  {
   "settings_title": "تنظیمات",
   "settings_language": "زبان برنامه",
   "select_language_title": "انتخاب زبان",
-  "btn_confirm": "تایید",
   "lang_change_success": "زبان با موفقیت تغییر کرد"
-}
-
-}
-
 }
