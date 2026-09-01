@@ -264,7 +264,6 @@
   "no_bid_offer": "No Offer",
   "btn_accept_trip": "Accept Trip",
   "btn_decline_trip": "Decline Trip",
-  {
   "offline_title": "You are offline",
   "offline_subtitle": "To start receiving new trips, press the button below.",
   "online_title": "You are online and ready to accept trips",
@@ -278,18 +277,8 @@
   "chat_with_passenger": "Chat with Passenger",
   "go_offline": "Go Offline",
   "go_online": "Go Online",
-  "nav_home": "Home",
-  "nav_earnings": "Earnings",
-  "nav_trips": "Trips",
-  "nav_profile": "Profile",
-  {
   "settings_title": "Settings",
   "settings_language": "App Language",
   "select_language_title": "Select Language",
-  "btn_confirm": "Confirm",
   "lang_change_success": "Language changed successfully"
-}
-
-}
-
 }
