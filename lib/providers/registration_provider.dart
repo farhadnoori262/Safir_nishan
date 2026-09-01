@@ -157,6 +157,22 @@ class RegistrationProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // 📌 گتر اختصاصی جهت رفع خطای profile_page.dart
+  Map<String, dynamic> get driverInformation {
+    return {
+      'name': "$driverName $driverSecondName".trim().isNotEmpty 
+          ? "$driverName $driverSecondName" 
+          : firstNameController.text,
+      'phone': driverPhone.isNotEmpty ? driverPhone : phoneController.text,
+      'email': driverEmail.isNotEmpty ? driverEmail : emailController.text,
+      'rating': rating.isNotEmpty ? rating : "0.0",
+      'photo': driverPhoto,
+      'carModel': carModel,
+      'carColor': carColor,
+      'carNumber': carNumber,
+    };
+  }
+
   void startLoading() {
     _isLoading = true;
     notifyListeners();
@@ -439,7 +455,6 @@ class RegistrationProvider extends ChangeNotifier {
           _database.ref().child("drivers").child(_auth.currentUser!.uid);
       await userRef.set(driver.toMap());
       
-      // ذخیره همزمان در متغیرهای سیستم
       await retrieveCurrentDriverInfo();
       stopLoading();
     } catch (e) {
@@ -552,7 +567,6 @@ class RegistrationProvider extends ChangeNotifier {
     }
   }
 
-  // 🛠️ اصلاح شده: ساخت پلاک کامل افغانستان در متغیر کاربری
   Future<void> retrieveCurrentDriverInfo() async {
     try {
       if (_auth.currentUser == null) return;
@@ -574,7 +588,6 @@ class RegistrationProvider extends ChangeNotifier {
         carModel = data['vehicleInfo']?['brand'] ?? '';
         carColor = data['vehicleInfo']?['color'] ?? '';
         
-        // 🇦🇫 ساخت پلاک ترکیبی شیک (ولایت - حرف شماره - نوع پلاک)
         String rawNumber = data['vehicleInfo']?['registrationPlateNumber'] ?? '';
         String prov = data['vehicleInfo']?['plateProvince'] ?? '';
         String cat = data['vehicleInfo']?['plateCategory'] ?? '';
@@ -688,7 +701,6 @@ class RegistrationProvider extends ChangeNotifier {
     }
   }
 
-  // 🛠️ اصلاح شده: آپدیت کامل فیلدهای پلاک افغانستان
   Future<void> updateVehicleBasicInfo(BuildContext context) async {
     try {
       _isLoading = true;
@@ -710,7 +722,6 @@ class RegistrationProvider extends ChangeNotifier {
           .child("vehicleInfo");
       await userRef.update(vehicleData);
       
-      // فراخوانی مجدد اطلاعات برای ست شدن در متغیرهای سراسری
       await retrieveCurrentDriverInfo();
       _isLoading = false;
       notifyListeners();
