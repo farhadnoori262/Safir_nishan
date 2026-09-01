@@ -38,17 +38,19 @@ class _ProfilePageState extends State<ProfilePage> {
         backgroundColor: AppColors.background,
         body: Consumer<RegistrationProvider>(
           builder: (context, regProvider, child) {
-            // دریافت اطلاعات زنده راننده از Provider
-            final driver = regProvider.driverInformation;
+            // 📌 خواندن صحیح داده‌ها از Map<String, dynamic>
+final driver = regProvider.driverInformation; 
 
-            String name = (driver?.name != null && driver!.name!.isNotEmpty)
-                ? "${driver.name} ${driver.secondName ?? ''}".trim()
-                : "نام ثبت‌نشده";
-            String phone = driver?.phone ?? "---";
-            String email = driver?.email ?? "";
-            String addressStr = driver?.address ?? "";
-            String photo = driver?.photo ?? "";
-            double ratingVal = double.tryParse(driver?.rating ?? "5.0") ?? 5.0;
+String name = (driver['name'] != null && driver['name'].toString().isNotEmpty)
+    ? driver['name'].toString()
+    : "---";
+
+      String phone = driver['phone']?.toString() ?? "---";
+        String email = driver['email']?.toString() ?? "";
+         String addressStr = driver['address']?.toString() ?? "";
+          String photo = driver['photo']?.toString() ?? "";
+          double ratingVal = double.tryParse(driver['rating']?.toString() ?? "5.0") ?? 5.0;
+
 
             return SingleChildScrollView(
               child: Column(
