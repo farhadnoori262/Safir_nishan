@@ -188,7 +188,8 @@ class _ProfilePageState extends State<ProfilePage> {
                                     ),
                                   ],
                                   const SizedBox(height: 8),
-                                  RatingStars(ratting: ratingVal),
+                                  RatingStars(ratting: ratingVal.toString()),
+
                                 ],
                               ),
                             ),
