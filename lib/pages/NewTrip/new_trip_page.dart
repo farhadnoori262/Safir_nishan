@@ -1,16 +1,14 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:maplibre_gl/maplibre_gl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../global/global.dart';
 import '../../methods/common_method.dart';
-import '../../methods/map_theme_methods.dart';
 import '../../models/trip_details.dart';
 import '../../utils/app_colors.dart';
 import '../../widgets/loading_dialog.dart';
@@ -25,86 +23,27 @@ class NewTripPage extends StatefulWidget {
 }
 
 class _NewTripPageState extends State<NewTripPage> {
-  MapLibreMapController? mapController;
-
-  MapThemeMethods themeMethods = MapThemeMethods();
-
-  List<LatLng> polylinePointsList = [];
-  bool directionRequested = false;
   String statusOfTrip = "accepted";
-  String durationText = "";
-  String distanceText = "";
-  double driverHeading = 0.0;
-
   String buttonTitleKey = "btn_arrived";
-
   Color buttonColor = AppColors.primaryButton;
   CommonMethods commonMethods = CommonMethods();
 
-  // 📐 محاسبه زاویه چرخش آیکون خودرو (Heading)
-  double calculateBearing(LatLng start, LatLng end) {
-    double lat1 = start.latitude * math.pi / 180;
-    double lng1 = start.longitude * math.pi / 180;
-    double lat2 = end.latitude * math.pi / 180;
-    double lng2 = end.longitude * math.pi / 180;
+  // 🗺️ باز کردن مسیریاب‌های بیرونی (گوگل مپس / نشان)
+  Future<void> _openExternalNavigationApp(double lat, double lng) async {
+    final Uri neshanUri = Uri.parse('neshan://navi?lat=$lat&lng=$lng');
+    final Uri googleUri = Uri.parse('google.navigation:q=$lat,$lng');
+    final Uri webUri = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lng');
 
-    double dLng = lng2 - lng1;
-    double y = math.sin(dLng) * math.cos(lat2);
-    double x = math.cos(lat1) * math.sin(lat2) -
-        math.sin(lat1) * math.cos(lat2) * math.cos(dLng);
-
-    double brng = math.atan2(y, x);
-    return (brng * 180 / math.pi + 360) % 360;
-  }
-
-  // 🗺️ دریافت مسیر و رسم Polyline روی MapLibre
-  obtainDirectionAndDrawRoute(
-      LatLng sourceLocationLatLng, LatLng destinationLocationLatLng) async {
-    try {
-      showDialog(
-        barrierDismissible: false,
-        context: context,
-        builder: (BuildContext context) => LoadingDialog(
-          messageText: 'please_wait'.tr(),
-        ),
-      );
-
-      var tripDetailsInfo = await CommonMethods.getDirectionDetailsFromAPI(
-          sourceLocationLatLng, destinationLocationLatLng);
-
-      if (mounted) Navigator.pop(context);
-
-      if (tripDetailsInfo == null || tripDetailsInfo.polylinePoints == null) {
-        return;
-      }
-
-      setState(() {
-        polylinePointsList = tripDetailsInfo.polylinePoints!;
-        durationText = tripDetailsInfo.durationTextString ?? "";
-        distanceText = tripDetailsInfo.distanceTextString ?? "";
-      });
-
-      // رسم خط مسیر روی MapLibre
-      if (mapController != null) {
-        await mapController!.clearLines();
-        await mapController!.addLine(
-           LineOptions(
-            geometry: polylinePointsList,
-            lineColor: "#145A41",
-            lineWidth: 5.0,
-          ),
-        );
-
-        // جابه‌جایی دوربین روی مبدأ
-        mapController!.animateCamera(
-          CameraUpdate.newLatLngZoom(sourceLocationLatLng, 15.5),
-        );
-      }
-    } catch (e) {
-      debugPrint("Error in obtainDirectionAndDrawRoute: $e");
+    if (await canLaunchUrl(neshanUri)) {
+      await launchUrl(neshanUri);
+    } else if (await canLaunchUrl(googleUri)) {
+      await launchUrl(googleUri);
+    } else {
+      await launchUrl(webUri, mode: LaunchMode.externalApplication);
     }
   }
 
+  // 📡 ارسال موقعیت زنده راننده به فایربیس
   getLiveLocationUpdatesOfDriver() {
     const LocationSettings locationSettings = LocationSettings(
       accuracy: LocationAccuracy.high,
@@ -114,32 +53,7 @@ class _NewTripPageState extends State<NewTripPage> {
     positionStreamNewTripPage = Geolocator.getPositionStream(
       locationSettings: locationSettings,
     ).listen((Position positionDriver) {
-      if (driverCurrentPosition != null) {
-        LatLng oldPos = LatLng(
-            driverCurrentPosition!.latitude, driverCurrentPosition!.longitude);
-        LatLng newPos =
-            LatLng(positionDriver.latitude, positionDriver.longitude);
-        driverHeading = calculateBearing(oldPos, newPos);
-      }
-
       driverCurrentPosition = positionDriver;
-
-      LatLng driverCurrentPositionLatLng = LatLng(
-          driverCurrentPosition!.latitude, driverCurrentPosition!.longitude);
-
-      if (mapController != null) {
-        mapController!.animateCamera(
-          CameraUpdate.newCameraPosition(
-            CameraPosition(
-              target: driverCurrentPositionLatLng,
-              zoom: 16.0,
-              bearing: driverHeading,
-            ),
-          ),
-        );
-      }
-
-      updateTripDetailsInformation();
 
       if (widget.newTripDetailsInfo?.tripID != null) {
         FirebaseFirestore.instance
@@ -152,44 +66,9 @@ class _NewTripPageState extends State<NewTripPage> {
           },
           "driver_lat": driverCurrentPosition!.latitude,
           "driver_lng": driverCurrentPosition!.longitude,
-          "driver_heading": driverHeading,
         });
       }
     });
-  }
-
-  updateTripDetailsInformation() async {
-    if (!directionRequested) {
-      directionRequested = true;
-
-      if (driverCurrentPosition == null) return;
-
-      var driverLocationLatLng = LatLng(
-          driverCurrentPosition!.latitude, driverCurrentPosition!.longitude);
-
-      LatLng dropOffDestinationLocationLatLng;
-      if (statusOfTrip == "accepted") {
-        dropOffDestinationLocationLatLng =
-            widget.newTripDetailsInfo!.pickUpLatLng!;
-      } else {
-        dropOffDestinationLocationLatLng =
-            widget.newTripDetailsInfo!.dropOffLatLng!;
-      }
-
-      var directionDetailsInfo = await CommonMethods.getDirectionDetailsFromAPI(
-          driverLocationLatLng, dropOffDestinationLocationLatLng);
-
-      if (directionDetailsInfo != null) {
-        directionRequested = false;
-
-        if (mounted) {
-          setState(() {
-            durationText = directionDetailsInfo.durationTextString!;
-            distanceText = directionDetailsInfo.distanceTextString!;
-          });
-        }
-      }
-    }
   }
 
   // 🏁 پایان سفر و محاسبه درآمد
@@ -202,11 +81,6 @@ class _NewTripPageState extends State<NewTripPage> {
       ),
     );
 
-    var driverCurrentLocationLatLng = LatLng(
-        driverCurrentPosition!.latitude, driverCurrentPosition!.longitude);
-    await CommonMethods.getDirectionDetailsFromAPI(
-        widget.newTripDetailsInfo!.pickUpLatLng!,
-        driverCurrentLocationLatLng);
     if (mounted) Navigator.pop(context);
 
     String finalFareAmount = "0";
@@ -227,10 +101,9 @@ class _NewTripPageState extends State<NewTripPage> {
       });
     }
 
-    positionStreamNewTripPage!.cancel();
+    positionStreamNewTripPage?.cancel();
 
     displayLoadingDialog(finalFareAmount);
-
     saveFareAmountToDriverTotalEearning(finalFareAmount);
   }
 
@@ -301,146 +174,132 @@ class _NewTripPageState extends State<NewTripPage> {
     getLiveLocationUpdatesOfDriver();
   }
 
-  void _onMapCreated(MapLibreMapController controller) {
-    mapController = controller;
-
-    // رسم مسیر اولیه از مکان راننده به سمت مبدأ مسافر
-    if (driverCurrentPosition != null &&
-        widget.newTripDetailsInfo?.pickUpLatLng != null) {
-      obtainDirectionAndDrawRoute(
-        LatLng(driverCurrentPosition!.latitude,
-            driverCurrentPosition!.longitude),
-        widget.newTripDetailsInfo!.pickUpLatLng!,
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    LatLng initialMapCenter;
-    if (driverCurrentPosition != null) {
-      initialMapCenter = LatLng(
-          driverCurrentPosition!.latitude, driverCurrentPosition!.longitude);
-    } else {
-      initialMapCenter = const LatLng(34.5553, 69.2075);
-    }
-
     return Directionality(
       textDirection: Directionality.of(context),
       child: SafeArea(
         child: Scaffold(
-          body: Stack(
-            children: [
-              // 🗺️ نقشه وکتوری جدید سفیر با MapLibre
-              MapLibreMap(
-                initialCameraPosition: CameraPosition(
-                  target: initialMapCenter,
-                  zoom: 15.5,
-                ),
-                styleString: 'assets/map/style.json',
-                onMapCreated: _onMapCreated,
-                myLocationEnabled: true,
-                myLocationTrackingMode: MyLocationTrackingMode.tracking,
-              ),
-
-              // 📇 کارت مدرن اطلاعات سفیر در پایین صفحه
-              Positioned(
-                left: 12,
-                right: 12,
-                bottom: 12,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.cardBackground,
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.12),
-                        blurRadius: 20,
-                        spreadRadius: 2,
-                        offset: const Offset(0, 4),
-                      )
-                    ],
-                  ),
-                  child: Padding(
+          appBar: AppBar(
+            title: const Text(
+              "مدیریت سفر فعال",
+              style: TextStyle(fontFamily: 'IranYekan', fontWeight: FontWeight.bold),
+            ),
+            backgroundColor: AppColors.primaryBrand,
+            centerTitle: true,
+            automaticallyImplyLeading: false,
+          ),
+          body: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                Expanded(
+                  child: Container(
                     padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: AppColors.cardBackground,
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.08),
+                          blurRadius: 15,
+                          offset: const Offset(0, 4),
+                        )
+                      ],
+                    ),
                     child: Column(
-                      mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // نشانگر فاصله و زمان
-                        if (durationText.isNotEmpty || distanceText.isNotEmpty)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                vertical: 6, horizontal: 12),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFEAF6F1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.access_time_rounded,
-                                    size: 16, color: AppColors.primaryBrand),
-                                const SizedBox(width: 6),
-                                Text(
-                                  "$durationText ($distanceText)",
-                                  style: const TextStyle(
-                                    color: AppColors.primaryBrand,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        const SizedBox(height: 12),
-                        Divider(height: 1, color: Colors.grey.shade200),
-                        const SizedBox(height: 12),
-
                         // آدرس مبدأ
                         Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Icon(Icons.circle,
-                                size: 10, color: AppColors.primaryBrand),
-                            const SizedBox(width: 10),
+                            const Icon(Icons.location_on, color: AppColors.primaryBrand, size: 24),
+                            const SizedBox(width: 12),
                             Expanded(
-                              child: Text(
-                                widget.newTripDetailsInfo!.pickupAddress ?? "",
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.grey.shade800,
-                                ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text("مبدأ مسافر:", style: TextStyle(fontSize: 12, color: Colors.grey)),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    widget.newTripDetailsInfo?.pickupAddress ?? "",
+                                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 16),
+                        Divider(height: 1, color: Colors.grey.shade300),
+                        const SizedBox(height: 16),
 
                         // آدرس مقصد
                         Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Icon(Icons.square,
-                                size: 10, color: Colors.redAccent),
-                            const SizedBox(width: 10),
+                            const Icon(Icons.flag_rounded, color: Colors.redAccent, size: 24),
+                            const SizedBox(width: 12),
                             Expanded(
-                              child: Text(
-                                widget.newTripDetailsInfo!.dropOffAddress ?? "",
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.grey.shade800,
-                                ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text("مقصد مسافر:", style: TextStyle(fontSize: 12, color: Colors.grey)),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    widget.newTripDetailsInfo?.dropOffAddress ?? "",
+                                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
                         ),
 
-                        const SizedBox(height: 18),
+                        const Spacer(),
 
-                        // دکمه تغییر وضعیت سفر (رسیدم / شروع سفر / پایان سفر)
+                        // 🧭 دکمه باز کردن مسیریاب خارجی (گوگل مپس / نشان)
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue.shade700,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          onPressed: () {
+                            // تعیین هدف مسیریابی (اگر هنوز نرسیده، به مبدأ؛ در غیر این صورت به مقصد)
+                            final targetLatLng = statusOfTrip == "accepted"
+                                ? widget.newTripDetailsInfo?.pickUpLatLng
+                                : widget.newTripDetailsInfo?.dropOffLatLng;
+
+                            if (targetLatLng != null) {
+                              _openExternalNavigationApp(
+                                targetLatLng.latitude,
+                                targetLatLng.longitude,
+                              );
+                            }
+                          },
+                          icon: const Icon(Icons.navigation_rounded, color: Colors.white),
+                          label: Text(
+                            statusOfTrip == "accepted"
+                                ? "مسیریابی به مبدأ مسافر"
+                                : "مسیریابی به مقصد",
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              fontFamily: 'IranYekan',
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        // 🔘 دکمه وضعیت سفر (رسیدم / شروع سفر / پایان سفر)
                         SizedBox(
-                          height: 48,
+                          height: 50,
                           child: ElevatedButton(
                             onPressed: () async {
                               if (statusOfTrip == "accepted") {
@@ -456,11 +315,6 @@ class _NewTripPageState extends State<NewTripPage> {
                                       .doc(widget.newTripDetailsInfo!.tripID!)
                                       .update({"status": "arrived"});
                                 }
-
-                                await obtainDirectionAndDrawRoute(
-                                  widget.newTripDetailsInfo!.pickUpLatLng!,
-                                  widget.newTripDetailsInfo!.dropOffLatLng!,
-                                );
                               } else if (statusOfTrip == "arrived") {
                                 setState(() {
                                   buttonTitleKey = "btn_end_trip";
@@ -490,17 +344,18 @@ class _NewTripPageState extends State<NewTripPage> {
                               buttonTitleKey.tr(),
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
-                                fontSize: 15,
+                                fontSize: 16,
+                                fontFamily: 'IranYekan',
                               ),
                             ),
                           ),
-                        )
+                        ),
                       ],
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
