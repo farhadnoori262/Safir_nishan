@@ -7,6 +7,7 @@ import 'package:safir_drivers/pages/home/home_page.dart';
 import 'package:safir_drivers/pages/profile/profile_page.dart';
 import 'package:safir_drivers/pages/trips/trips_page.dart';
 import 'package:safir_drivers/providers/dashboard_provider.dart';
+import 'package:safir_drivers/providers/registration_provider.dart';
 import 'package:safir_drivers/utils/app_colors.dart';
 
 class Dashboard extends StatefulWidget {
@@ -24,6 +25,13 @@ class _DashboardState extends State<Dashboard>
   void initState() {
     super.initState();
     controller = TabController(length: 4, vsync: this);
+
+    // 📌 فراخوانی و به‌روزرسانی اطلاعات راننده به محض ورود به داشبورد
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final regProvider = Provider.of<RegistrationProvider>(context, listen: false);
+      regProvider.retrieveCurrentDriverInfo();
+      regProvider.fetchDriverEarnings();
+    });
   }
 
   @override
@@ -35,6 +43,11 @@ class _DashboardState extends State<Dashboard>
   @override
   Widget build(BuildContext context) {
     final dashboardProvider = Provider.of<DashboardProvider>(context);
+
+    // همگام‌سازی ایندکس کنترلر با پرووایدر در صورت تغییر از پرووایدر
+    if (controller != null && controller!.index != dashboardProvider.selectedIndex) {
+      controller!.index = dashboardProvider.selectedIndex;
+    }
 
     return Scaffold(
       backgroundColor: AppColors.background,
