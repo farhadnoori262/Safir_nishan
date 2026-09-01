@@ -1,6 +1,6 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:maplibre_gl/maplibre_gl.dart';
+import 'package:latlong2/latlong2.dart';
 
 class DirectionDetails {
   String? distanceTextString; // متن مسافت خام از API (مثلاً 5.4 km)
