@@ -252,5 +252,16 @@
   "plate_province": "Plate Province",
   "plate_category": "Plate Letter",
   "required_field": "This field is required",
-  "save_and_continue": "Save & Continue"
+  "save_and_continue": "Save & Continue",
+  "vehicle_image_hint": "Please upload a clear photo of your vehicle",
+  "take_photo_camera": "Take Photo with Camera",
+  "confirm_and_save": "Confirm & Save",
+  "title_new_trip_request": "New Trip Request",
+  "label_pickup_location": "Pickup Location",
+  "label_dropoff_location": "Drop-off Location",
+  "label_standard_fare": "Standard Fare",
+  "label_passenger_bid": "Passenger Offer",
+  "no_bid_offer": "No Offer",
+  "btn_accept_trip": "Accept Trip",
+  "btn_decline_trip": "Decline Trip"
 }
