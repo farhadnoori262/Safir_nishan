@@ -252,5 +252,16 @@
   "plate_province": "ولایت پلاک",
   "plate_category": "حرف پلاک",
   "required_field": "این خانه حتمی است",
-  "save_and_continue": "ذخیره و ادامه"
+  "save_and_continue": "ذخیره و ادامه",
+  "vehicle_image_hint": "لطفاً عکس موتر خود را به شکل واضح وارد کنید",
+  "take_photo_camera": "گرفتن عکس با کمره",
+  "confirm_and_save": "تأیید و ذخیره",
+  "title_new_trip_request": "درخواست سفر جدید",
+  "label_pickup_location": "مبدأ",
+  "label_dropoff_location": "مقصد",
+  "label_standard_fare": "کرایه معیاری",
+  "label_passenger_bid": "پیشنهاد مسافر",
+  "no_bid_offer": "بدون پیشنهاد",
+  "btn_accept_trip": "قبول سفر",
+  "btn_decline_trip": "رد سفر"
 }
