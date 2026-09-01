@@ -7,7 +7,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_notification_channel/flutter_notification_channel.dart';
 import 'package:flutter_notification_channel/notification_importance.dart';
-import 'package:latlong2/latlong.dart'; // 👈 جایگزین شدن latlong2 به جای maplibre_gl
+import 'package:latlong2/latlong.dart';
 import 'package:safir_drivers/global/global.dart'; 
 import 'package:safir_drivers/main.dart'; 
 import 'package:safir_drivers/models/trip_details.dart'; 
@@ -15,7 +15,7 @@ import 'package:safir_drivers/widgets/notification_dialog.dart';
 
 class PushNotificationSystem {
   FirebaseMessaging firebaseCloudMessaging = FirebaseMessaging.instance;
-  final AudioPlayer _audioPlayer = AudioPlayer(); // ساخت یک‌باره برای جلوگیری از نشت حافظه
+  final AudioPlayer _audioPlayer = AudioPlayer();
 
   Future<String?> generateDeviceRegistrationToken() async {
     String? deviceRecognitionToken = await firebaseCloudMessaging.getToken();
@@ -79,12 +79,10 @@ class PushNotificationSystem {
     });
   }
 
-  // استخراج آیدی سفر از انواع کلیدهای ممکن
   String? _extractTripId(RemoteMessage message) {
     return message.data["tripID"] ?? message.data["trip_id"] ?? message.data["ride_id"];
   }
 
-  // تبدیل امن مقادیر مختصات به double
   double? _parseDouble(dynamic value) {
     if (value == null) return null;
     if (value is num) return value.toDouble();
@@ -108,7 +106,26 @@ class PushNotificationSystem {
       Map<String, dynamic> data = tripSnapshot.data() as Map<String, dynamic>;
       log("Firestore Trip Data: $data");
 
-      // پخش هشدار صوتی
+      // 🔴 ۱. فیلتر مهم: بررسی وضعیت سفر (فقط سفرهای در انتظار قبول شوند)
+      String tripStatus = data["status"]?.toString() ?? "";
+      if (tripStatus != "pending") {
+        log("Trip $tripID is not pending (Current status: $tripStatus). Ignoring.");
+        return;
+      }
+
+      // 🔴 ۲. فیلتر زمان: عدم نمایش سفرهای بیشتر از ۳ دقیقه پیش
+      if (data["createdAt"] != null) {
+        Timestamp createdTimestamp = data["createdAt"] as Timestamp;
+        DateTime createdAt = createdTimestamp.toDate();
+        DateTime now = DateTime.now();
+
+        if (now.difference(createdAt).inMinutes > 3) {
+          log("Trip $tripID is expired (created more than 3 minutes ago). Ignoring.");
+          return;
+        }
+      }
+
+      // پخش هشدار صوتی برای سفرهای معتبر
       try {
         await _audioPlayer.stop();
         await _audioPlayer.play(AssetSource('audio/alert-sound.mp3'));
@@ -118,7 +135,7 @@ class PushNotificationSystem {
 
       TripDetails tripDetailsInfo = TripDetails();
 
-      // 📍 ۱. مبدأ
+      // 📍 مبدأ
       if (data["from_lat"] != null && data["from_lng"] != null) {
         double? lat = _parseDouble(data["from_lat"]);
         double? lng = _parseDouble(data["from_lng"]);
@@ -132,7 +149,7 @@ class PushNotificationSystem {
 
       tripDetailsInfo.pickupAddress = data["pickup_address"]?.toString() ?? data["pickUpAddress"]?.toString() ?? "";
 
-      // 🏁 ۲. مقصد
+      // 🏁 مقصد
       if (data["to_lat"] != null && data["to_lng"] != null) {
         double? lat = _parseDouble(data["to_lat"]);
         double? lng = _parseDouble(data["to_lng"]);
@@ -146,7 +163,7 @@ class PushNotificationSystem {
 
       tripDetailsInfo.dropOffAddress = data["dropoff_address"]?.toString() ?? data["dropOffAddress"]?.toString() ?? "";
 
-      // 👤 ۳. مشخصات مسافر و کرایه
+      // 👤 مشخصات مسافر و کرایه
       tripDetailsInfo.userName = data["full_name"]?.toString() ?? data["userName"]?.toString() ?? "";
       tripDetailsInfo.userPhone = data["phone"]?.toString() ?? data["userPhone"]?.toString() ?? "";
       
@@ -154,7 +171,7 @@ class PushNotificationSystem {
       fareAmount = data["fare"]?.toString() ?? data["fareAmount"]?.toString() ?? "";
       tripDetailsInfo.tripID = tripID;
 
-      // 🔔 ۴. نمایش پاپ‌آپ پذیرش سفر
+      // 🔔 نمایش پاپ‌آپ فقط برای سفر معتبر
       showDialog(
         context: currentContext,
         barrierDismissible: false,
