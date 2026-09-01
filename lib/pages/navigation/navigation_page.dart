@@ -244,7 +244,8 @@ class _NavigationPageState extends State<NavigationPage> {
           final projection = _projectOntoRoute(rawLocation, routePoints);
           if (projection != null) {
             lockedLocation = projection.point;
-            lockedBearing = (projection.bearing + 180.0) % 360.0;
+            lockedBearing = projection.bearing;
+
 
           }
         }
@@ -482,29 +483,38 @@ await _mapController!.addImage(_driverArrowIconName, arrowBytes);
   /// آیکن/زاویه‌اش را عوض می‌کنیم؛ هرگز Symbol جدید اضافه نمی‌شود
   /// (تا از چشمک‌زدن/پرش جلوگیری شود).
   Future<void> _updateDriverMarker(
-    LatLng position, {
-    required bool navigating,
-    double rotate = 0,
-  }) async {
-    if (_mapController == null || !_iconsAdded) return;
+  LatLng position, {
+  required bool navigating,
+  double rotate = 0,
+}) async {
+  if (_mapController == null || !_iconsAdded) return;
 
-    final options = SymbolOptions(
-  geometry: position,
-  iconImage: navigating ? _driverArrowIconName : _driverDotIconName,
-  iconRotate: navigating ? rotate : 0,
-  iconAnchor: "center",
-  iconSize: 0.85, // این عدد اندازه فلش را روی نقشه دقیقاً مثل نشان تنظیم می‌کند
-);
-
-
-    if (_driverSymbol == null) {
-      _driverSymbol = await _mapController!.addSymbol(options);
-      await _mapController!.setSymbolIconAllowOverlap(true);
-      await _mapController!.setSymbolIconIgnorePlacement(true);
-    } else {
-      await _mapController!.updateSymbol(_driverSymbol!, options);
-    }
+  // محاسبه اندازه فلش متناسب با زوم نقشه
+  double dynamicSize = 0.85;
+  if (navigating) {
+    final currentZoom = _mapController!.zoomLevel;
+    dynamicSize = (math.pow(2, currentZoom - 18.0) * 0.85).clamp(0.25, 1.3);
   }
+
+  final options = SymbolOptions(
+    geometry: position,
+    iconImage: navigating ? _driverArrowIconName : _driverDotIconName,
+    iconRotate: 0, // فلش همیشه رو به بالا ثابت می‌ماند
+    iconAnchor: "center",
+    iconSize: dynamicSize,
+    iconRotationAlignment: "viewport",
+    iconPitchAlignment: "viewport",
+  );
+
+  if (_driverSymbol == null) {
+    _driverSymbol = await _mapController!.addSymbol(options);
+    await _mapController!.setSymbolIconAllowOverlap(true);
+    await _mapController!.setSymbolIconIgnorePlacement(true);
+  } else {
+    await _mapController!.updateSymbol(_driverSymbol!, options);
+  }
+}
+
 
   Future<void> _onPlaceSelected(PlaceSearchResult place) async {
     if (!mounted) return;
@@ -715,17 +725,35 @@ await _mapController!.addImage(_driverArrowIconName, arrowBytes);
   _isProgrammaticCameraMove = true;
 
   try {
+    // قفل کردن نقطه تمرکز دوربین در ۳۵٪ پایینی صفحه
+    await _mapController!.updateContentInsets(
+      EdgeInsets.only(
+        top: 0,
+        bottom: MediaQuery.of(context).size.height * 0.35,
+        left: 0,
+        right: 0,
+      ),
+    );
+
     await _mapController!.animateCamera(
       CameraUpdate.newCameraPosition(
         CameraPosition(
           target: location,
           zoom: 18.0,
           bearing: heading,
-          tilt: 60.0,
+          tilt: 55.0,
         ),
       ),
-      duration: const Duration(milliseconds: 500),
+      duration: const Duration(milliseconds: 400),
     );
+  } catch (_) {
+  } finally {
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) _isProgrammaticCameraMove = false;
+    });
+  }
+}
+
 
     await _mapController!.updateContentInsets(
   EdgeInsets.only(
