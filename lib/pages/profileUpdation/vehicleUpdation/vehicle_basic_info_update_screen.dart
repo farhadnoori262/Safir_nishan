@@ -101,6 +101,7 @@ class _VehicleBasicInfoUpdateScreenState
                           onChanged: (bool? value) {
                             if (value == true) {
                               registrationProvider.setSelectedVehicle("Car");
+                              registrationProvider.checkVehicleBasicFormValidity();
                             }
                           },
                         ),
@@ -118,6 +119,7 @@ class _VehicleBasicInfoUpdateScreenState
                           onChanged: (bool? value) {
                             if (value == true) {
                               registrationProvider.setSelectedVehicle("Bike");
+                              registrationProvider.checkVehicleBasicFormValidity();
                             }
                           },
                         ),
@@ -135,6 +137,7 @@ class _VehicleBasicInfoUpdateScreenState
                           onChanged: (bool? value) {
                             if (value == true) {
                               registrationProvider.setSelectedVehicle("Auto");
+                              registrationProvider.checkVehicleBasicFormValidity();
                             }
                           },
                         ),
@@ -233,6 +236,7 @@ class _VehicleBasicInfoUpdateScreenState
                                 onChanged: (val) {
                                   if (val != null) {
                                     registrationProvider.setPlateProvince(val);
+                                    registrationProvider.checkVehicleBasicFormValidity();
                                   }
                                 },
                               ),
@@ -261,6 +265,7 @@ class _VehicleBasicInfoUpdateScreenState
                                 onChanged: (val) {
                                   if (val != null) {
                                     registrationProvider.setPlateCategory(val);
+                                    registrationProvider.checkVehicleBasicFormValidity();
                                   }
                                 },
                               ),
@@ -309,6 +314,7 @@ class _VehicleBasicInfoUpdateScreenState
                           onChanged: (val) {
                             if (val != null) {
                               registrationProvider.setPlateType(val);
+                              registrationProvider.checkVehicleBasicFormValidity();
                             }
                           },
                         ),
@@ -323,8 +329,7 @@ class _VehicleBasicInfoUpdateScreenState
                     width: double.infinity,
                     height: 52,
                     child: ElevatedButton(
-                      onPressed: registrationProvider.isVehicleBasicFormValid &&
-                              !registrationProvider.isLoading
+                      onPressed: !registrationProvider.isLoading
                           ? () async {
                               if (_formKey.currentState?.validate() == true) {
                                 try {
