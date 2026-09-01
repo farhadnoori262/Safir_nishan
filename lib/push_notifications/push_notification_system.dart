@@ -7,7 +7,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_notification_channel/flutter_notification_channel.dart';
 import 'package:flutter_notification_channel/notification_importance.dart';
-import 'package:maplibre_gl/maplibre_gl.dart';
+import 'package:latlong2/latlong.dart'; // 👈 جایگزین شدن latlong2 به جای maplibre_gl
 import 'package:safir_drivers/global/global.dart'; 
 import 'package:safir_drivers/main.dart'; 
 import 'package:safir_drivers/models/trip_details.dart'; 
