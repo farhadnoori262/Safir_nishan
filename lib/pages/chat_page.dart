@@ -2,17 +2,20 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:safir_drivers/utils/app_colors.dart';
 
 class ChatPage extends StatefulWidget {
   final String tripId;
   final String passengerName;
+  final String passengerPhone; // 📞 اضافه شدن شماره مسافر
 
   const ChatPage({
     super.key,
     required this.tripId,
     required this.passengerName,
+    required this.passengerPhone,
   });
 
   @override
@@ -27,6 +30,21 @@ class _ChatPageState extends State<ChatPage> {
   void dispose() {
     _messageController.dispose();
     super.dispose();
+  }
+
+  // 📞 متد تماس مستقیم تلفنی
+  Future<void> _makePhoneCall(String phoneNumber) async {
+    if (phoneNumber.isEmpty) return;
+    
+    final Uri launchUri = Uri(
+      scheme: 'tel',
+      path: phoneNumber,
+    );
+    if (await canLaunchUrl(launchUri)) {
+      await launchUrl(launchUri);
+    } else {
+      debugPrint("Could not launch $launchUri");
+    }
   }
 
   void sendMessage() async {
@@ -62,28 +80,41 @@ class _ChatPageState extends State<ChatPage> {
               child: Icon(Icons.person, color: Colors.white),
             ),
             const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  widget.passengerName,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.passengerName,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-                Text(
-                  'chat_passenger_subtitle'.tr(),
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: Colors.white70,
+                  Text(
+                    widget.passengerPhone.isNotEmpty
+                        ? widget.passengerPhone
+                        : 'chat_passenger_subtitle'.tr(),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.white70,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
         ),
+        actions: [
+          // 📞 دکمه تماس مستقیم در هدر صفحه چت
+          IconButton(
+            icon: const Icon(Icons.phone_enabled_rounded, color: Colors.white),
+            onPressed: () => _makePhoneCall(widget.passengerPhone),
+          ),
+          const SizedBox(width: 6),
+        ],
       ),
       body: Column(
         children: [
