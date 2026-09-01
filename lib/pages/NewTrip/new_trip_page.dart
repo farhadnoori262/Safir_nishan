@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -28,7 +29,7 @@ class _NewTripPageState extends State<NewTripPage> {
   Color buttonColor = AppColors.primaryButton;
   CommonMethods commonMethods = CommonMethods();
 
-  // 🗺️ باز کردن مسیریاب‌های بیرونی (گوگل مپس / نشان)
+  // 🗺️ باز کردن مسیریاب‌های بیرونی
   Future<void> _openExternalNavigationApp(double lat, double lng) async {
     final Uri neshanUri = Uri.parse('neshan://navi?lat=$lat&lng=$lng');
     final Uri googleUri = Uri.parse('google.navigation:q=$lat,$lng&mode=d');
@@ -75,7 +76,7 @@ class _NewTripPageState extends State<NewTripPage> {
     });
   }
 
-  // 🏁 پایان سفر و محاسبه درآمد
+  // 🏁 پایان سفر و محاسبه درآمد در Realtime Database
   endTripNow() async {
     showDialog(
       barrierDismissible: false,
@@ -84,8 +85,6 @@ class _NewTripPageState extends State<NewTripPage> {
         messageText: 'ending_trip'.tr(),
       ),
     );
-
-    if (mounted) Navigator.pop(context);
 
     String finalFareAmount = "0";
     if (bidAmount != "null" && bidAmount.isNotEmpty) {
@@ -107,8 +106,10 @@ class _NewTripPageState extends State<NewTripPage> {
 
     positionStreamNewTripPage?.cancel();
 
+    if (mounted) Navigator.pop(context);
+
     displayLoadingDialog(finalFareAmount);
-    saveFareAmountToDriverTotalEearning(finalFareAmount);
+    await saveFareAmountToDriverTotalEearning(finalFareAmount);
   }
 
   displayLoadingDialog(faremmount) {
@@ -119,55 +120,107 @@ class _NewTripPageState extends State<NewTripPage> {
     );
   }
 
-  saveFareAmountToDriverTotalEearning(String fareAmount) async {
+  // 💰 آپدیت درآمد راننده در Realtime Database
+  Future<void> saveFareAmountToDriverTotalEearning(String fareAmount) async {
     String currentDriverUid = FirebaseAuth.instance.currentUser!.uid;
-    DocumentReference driverRef = FirebaseFirestore.instance
-        .collection("drivers")
-        .doc(currentDriverUid);
+    DatabaseReference driverRef = FirebaseDatabase.instance
+        .ref()
+        .child("drivers")
+        .child(currentDriverUid);
 
-    DocumentSnapshot snap = await driverRef.get();
+    DataSnapshot snap = await driverRef.child("earnings").get();
     double fareAmountForThisAmount = double.tryParse(fareAmount) ?? 0.0;
 
-    if (snap.exists && snap.data() != null) {
-      var data = snap.data() as Map<String, dynamic>;
+    if (snap.exists && snap.value != null) {
       double previousTotalEarning =
-          double.tryParse(data["earnings"]?.toString() ?? "0") ?? 0.0;
+          double.tryParse(snap.value.toString()) ?? 0.0;
       double newTotalEarning = previousTotalEarning + fareAmountForThisAmount;
-      await driverRef.update({"earnings": newTotalEarning});
+      await driverRef.update({"earnings": newTotalEarning.toStringAsFixed(2)});
     } else {
-      await driverRef.set({"earnings": fareAmountForThisAmount}, SetOptions(merge: true));
+      await driverRef.update({"earnings": fareAmountForThisAmount.toStringAsFixed(2)});
     }
   }
 
-  saveDriverDataToTripInfo() async {
-    Map<String, dynamic> driverDataMap = {
-      "status": "accepted",
-      "driverId": FirebaseAuth.instance.currentUser!.uid,
-      "driver_id": FirebaseAuth.instance.currentUser!.uid,
-      "driverName": "$driverName $driverSecondName",
-      "driver_name": "$driverName $driverSecondName",
-      "driverPhone": driverPhone,
-      "driver_phone": driverPhone,
-      "driverPhoto": driverPhoto,
-      "driver_photo": driverPhoto,
-      "carDetails": "$carModel - $carNumber - $carColor",
-      "car_details": "$carModel - $carNumber - $carColor",
-    };
+  // 🚗 دریافت مستقیم دیتا از Realtime Database و ذخیره پلاک کامل، عکس و نام در Firestore
+  Future<void> saveDriverDataToTripInfo() async {
+    String currentUid = FirebaseAuth.instance.currentUser!.uid;
 
-    if (driverCurrentPosition != null) {
-      driverDataMap["driverLocation"] = {
-        'latitude': driverCurrentPosition!.latitude,
-        'longitude': driverCurrentPosition!.longitude,
+    try {
+      // دریافت اطلاعات به روز راننده از Realtime Database
+      DatabaseReference driverRef =
+          FirebaseDatabase.instance.ref().child("drivers").child(currentUid);
+      DataSnapshot snapshot = await driverRef.get();
+
+      String realDriverName = "";
+      String realDriverPhone = "";
+      String realDriverPhoto = "";
+      String fullCarPlate = "";
+      String carModelName = "";
+      String carColorName = "";
+
+      if (snapshot.exists) {
+        Map<dynamic, dynamic> data = snapshot.value as Map<dynamic, dynamic>;
+
+        String fName = data['firstName'] ?? '';
+        String sName = data['secondName'] ?? '';
+        realDriverName = "$fName $sName".trim();
+        realDriverPhone = data['phoneNumber'] ?? '';
+        realDriverPhoto = data['profilePicture'] ?? '';
+
+        // استخراج فیلدهای خودرو و پلاک کامل افغانستان
+        var vehicle = data['vehicleInfo'];
+        if (vehicle != null) {
+          carModelName = vehicle['brand'] ?? '';
+          carColorName = vehicle['color'] ?? '';
+          
+          String rawPlate = vehicle['registrationPlateNumber'] ?? '';
+          String prov = vehicle['plateProvince'] ?? '';
+          String cat = vehicle['plateCategory'] ?? '';
+          String type = vehicle['plateType'] ?? '';
+
+          if (prov.isNotEmpty && rawPlate.isNotEmpty) {
+            fullCarPlate = "$prov - $cat $rawPlate ($type)";
+          } else {
+            fullCarPlate = rawPlate;
+          }
+        }
+      }
+
+      // ساخت مپ کامل داده‌ها
+      Map<String, dynamic> driverDataMap = {
+        "status": "accepted",
+        "driverId": currentUid,
+        "driver_id": currentUid,
+        "driverName": realDriverName.isNotEmpty ? realDriverName : "$driverName $driverSecondName",
+        "driver_name": realDriverName.isNotEmpty ? realDriverName : "$driverName $driverSecondName",
+        "driverPhone": realDriverPhone.isNotEmpty ? realDriverPhone : driverPhone,
+        "driver_phone": realDriverPhone.isNotEmpty ? realDriverPhone : driverPhone,
+        "driverPhoto": realDriverPhoto.isNotEmpty ? realDriverPhoto : driverPhoto,
+        "driver_photo": realDriverPhoto.isNotEmpty ? realDriverPhoto : driverPhoto,
+        "carDetails": "$carModelName - $fullCarPlate - $carColorName",
+        "car_details": "$carModelName - $fullCarPlate - $carColorName",
+        "carNumber": fullCarPlate,
+        "car_number": fullCarPlate,
       };
-      driverDataMap["driver_lat"] = driverCurrentPosition!.latitude;
-      driverDataMap["driver_lng"] = driverCurrentPosition!.longitude;
-    }
 
-    if (widget.newTripDetailsInfo?.tripID != null) {
-      await FirebaseFirestore.instance
-          .collection("rides")
-          .doc(widget.newTripDetailsInfo!.tripID!)
-          .update(driverDataMap);
+      if (driverCurrentPosition != null) {
+        driverDataMap["driverLocation"] = {
+          'latitude': driverCurrentPosition!.latitude,
+          'longitude': driverCurrentPosition!.longitude,
+        };
+        driverDataMap["driver_lat"] = driverCurrentPosition!.latitude;
+        driverDataMap["driver_lng"] = driverCurrentPosition!.longitude;
+      }
+
+      // آپدیت سند سفر در Firestore
+      if (widget.newTripDetailsInfo?.tripID != null) {
+        await FirebaseFirestore.instance
+            .collection("rides")
+            .doc(widget.newTripDetailsInfo!.tripID!)
+            .update(driverDataMap);
+      }
+    } catch (e) {
+      debugPrint("Error saving driver data to trip: $e");
     }
   }
 
