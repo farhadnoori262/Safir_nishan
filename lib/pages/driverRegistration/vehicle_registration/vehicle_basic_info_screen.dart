@@ -15,6 +15,19 @@ class VehicleBasicInfoScreen extends StatefulWidget {
 class _VehicleBasicInfoScreenState extends State<VehicleBasicInfoScreen> {
   final _formKey = GlobalKey<FormState>();
 
+  // لیست ولایت‌های افغانستان
+  final List<String> afghanistanProvinces = [
+    'کابل', 'هرات', 'بلخ', 'قندهار', 'ننگرهار', 'غزنی', 'پکتیا', 'پروان', 'کندز', 'دایکندی', 'بامیان'
+  ];
+
+  // حروف پلاک
+  final List<String> plateCategories = [
+    'ش', 'الف', 'ب', 'ت', 'ج', 'د', 'ر', 'ز', 'س', 'ص', 'ط', 'ع', 'ف', 'ق', 'ک', 'م', 'ن', 'و', 'هـ', 'ی'
+  ];
+
+  // نوع پلاک
+  final List<String> plateTypes = ['شخصی', 'موقتی', 'تاکسی', 'دولتی'];
+
   String _toEnglishNumbers(String input) {
     const english = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
     const farsi = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
@@ -67,6 +80,7 @@ class _VehicleBasicInfoScreenState extends State<VehicleBasicInfoScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // ۱. کارت انتخاب نوع وسیله نقلیه
                   Container(
                     margin: const EdgeInsets.symmetric(vertical: 10),
                     decoration: BoxDecoration(
@@ -107,6 +121,7 @@ class _VehicleBasicInfoScreenState extends State<VehicleBasicInfoScreen> {
                           onChanged: (bool? value) {
                             if (value == true) {
                               registrationProvider.setSelectedVehicle("Car");
+                              registrationProvider.checkVehicleBasicFormValidity();
                             }
                           },
                         ),
@@ -135,6 +150,7 @@ class _VehicleBasicInfoScreenState extends State<VehicleBasicInfoScreen> {
                           onChanged: (bool? value) {
                             if (value == true) {
                               registrationProvider.setSelectedVehicle("Bike");
+                              registrationProvider.checkVehicleBasicFormValidity();
                             }
                           },
                         ),
@@ -163,6 +179,7 @@ class _VehicleBasicInfoScreenState extends State<VehicleBasicInfoScreen> {
                           onChanged: (bool? value) {
                             if (value == true) {
                               registrationProvider.setSelectedVehicle("Auto");
+                              registrationProvider.checkVehicleBasicFormValidity();
                             }
                           },
                         ),
@@ -172,6 +189,7 @@ class _VehicleBasicInfoScreenState extends State<VehicleBasicInfoScreen> {
 
                   const SizedBox(height: 10),
 
+                  // ۲. کادر مشخصات موتر و پلاک اختصاصی افغانستان
                   Container(
                     decoration: BoxDecoration(
                       border: Border.all(color: Colors.grey.shade200),
@@ -187,11 +205,13 @@ class _VehicleBasicInfoScreenState extends State<VehicleBasicInfoScreen> {
                     ),
                     padding: const EdgeInsets.all(16),
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // مدل / برند
                         TextFormField(
                           controller: registrationProvider.brandController,
                           decoration: InputDecoration(
-                            labelText: 'label_brand'.tr(),
+                            labelText: 'vehicle_brand_label'.tr(),
                             labelStyle: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
                             focusedBorder: const OutlineInputBorder(
                               borderRadius: BorderRadius.all(Radius.circular(12)),
@@ -205,17 +225,19 @@ class _VehicleBasicInfoScreenState extends State<VehicleBasicInfoScreen> {
                           ),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
-                              return 'err_brand_required'.tr();
+                              return 'vehicle_brand_error'.tr();
                             }
                             return null;
                           },
                           onChanged: (_) => registrationProvider.checkVehicleBasicFormValidity(),
                         ),
                         const SizedBox(height: 16),
+
+                        // رنگ
                         TextFormField(
                           controller: registrationProvider.colorController,
                           decoration: InputDecoration(
-                            labelText: 'label_color'.tr(),
+                            labelText: 'vehicle_color_label'.tr(),
                             labelStyle: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
                             focusedBorder: const OutlineInputBorder(
                               borderRadius: BorderRadius.all(Radius.circular(12)),
@@ -229,18 +251,20 @@ class _VehicleBasicInfoScreenState extends State<VehicleBasicInfoScreen> {
                           ),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
-                              return 'err_color_required'.tr();
+                              return 'vehicle_color_error'.tr();
                             }
                             return null;
                           },
                           onChanged: (_) => registrationProvider.checkVehicleBasicFormValidity(),
                         ),
                         const SizedBox(height: 16),
+
+                        // سال ساخت
                         TextFormField(
                           controller: registrationProvider.productionYearController,
                           keyboardType: TextInputType.number,
                           decoration: InputDecoration(
-                            labelText: 'label_year'.tr(),
+                            labelText: 'vehicle_year_label'.tr(),
                             labelStyle: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
                             focusedBorder: const OutlineInputBorder(
                               borderRadius: BorderRadius.all(Radius.circular(12)),
@@ -254,7 +278,7 @@ class _VehicleBasicInfoScreenState extends State<VehicleBasicInfoScreen> {
                           ),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
-                              return 'err_year_required'.tr();
+                              return 'vehicle_year_error'.tr();
                             }
                             return null;
                           },
@@ -269,40 +293,133 @@ class _VehicleBasicInfoScreenState extends State<VehicleBasicInfoScreen> {
                             registrationProvider.checkVehicleBasicFormValidity();
                           },
                         ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: registrationProvider.numberPlateController,
-                          decoration: InputDecoration(
-                            labelText: 'label_plate'.tr(),
-                            labelStyle: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
-                            focusedBorder: const OutlineInputBorder(
-                              borderRadius: BorderRadius.all(Radius.circular(12)),
-                              borderSide: BorderSide(color: AppColors.primaryBrand, width: 2),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: const BorderRadius.all(Radius.circular(12)),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                        
+                        const SizedBox(height: 20),
+                        Text(
+                          'plate_info_header'.tr(),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: AppColors.primaryBrand,
                           ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'err_plate_required'.tr();
-                            }
-                            return null;
-                          },
+                        ),
+                        const SizedBox(height: 12),
+
+                        // 🇦🇫 سطر سه تایی پلاک: ولایت + حرف + شماره پلاک
+                        Row(
+                          children: [
+                            // انتخاب ولایت
+                            Expanded(
+                              flex: 3,
+                              child: DropdownButtonFormField<String>(
+                                value: afghanistanProvinces.contains(registrationProvider.plateProvince)
+                                    ? registrationProvider.plateProvince
+                                    : null,
+                                decoration: InputDecoration(
+                                  labelText: 'province'.tr(),
+                                  labelStyle: const TextStyle(fontSize: 11),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                                ),
+                                items: afghanistanProvinces.map((prov) {
+                                  return DropdownMenuItem(
+                                    value: prov, 
+                                    child: Text(prov, style: const TextStyle(fontSize: 12)),
+                                  );
+                                }).toList(),
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    registrationProvider.setPlateProvince(val);
+                                    registrationProvider.checkVehicleBasicFormValidity();
+                                  }
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+
+                            // انتخاب حرف پلاک
+                            Expanded(
+                              flex: 2,
+                              child: DropdownButtonFormField<String>(
+                                value: plateCategories.contains(registrationProvider.plateCategory)
+                                    ? registrationProvider.plateCategory
+                                    : null,
+                                decoration: InputDecoration(
+                                  labelText: 'plate_letter'.tr(),
+                                  labelStyle: const TextStyle(fontSize: 11),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+                                ),
+                                items: plateCategories.map((cat) {
+                                  return DropdownMenuItem(
+                                    value: cat, 
+                                    child: Text(cat, style: const TextStyle(fontSize: 12)),
+                                  );
+                                }).toList(),
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    registrationProvider.setPlateCategory(val);
+                                    registrationProvider.checkVehicleBasicFormValidity();
+                                  }
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+
+                            // شماره پلاک (ارقام)
+                            Expanded(
+                              flex: 4,
+                              child: TextFormField(
+                                controller: registrationProvider.numberPlateController,
+                                keyboardType: TextInputType.number,
+                                decoration: InputDecoration(
+                                  labelText: 'plate_number'.tr(),
+                                  labelStyle: const TextStyle(fontSize: 11),
+                                  border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                ),
+                                validator: (value) => (value == null || value.isEmpty) ? 'plate_number_error'.tr() : null,
+                                onChanged: (val) {
+                                  final converted = _toEnglishNumbers(val);
+                                  if (converted != val) {
+                                    registrationProvider.numberPlateController.value = TextEditingValue(
+                                      text: converted,
+                                      selection: TextSelection.collapsed(offset: converted.length),
+                                    );
+                                  }
+                                  registrationProvider.checkVehicleBasicFormValidity();
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        
+                        const SizedBox(height: 14),
+
+                        // انتخاب نوع پلاک (شخصی، موقتی، تاکسی، ...)
+                        DropdownButtonFormField<String>(
+                          value: plateTypes.contains(registrationProvider.plateType)
+                              ? registrationProvider.plateType
+                              : null,
+                          decoration: InputDecoration(
+                            labelText: 'plate_type'.tr(),
+                            labelStyle: const TextStyle(fontSize: 12),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                          ),
+                          items: plateTypes.map((type) {
+                            return DropdownMenuItem(
+                              value: type, 
+                              child: Text(type, style: const TextStyle(fontSize: 13)),
+                            );
+                          }).toList(),
                           onChanged: (val) {
-                            final converted = _toEnglishNumbers(val);
-                            if (converted != val) {
-                              registrationProvider.numberPlateController.value = TextEditingValue(
-                                text: converted,
-                                selection: TextSelection.collapsed(offset: converted.length),
-                              );
+                            if (val != null) {
+                              registrationProvider.setPlateType(val);
+                              registrationProvider.checkVehicleBasicFormValidity();
                             }
-                            registrationProvider.checkVehicleBasicFormValidity();
                           },
                         ),
-                        const SizedBox(height: 8),
                       ],
                     ),
                   ),
