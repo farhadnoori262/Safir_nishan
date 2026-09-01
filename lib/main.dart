@@ -4,8 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 
-import 'package:safir_drivers/controllers/navigation_controller.dart';
-import 'package:safir_drivers/pages/navigation/navigation_page.dart';
 import 'package:safir_drivers/pages/splash_screen.dart';
 import 'package:safir_drivers/providers/authentication_provider.dart';
 import 'package:safir_drivers/providers/dashboard_provider.dart';
@@ -103,9 +101,6 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(
           create: (_) => TripProvider(),
         ),
-        ChangeNotifierProvider(
-          create: (_) => NavigationController(),
-        ),
       ],
       child: MaterialApp(
         navigatorKey: navigatorKey,
@@ -116,7 +111,7 @@ class MyApp extends StatelessWidget {
         locale: context.locale,
         theme: ThemeData(
           useMaterial3: true,
-          fontFamily: 'IranYekan', // 👈 اعمال سراسری فونت ایران یکان
+          fontFamily: 'IranYekan',
           primaryColor: AppColors.primaryBrand,
           scaffoldBackgroundColor: AppColors.background,
           colorScheme: ColorScheme.fromSeed(
@@ -137,7 +132,6 @@ class MyApp extends StatelessWidget {
             ),
           ),
         ),
-        // شروع برنامه با اسپلش یا مستقیم از صفحه مسیریابی
         home: const SplashScreen(),
       ),
     );
