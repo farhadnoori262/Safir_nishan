@@ -327,8 +327,9 @@ class _NewTripPageState extends State<NewTripPage> {
                           ),
                           onPressed: () {
                             dynamic targetLocation = statusOfTrip == "accepted"
-                                ? (widget.newTripDetailsInfo?.pickUpLatLng ?? widget.newTripDetailsInfo?.pickupLatLng)
-                                : (widget.newTripDetailsInfo?.dropOffLatLng ?? widget.newTripDetailsInfo?.dropoffLatLng);
+                                ? widget.newTripDetailsInfo?.pickUpLatLng
+                                : widget.newTripDetailsInfo?.dropOffLatLng;
+
 
                             if (targetLocation != null && targetLocation.latitude != null && targetLocation.longitude != null) {
                               _openExternalNavigationApp(
