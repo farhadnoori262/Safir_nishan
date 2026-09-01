@@ -22,6 +22,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   Position? currentPositionOfDriver;
   bool isDriverAvailable = false;
+  bool isLoading = false; // برای حالت لودینگ دکمه
 
   StreamSubscription<Position>? positionStreamHomePage;
   StreamSubscription<QuerySnapshot>? tripRequestStream;
@@ -87,12 +88,11 @@ class _HomePageState extends State<HomePage> {
     await prefs.setBool('isDriverAvailable', status);
   }
 
-  goOnlineNow() async {
+  Future<void> goOnlineNow() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
     String uid = user.uid;
 
-    // اگر موقعیت قبلاً گرفته نشده باشد، همین‌جا موقعیت زنده را دریافت می‌کند
     currentPositionOfDriver ??= await getCurrentLiveLocationOfDriver();
 
     if (currentPositionOfDriver != null) {
@@ -139,7 +139,7 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  goOfflineNow() async {
+  Future<void> goOfflineNow() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       String uid = user.uid;
@@ -191,144 +191,172 @@ class _HomePageState extends State<HomePage> {
       context: context,
       isDismissible: true,
       backgroundColor: Colors.transparent,
-      builder: (BuildContext context) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: AppColors.cardBackground,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(28),
-              topRight: Radius.circular(28),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black12,
-                blurRadius: 15,
-                spreadRadius: 2,
-              ),
-            ],
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
+      builder: (BuildContext modalContext) {
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setModalState) {
+            return Container(
+              decoration: const BoxDecoration(
+                color: AppColors.cardBackground,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(28),
+                  topRight: Radius.circular(28),
                 ),
-              ),
-              const SizedBox(height: 20),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryBrand.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.power_settings_new,
-                  color: AppColors.primaryBrand,
-                  size: 32,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                (!isDriverAvailable)
-                    ? 'change_to_online_title'.tr()
-                    : 'change_to_offline_title'.tr(),
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 18,
-                  color: AppColors.textPrimary,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                (!isDriverAvailable)
-                    ? 'change_to_online_desc'.tr()
-                    : 'change_to_offline_desc'.tr(),
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 13,
-                  height: 1.5,
-                ),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        if (!isDriverAvailable) {
-                          await goOnlineNow();
-                          setAndGetLocationUpdates();
-                          listenForTripRequests();
-                          if (mounted) {
-                            Navigator.pop(context);
-                            setState(() {
-                              isDriverAvailable = true;
-                            });
-                          }
-                          _saveDriverStatus(true);
-                        } else {
-                          await goOfflineNow();
-                          if (mounted) {
-                            Navigator.pop(context);
-                            setState(() {
-                              isDriverAvailable = false;
-                            });
-                          }
-                          _saveDriverStatus(false);
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: isDriverAvailable 
-                            ? Colors.red.shade700 
-                            : AppColors.primaryButton,
-                        foregroundColor: AppColors.buttonText,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                      child: Text(
-                        'confirm'.tr(),
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: Colors.grey.shade300),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                      child: Text(
-                        'cancel'.tr(),
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black12,
+                    blurRadius: 15,
+                    spreadRadius: 2,
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
-            ],
-          ),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryBrand.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.power_settings_new,
+                      color: AppColors.primaryBrand,
+                      size: 32,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    (!isDriverAvailable)
+                        ? 'change_to_online_title'.tr()
+                        : 'change_to_offline_title'.tr(),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    (!isDriverAvailable)
+                        ? 'change_to_online_desc'.tr()
+                        : 'change_to_offline_desc'.tr(),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 13,
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: isLoading
+                              ? null
+                              : () async {
+                                  setModalState(() {
+                                    isLoading = true;
+                                  });
+
+                                  try {
+                                    if (!isDriverAvailable) {
+                                      await goOnlineNow();
+                                      setAndGetLocationUpdates();
+                                      listenForTripRequests();
+                                      await _saveDriverStatus(true);
+                                      
+                                      if (mounted) {
+                                        setState(() {
+                                          isDriverAvailable = true;
+                                        });
+                                      }
+                                    } else {
+                                      await goOfflineNow();
+                                      await _saveDriverStatus(false);
+                                      
+                                      if (mounted) {
+                                        setState(() {
+                                          isDriverAvailable = false;
+                                        });
+                                      }
+                                    }
+                                  } catch (e) {
+                                    debugPrint("Error changing status: $e");
+                                  } finally {
+                                    if (modalContext.mounted) {
+                                      Navigator.pop(modalContext);
+                                    }
+                                    isLoading = false;
+                                  }
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: isDriverAvailable 
+                                ? Colors.red.shade700 
+                                : AppColors.primaryButton,
+                            foregroundColor: AppColors.buttonText,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          child: isLoading
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : Text(
+                                  'confirm'.tr(),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: isLoading ? null : () => Navigator.pop(modalContext),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: Colors.grey.shade300),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          child: Text(
+                            'cancel'.tr(),
+                            style: const TextStyle(
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                ],
+              ),
+            );
+          },
         );
       },
     );
