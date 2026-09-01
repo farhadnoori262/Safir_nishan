@@ -426,19 +426,19 @@ class _SettingsPageState extends State<SettingsPage> {
             // گزینه زبان دری / فارسی
             _buildLanguageOption(
               title: "دری (Dari)",
-              locale: const Locale('fa', 'AF'),
+              locale: const Locale('fa'),
             ),
 
             // گزینه زبان پشتو
             _buildLanguageOption(
               title: "پښتو (Pashto)",
-              locale: const Locale('ps', 'AF'),
+              locale: const Locale('ps'),
             ),
 
             // گزینه زبان انگلیسی
             _buildLanguageOption(
               title: "English",
-              locale: const Locale('en', 'US'),
+              locale: const Locale('en'),
             ),
 
             const Spacer(),
