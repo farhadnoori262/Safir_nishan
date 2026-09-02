@@ -31,23 +31,45 @@ class _HomePageState extends State<HomePage> {
   StreamSubscription<QuerySnapshot>? tripRequestStream;
 
   void listenForTripRequests() {
-    tripRequestStream?.cancel();
-    tripRequestStream = FirebaseFirestore.instance
-        .collection('rides')
-        .where('status', isEqualTo: 'requested')
-        .snapshots()
-        .listen((snapshot) {
-      for (var change in snapshot.docChanges) {
+  tripRequestStream?.cancel();
+
+  final Timestamp? onlineTime = driverWentOnlineAt;
+
+  if (onlineTime == null) {
+    debugPrint(
+      "Trip listener was not started because driver online time is null.",
+    );
+    return;
+  }
+
+  tripRequestStream = FirebaseFirestore.instance
+      .collection('rides')
+      .where('status', isEqualTo: 'requested')
+      .where('createdAt', isGreaterThan: onlineTime)
+      .snapshots()
+      .listen(
+    (snapshot) {
+      debugPrint(
+        "New requested rides after online: ${snapshot.docs.length}",
+      );
+
+      for (final change in snapshot.docChanges) {
         if (change.type == DocumentChangeType.added) {
-          String tripID = change.doc.id;
+          final String tripID = change.doc.id;
+
+          debugPrint("New trip request received: $tripID");
+
           if (mounted && isDriverAvailable) {
-            PushNotificationSystem().retrieveTripRequestInfo(tripID, context);
+            PushNotificationSystem()
+                .retrieveTripRequestInfo(tripID, context);
           }
         }
       }
-    }, onError: (error) {
+    },
+    onError: (error) {
       debugPrint("Error listening for trip requests: $error");
-    });
+    },
+  );
   }
 
   Future<Position?> getCurrentLiveLocationOfDriver() async {
