@@ -25,6 +25,7 @@ class _HomePageState extends State<HomePage> {
   Position? currentPositionOfDriver;
   bool isDriverAvailable = false;
   bool isLoading = false;
+  Timestamp? driverWentOnlineAt;
 
   StreamSubscription<Position>? positionStreamHomePage;
   StreamSubscription<QuerySnapshot>? tripRequestStream;
@@ -113,6 +114,7 @@ class _HomePageState extends State<HomePage> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
     String uid = user.uid;
+    driverWentOnlineAt = Timestamp.now();
 
     currentPositionOfDriver ??= await getCurrentLiveLocationOfDriver();
 
