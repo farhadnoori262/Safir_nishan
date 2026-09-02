@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:easy_localization/easy_localization.dart';
+import 'package:easy_localization/easy_localization';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
@@ -29,7 +29,7 @@ class _HomePageState extends State<HomePage> {
   StreamSubscription<Position>? positionStreamHomePage;
   StreamSubscription<QuerySnapshot>? tripRequestStream;
 
-    void listenForTripRequests() {
+  void listenForTripRequests() {
     tripRequestStream?.cancel();
     tripRequestStream = FirebaseFirestore.instance
         .collection('rides')
@@ -39,7 +39,6 @@ class _HomePageState extends State<HomePage> {
       for (var change in snapshot.docChanges) {
         if (change.type == DocumentChangeType.added) {
           String tripID = change.doc.id;
-          // 📌 اضافه شدن شرط isDriverAvailable
           if (mounted && isDriverAvailable) {
             PushNotificationSystem().retrieveTripRequestInfo(tripID, context);
           }
@@ -49,7 +48,6 @@ class _HomePageState extends State<HomePage> {
       debugPrint("Error listening for trip requests: $error");
     });
   }
-
 
   Future<Position?> getCurrentLiveLocationOfDriver() async {
     try {
@@ -78,7 +76,7 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-    Future<void> _loadDriverStatus() async {
+  Future<void> _loadDriverStatus() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     bool status = prefs.getBool('isDriverAvailable') ?? false;
     if (!mounted) return;
@@ -88,19 +86,30 @@ class _HomePageState extends State<HomePage> {
     });
 
     if (isDriverAvailable) {
-      await goOnlineNow(); // 📌 ابتدا ذخیره موقعیت آنلاین در Firestore
-      setAndGetLocationUpdates(); // سپس آپدیت لحظه‌ای جی‌پی‌اس
-      listenForTripRequests(); // در نهایت شنود درخواست‌های جدید
+      await goOnlineNow();
+      setAndGetLocationUpdates();
+      listenForTripRequests();
     }
   }
-
 
   Future<void> _saveDriverStatus(bool status) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setBool('isDriverAvailable', status);
   }
 
-    Future<void> goOnlineNow() async {
+  Future<void> updateDriverStatus(String uid) async {
+    await FirebaseFirestore.instance
+        .collection("drivers")
+        .doc(uid)
+        .update({
+      "newTripStatus": "waiting",
+      "isOnline": true,
+    }).catchError((e) {
+      debugPrint("Error updating driver status: $e");
+    });
+  }
+
+  Future<void> goOnlineNow() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
     String uid = user.uid;
@@ -116,24 +125,14 @@ class _HomePageState extends State<HomePage> {
         "latitude": currentPositionOfDriver!.latitude,
         "longitude": currentPositionOfDriver!.longitude,
         "last_active": FieldValue.serverTimestamp(),
-        "status": "idle", // 📌 مطمئن شدن از ثبت وضعیت idle برای پذیرش سفر
+        "status": "idle",
       }, SetOptions(merge: true)).catchError((e) {
         debugPrint("Error updating onlineDrivers: $e");
       });
     }
 
-      Future<void> updateDriverStatus(String uid) async {
-    await FirebaseFirestore.instance
-        .collection("drivers")
-        .doc(uid)
-        .update({
-      "newTripStatus": "waiting",
-      "isOnline": true,
-    }).catchError((e) {
-      debugPrint("Error updating driver status: $e");
-    });
+    await updateDriverStatus(uid);
   }
-
 
   void setAndGetLocationUpdates() {
     positionStreamHomePage?.cancel();
@@ -169,7 +168,6 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> goOfflineNow() async {
-    // ابتدا شنود لکیشن و سفرها قطع می‌شود
     await positionStreamHomePage?.cancel();
     positionStreamHomePage = null;
 
@@ -465,7 +463,6 @@ class _HomePageState extends State<HomePage> {
               ),
               const Spacer(),
 
-              // 🚗 بخش نمایش سفر زنده فعال
               if (currentUser != null)
                 StreamBuilder<QuerySnapshot>(
                   stream: FirebaseFirestore.instance
@@ -573,7 +570,6 @@ class _HomePageState extends State<HomePage> {
                   },
                 ),
 
-              // 🔴 دکمه تغییر وضعیت آنلاین / آفلاین
               Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
