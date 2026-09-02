@@ -40,9 +40,15 @@ android {
 
     buildTypes {
         release {
-            signingConfig signingConfigs.debug
-            minifyEnabled false
-            shrinkResources false
+            // فعال‌سازی کوچک‌سازی و کاهش حجم فایل
+            minifyEnabled true
+            shrinkResources true
+            
+            // جلوگیری از شکستن ورود گوگل و فایربیس
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            
+            // نکته: اگر با Codemagic بیلد می‌گیرید، خودش کی‌استور را اعمال می‌کند.
+            // اگر کی‌استور اختصاصی دارید، signingConfig signingConfigs.release را قرار دهید.
         }
         debug {
             signingConfig signingConfigs.debug
@@ -58,7 +64,7 @@ dependencies {
     implementation platform('com.google.firebase:firebase-bom:32.7.0')
 }
 
-// این بخش تمام پکیج‌ها (حتی maplibre) را مجبور می‌کند با Java 17 کامپایل شوند
+// مجبور کردن تمام ساب‌پروژه‌ها و پکیج‌ها به استفاده از جاوا ۱۷
 subprojects {
     afterEvaluate { project ->
         if (project.hasProperty("android")) {
