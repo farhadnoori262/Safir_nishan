@@ -25,51 +25,54 @@ class _HomePageState extends State<HomePage> {
   Position? currentPositionOfDriver;
   bool isDriverAvailable = false;
   bool isLoading = false;
-  Timestamp? driverWentOnlineAt;
+  DateTime? driverOnlineTimestamp;
 
   StreamSubscription<Position>? positionStreamHomePage;
   StreamSubscription<QuerySnapshot>? tripRequestStream;
 
   void listenForTripRequests() {
-  tripRequestStream?.cancel();
+    tripRequestStream?.cancel();
 
-  final Timestamp? onlineTime = driverWentOnlineAt;
+    driverOnlineTimestamp = DateTime.now().subtract(const Duration(seconds: 10));
 
-  if (onlineTime == null) {
-    debugPrint(
-      "Trip listener was not started because driver online time is null.",
-    );
-    return;
-  }
+    // دریافت مستقیم درخواست‌های با وضعیت requested بدون محدودیت سختگیرانه فیلد زمان
+    tripRequestStream = FirebaseFirestore.instance
+        .collection('rides')
+        .where('status', isEqualTo: 'requested')
+        .snapshots()
+        .listen(
+      (snapshot) {
+        debugPrint("Total active trip requests found: ${snapshot.docs.length}");
 
-  tripRequestStream = FirebaseFirestore.instance
-      .collection('rides')
-      .where('status', isEqualTo: 'requested')
-      .where('createdAt', isGreaterThan: onlineTime)
-      .snapshots()
-      .listen(
-    (snapshot) {
-      debugPrint(
-        "New requested rides after online: ${snapshot.docs.length}",
-      );
+        for (final change in snapshot.docChanges) {
+          if (change.type == DocumentChangeType.added) {
+            final String tripID = change.doc.id;
+            final data = change.doc.data() as Map<String, dynamic>?;
 
-      for (final change in snapshot.docChanges) {
-        if (change.type == DocumentChangeType.added) {
-          final String tripID = change.doc.id;
+            if (data == null) continue;
 
-          debugPrint("New trip request received: $tripID");
+            // چک کردن زمان ساخت به‌صورت نرم‌افزاری در کد
+            final dynamic createdAtValue = data['created_at'] ?? data['createdAt'] ?? data['timestamp'];
+            if (createdAtValue is Timestamp) {
+              final DateTime tripTime = createdAtValue.toDate();
+              if (driverOnlineTimestamp != null && tripTime.isBefore(driverOnlineTimestamp!)) {
+                log("Trip $tripID is older than driver online time. Skipping.");
+                continue;
+              }
+            }
 
-          if (mounted && isDriverAvailable) {
-            PushNotificationSystem()
-                .retrieveTripRequestInfo(tripID, context);
+            debugPrint("New valid trip request received: $tripID");
+
+            if (mounted && isDriverAvailable) {
+              PushNotificationSystem().retrieveTripRequestInfo(tripID, context);
+            }
           }
         }
-      }
-    },
-    onError: (error) {
-      debugPrint("Error listening for trip requests: $error");
-    },
-  );
+      },
+      onError: (error) {
+        debugPrint("Error listening for trip requests: $error");
+      },
+    );
   }
 
   Future<Position?> getCurrentLiveLocationOfDriver() async {
@@ -136,7 +139,6 @@ class _HomePageState extends State<HomePage> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
     String uid = user.uid;
-    driverWentOnlineAt = Timestamp.now();
 
     currentPositionOfDriver ??= await getCurrentLiveLocationOfDriver();
 
@@ -491,104 +493,108 @@ class _HomePageState extends State<HomePage> {
                 StreamBuilder<QuerySnapshot>(
                   stream: FirebaseFirestore.instance
                       .collection('rides')
-                      .where('driverId', isEqualTo: currentUser.uid)
-                      .where('status',
-                          whereIn: ['accepted', 'arrived', 'ontrip'])
+                      .where('status', whereIn: ['accepted', 'arrived', 'ontrip'])
                       .snapshots(),
                   builder: (context, snapshot) {
                     if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
-                      var tripDoc = snapshot.data!.docs.first;
-                      var tripData = tripDoc.data() as Map<String, dynamic>;
-                      String tripId = tripDoc.id;
-                      String passengerName =
-                          tripData['userName'] ?? 'passenger'.tr();
-                      String passengerPhone = tripData['userPhone'] ?? '';
+                      DocumentSnapshot? activeTripDoc;
 
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 16),
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: AppColors.cardBackground,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Colors.black12,
-                              blurRadius: 10,
-                              offset: Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          children: [
-                            Row(
-                              children: [
-                                const CircleAvatar(
-                                  backgroundColor: AppColors.primaryBrand,
-                                  child:
-                                      Icon(Icons.person, color: Colors.white),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        passengerName,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 16,
-                                          color: AppColors.textPrimary,
-                                        ),
-                                      ),
-                                      Text(
-                                        'active_trip'.tr(),
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.green,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ],
+                      // پشتیبانی از هر دو کلید driverId و driver_id
+                      for (var doc in snapshot.data!.docs) {
+                        var data = doc.data() as Map<String, dynamic>;
+                        if (data['driverId'] == currentUser.uid || data['driver_id'] == currentUser.uid) {
+                          activeTripDoc = doc;
+                          break;
+                        }
+                      }
+
+                      if (activeTripDoc != null) {
+                        var tripData = activeTripDoc.data() as Map<String, dynamic>;
+                        String tripId = activeTripDoc.id;
+                        String passengerName = tripData['userName'] ?? tripData['full_name'] ?? 'passenger'.tr();
+                        String passengerPhone = tripData['userPhone'] ?? tripData['phone'] ?? '';
+
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 16),
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: AppColors.cardBackground,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Colors.black12,
+                                blurRadius: 10,
+                                offset: Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            children: [
+                              Row(
+                                children: [
+                                  const CircleAvatar(
+                                    backgroundColor: AppColors.primaryBrand,
+                                    child: Icon(Icons.person, color: Colors.white),
                                   ),
-                                ),
-                                IconButton(
-                                  onPressed: () =>
-                                      _makePhoneCall(passengerPhone),
-                                  icon: const Icon(Icons.phone,
-                                      color: Colors.green, size: 26),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            ElevatedButton.icon(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => ChatPage(
-                                      tripId: tripId,
-                                      passengerName: passengerName,
-                                      passengerPhone: passengerPhone,
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          passengerName,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                            color: AppColors.textPrimary,
+                                          ),
+                                        ),
+                                        Text(
+                                          'active_trip'.tr(),
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.green,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                );
-                              },
-                              icon: const Icon(Icons.chat_bubble_rounded,
-                                  size: 20),
-                              label: Text('chat_with_passenger'.tr()),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primaryBrand,
-                                foregroundColor: Colors.white,
-                                minimumSize: const Size(double.infinity, 45),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
+                                  IconButton(
+                                    onPressed: () => _makePhoneCall(passengerPhone),
+                                    icon: const Icon(Icons.phone, color: Colors.green, size: 26),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              ElevatedButton.icon(
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => ChatPage(
+                                        tripId: tripId,
+                                        passengerName: passengerName,
+                                        passengerPhone: passengerPhone,
+                                      ),
+                                    ),
+                                  );
+                                },
+                                icon: const Icon(Icons.chat_bubble_rounded, size: 20),
+                                label: Text('chat_with_passenger'.tr()),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primaryBrand,
+                                  foregroundColor: Colors.white,
+                                  minimumSize: const Size(double.infinity, 45),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                      );
+                            ],
+                          ),
+                        );
+                      }
                     }
                     return const SizedBox.shrink();
                   },
