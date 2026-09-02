@@ -1,22 +1,50 @@
-workflows:
+Workflows:
   android-workflow:
     name: Android Build
     max_build_duration: 30
     instance_type: mac_mini_m2
+
     environment:
+      flutter: 3.29.3
       java: 21
-      flutter: 3.29.0
+
     scripts:
+      - name: Show versions
+        script: |
+          flutter --version
+          dart --version
+
       - name: Get Flutter packages
         script: |
           flutter pub get
-      - name: Get SHA1 Fingerprint
+
+      - name: Get SHA-1
         script: |
-          cd android
-          chmod +x gradlew
-          ./gradlew signingReport
-      - name: Build APK
+          mkdir -p "$HOME/.android"
+
+          if [ ! -f "$HOME/.android/debug.keystore" ]; then
+            keytool -genkeypair \
+              -v \
+              -keystore "$HOME/.android/debug.keystore" \
+              -storetype JKS \
+              -alias androiddebugkey \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -storepass android \
+              -keypass android \
+              -dname "CN=Android Debug,O=Android,C=US"
+          fi
+
+          keytool -list -v \
+            -keystore "$HOME/.android/debug.keystore" \
+            -alias androiddebugkey \
+            -storepass android \
+            -keypass android
+
+      - name: Build Release APK
         script: |
           flutter build apk --release --split-per-abi
+
     artifacts:
-      - build/app/outputs/flutter-apk/*.apk
+      - build/app/outputs/flutter-apk/*-release.apk
