@@ -117,17 +117,25 @@ if (tripStatus != "requested") {
   return;
 }
 
-      // 🔴 ۲. فیلتر زمان: عدم نمایش سفرهای بیشتر از ۳ دقیقه پیش
-      if (data["createdAt"] != null) {
-        Timestamp createdTimestamp = data["createdAt"] as Timestamp;
-        DateTime createdAt = createdTimestamp.toDate();
-        DateTime now = DateTime.now();
+      final dynamic createdAtValue = data["createdAt"];
 
-        if (now.difference(createdAt).inMinutes > 3) {
-          log("Trip $tripID is expired (created more than 3 minutes ago). Ignoring.");
-          return;
-        }
-      }
+if (createdAtValue is Timestamp) {
+  final DateTime createdAt = createdAtValue.toDate();
+  final DateTime now = DateTime.now();
+
+  if (now.difference(createdAt).inMinutes > 3) {
+    log(
+      "Trip $tripID is expired "
+      "(created more than 3 minutes ago). Ignoring.",
+    );
+    return;
+  }
+} else {
+  log(
+    "Trip $tripID has no valid createdAt Timestamp. "
+    "Showing it as a new trip.",
+  );
+}
 
       // پخش هشدار صوتی برای سفرهای معتبر
       try {
