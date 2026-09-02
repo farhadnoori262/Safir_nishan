@@ -12,7 +12,9 @@ workflows:
           flutter pub get
       - name: Get SHA1 Fingerprint
         script: |
-          cd android && gradlew signingReport || ./gradlew signingReport
+          cd android
+          chmod +x gradlew
+          ./gradlew signingReport
       - name: Build APK
         script: |
           flutter build apk --release --split-per-abi
