@@ -106,12 +106,16 @@ class PushNotificationSystem {
       Map<String, dynamic> data = tripSnapshot.data() as Map<String, dynamic>;
       log("Firestore Trip Data: $data");
 
-      // 🔴 ۱. فیلتر مهم: بررسی وضعیت سفر (فقط سفرهای در انتظار قبول شوند)
-      String tripStatus = data["status"]?.toString() ?? "";
-      if (tripStatus != "pending") {
-        log("Trip $tripID is not pending (Current status: $tripStatus). Ignoring.");
-        return;
-      }
+      final String tripStatus =
+    data["status"]?.toString().trim().toLowerCase() ?? "";
+
+if (tripStatus != "requested") {
+  log(
+    "Trip $tripID ignored. "
+    "Current status: $tripStatus, expected: requested.",
+  );
+  return;
+}
 
       // 🔴 ۲. فیلتر زمان: عدم نمایش سفرهای بیشتر از ۳ دقیقه پیش
       if (data["createdAt"] != null) {
