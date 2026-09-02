@@ -18,54 +18,52 @@ class PushNotificationSystem {
   final AudioPlayer _audioPlayer = AudioPlayer();
 
   Future<String?> generateDeviceRegistrationToken() async {
-  final NotificationSettings settings =
-      await firebaseCloudMessaging.requestPermission(
-    alert: true,
-    badge: true,
-    sound: true,
-  );
+    final NotificationSettings settings =
+        await firebaseCloudMessaging.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
 
-  log(
-    "Notification permission: ${settings.authorizationStatus}",
-  );
+    log("Notification permission: ${settings.authorizationStatus}");
 
-  final String? deviceRecognitionToken =
-      await firebaseCloudMessaging.getToken();
+    final String? deviceRecognitionToken =
+        await firebaseCloudMessaging.getToken();
 
-  final currentUser = FirebaseAuth.instance.currentUser;
+    final currentUser = FirebaseAuth.instance.currentUser;
 
-  if (currentUser != null && deviceRecognitionToken != null) {
-    await FirebaseFirestore.instance
-        .collection("drivers")
-        .doc(currentUser.uid)
-        .set({
-      "deviceToken": deviceRecognitionToken,
-      "token": deviceRecognitionToken,
-    }, SetOptions(merge: true));
-  }
+    if (currentUser != null && deviceRecognitionToken != null) {
+      await FirebaseFirestore.instance
+          .collection("drivers")
+          .doc(currentUser.uid)
+          .set({
+        "deviceToken": deviceRecognitionToken,
+        "token": deviceRecognitionToken,
+      }, SetOptions(merge: true));
+    }
 
-  FirebaseMessaging.instance.onTokenRefresh.listen((String newToken) async {
-    final user = FirebaseAuth.instance.currentUser;
+    FirebaseMessaging.instance.onTokenRefresh.listen((String newToken) async {
+      final user = FirebaseAuth.instance.currentUser;
 
-    if (user == null) return;
+      if (user == null) return;
 
-    await FirebaseFirestore.instance
-        .collection("drivers")
-        .doc(user.uid)
-        .set({
-      "deviceToken": newToken,
-      "token": newToken,
-    }, SetOptions(merge: true));
+      await FirebaseFirestore.instance
+          .collection("drivers")
+          .doc(user.uid)
+          .set({
+        "deviceToken": newToken,
+        "token": newToken,
+      }, SetOptions(merge: true));
 
-    log("FCM token refreshed and saved for driver: ${user.uid}");
-  });
+      log("FCM token refreshed and saved for driver: ${user.uid}");
+    });
 
-  await firebaseCloudMessaging.subscribeToTopic("drivers");
-  await firebaseCloudMessaging.subscribeToTopic("users");
+    await firebaseCloudMessaging.subscribeToTopic("drivers");
+    await firebaseCloudMessaging.subscribeToTopic("users");
 
-  log("Driver FCM token: $deviceRecognitionToken");
+    log("Driver FCM token: $deviceRecognitionToken");
 
-  return deviceRecognitionToken;
+    return deviceRecognitionToken;
   }
 
   startListeningForNewNotification(BuildContext context) async {
@@ -138,38 +136,28 @@ class PushNotificationSystem {
       Map<String, dynamic> data = tripSnapshot.data() as Map<String, dynamic>;
       log("Firestore Trip Data: $data");
 
-      final String tripStatus =
-    data["status"]?.toString().trim().toLowerCase() ?? "";
+      // ۱. بررسی وضعیت (بدون حساسیت به فاصله و بزرگ/کوچک بودن)
+      final String tripStatus = data["status"]?.toString().trim().toLowerCase() ?? "";
 
-if (tripStatus != "requested") {
-  log(
-    "Trip $tripID ignored. "
-    "Current status: $tripStatus, expected: requested.",
-  );
-  return;
-}
+      if (tripStatus != "requested" && tripStatus != "pending" && tripStatus != "waiting") {
+        log("Trip $tripID ignored. Current status: $tripStatus");
+        return;
+      }
 
-      final dynamic createdAtValue = data["createdAt"];
+      // ۲. بررسی زمان ساخت (پشتیبانی از هم created_at و هم createdAt)
+      final dynamic createdAtValue = data["created_at"] ?? data["createdAt"] ?? data["timestamp"];
 
-if (createdAtValue is Timestamp) {
-  final DateTime createdAt = createdAtValue.toDate();
-  final DateTime now = DateTime.now();
+      if (createdAtValue is Timestamp) {
+        final DateTime createdAt = createdAtValue.toDate();
+        final DateTime now = DateTime.now();
 
-  if (now.difference(createdAt).inMinutes > 3) {
-    log(
-      "Trip $tripID is expired "
-      "(created more than 3 minutes ago). Ignoring.",
-    );
-    return;
-  }
-} else {
-  log(
-    "Trip $tripID has no valid createdAt Timestamp. "
-    "Showing it as a new trip.",
-  );
-}
+        if (now.difference(createdAt).inMinutes > 5) {
+          log("Trip $tripID is expired (> 5 mins). Ignoring.");
+          return;
+        }
+      }
 
-      // پخش هشدار صوتی برای سفرهای معتبر
+      // ۳. پخش صدای زنگ
       try {
         await _audioPlayer.stop();
         await _audioPlayer.play(AssetSource('audio/alert-sound.mp3'));
@@ -179,7 +167,7 @@ if (createdAtValue is Timestamp) {
 
       TripDetails tripDetailsInfo = TripDetails();
 
-      // 📍 مبدأ
+      // 📍 مبدأ (پشتیبانی کامل از موقعیت مکانی)
       if (data["from_lat"] != null && data["from_lng"] != null) {
         double? lat = _parseDouble(data["from_lat"]);
         double? lng = _parseDouble(data["from_lng"]);
@@ -191,7 +179,9 @@ if (createdAtValue is Timestamp) {
         tripDetailsInfo.pickUpLatLng = LatLng(gp.latitude, gp.longitude);
       }
 
-      tripDetailsInfo.pickupAddress = data["pickup_address"]?.toString() ?? data["pickUpAddress"]?.toString() ?? "";
+      tripDetailsInfo.pickupAddress = data["pickup_address"]?.toString() ??
+          data["pickUpAddress"]?.toString() ??
+          "مبدأ نامشخص";
 
       // 🏁 مقصد
       if (data["to_lat"] != null && data["to_lng"] != null) {
@@ -205,17 +195,26 @@ if (createdAtValue is Timestamp) {
         tripDetailsInfo.dropOffLatLng = LatLng(gp.latitude, gp.longitude);
       }
 
-      tripDetailsInfo.dropOffAddress = data["dropoff_address"]?.toString() ?? data["dropOffAddress"]?.toString() ?? "";
+      tripDetailsInfo.dropOffAddress = data["dropoff_address"]?.toString() ??
+          data["dropOffAddress"]?.toString() ??
+          "مقصد نامشخص";
 
-      // 👤 مشخصات مسافر و کرایه
-      tripDetailsInfo.userName = data["full_name"]?.toString() ?? data["userName"]?.toString() ?? "";
-      tripDetailsInfo.userPhone = data["phone"]?.toString() ?? data["userPhone"]?.toString() ?? "";
-      
+      // 👤 مشخصات کامل مسافر (پشتیبانی از هر دو الگوی ثبت مسافر)
+      tripDetailsInfo.userName = data["userName"]?.toString() ??
+          data["full_name"]?.toString() ??
+          data["passengerName"]?.toString() ??
+          "مسافر";
+
+      tripDetailsInfo.userPhone = data["userPhone"]?.toString() ??
+          data["phone"]?.toString() ??
+          data["passengerPhone"]?.toString() ??
+          "";
+
       bidAmount = data["bidAmount"]?.toString() ?? data["bid_amount"]?.toString() ?? "";
       fareAmount = data["fare"]?.toString() ?? data["fareAmount"]?.toString() ?? "";
       tripDetailsInfo.tripID = tripID;
 
-      // 🔔 نمایش پاپ‌آپ فقط برای سفر معتبر
+      // 🔔 باز کردن دیالوگ درخواست
       showDialog(
         context: currentContext,
         barrierDismissible: false,
