@@ -18,22 +18,54 @@ class PushNotificationSystem {
   final AudioPlayer _audioPlayer = AudioPlayer();
 
   Future<String?> generateDeviceRegistrationToken() async {
-    String? deviceRecognitionToken = await firebaseCloudMessaging.getToken();
+  final NotificationSettings settings =
+      await firebaseCloudMessaging.requestPermission(
+    alert: true,
+    badge: true,
+    sound: true,
+  );
 
-    final currentUser = FirebaseAuth.instance.currentUser;
-    if (currentUser != null && deviceRecognitionToken != null) {
-      await FirebaseFirestore.instance
-          .collection("drivers")
-          .doc(currentUser.uid)
-          .set({
-        "deviceToken": deviceRecognitionToken,
-        "token": deviceRecognitionToken,
-      }, SetOptions(merge: true));
-    }
-    
-    await firebaseCloudMessaging.subscribeToTopic("drivers");
-    await firebaseCloudMessaging.subscribeToTopic("users");
-    return deviceRecognitionToken;
+  log(
+    "Notification permission: ${settings.authorizationStatus}",
+  );
+
+  final String? deviceRecognitionToken =
+      await firebaseCloudMessaging.getToken();
+
+  final currentUser = FirebaseAuth.instance.currentUser;
+
+  if (currentUser != null && deviceRecognitionToken != null) {
+    await FirebaseFirestore.instance
+        .collection("drivers")
+        .doc(currentUser.uid)
+        .set({
+      "deviceToken": deviceRecognitionToken,
+      "token": deviceRecognitionToken,
+    }, SetOptions(merge: true));
+  }
+
+  FirebaseMessaging.instance.onTokenRefresh.listen((String newToken) async {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) return;
+
+    await FirebaseFirestore.instance
+        .collection("drivers")
+        .doc(user.uid)
+        .set({
+      "deviceToken": newToken,
+      "token": newToken,
+    }, SetOptions(merge: true));
+
+    log("FCM token refreshed and saved for driver: ${user.uid}");
+  });
+
+  await firebaseCloudMessaging.subscribeToTopic("drivers");
+  await firebaseCloudMessaging.subscribeToTopic("users");
+
+  log("Driver FCM token: $deviceRecognitionToken");
+
+  return deviceRecognitionToken;
   }
 
   startListeningForNewNotification(BuildContext context) async {
