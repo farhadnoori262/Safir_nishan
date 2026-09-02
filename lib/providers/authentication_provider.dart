@@ -52,7 +52,10 @@ class AuthenticationProvider extends ChangeNotifier {
   final FirebaseFirestore firebaseFirestore = FirebaseFirestore.instance;
   final FirebaseStorage firebaseStorage = FirebaseStorage.instance;
   final FirebaseDatabase firebaseDatabase = FirebaseDatabase.instance; 
-  final GoogleSignIn googleSignIn = GoogleSignIn(); 
+  final GoogleSignIn googleSignIn = GoogleSignIn(
+  serverClientId: '983174537944-n532tsodijqddnufq0lgtmevc2g0qr5a.apps.googleusercontent.com',
+);
+ 
 
   void startLoading() {
     _isLoading = true;
