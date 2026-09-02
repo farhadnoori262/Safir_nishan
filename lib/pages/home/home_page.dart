@@ -122,7 +122,11 @@ class _HomePageState extends State<HomePage> {
       });
     }
 
-    await FirebaseFirestore.instance.collection("drivers").doc(uid).update({
+      Future<void> updateDriverStatus(String uid) async {
+    await FirebaseFirestore.instance
+        .collection("drivers")
+        .doc(uid)
+        .update({
       "newTripStatus": "waiting",
       "isOnline": true,
     }).catchError((e) {
@@ -130,14 +134,6 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-
-    await FirebaseFirestore.instance.collection("drivers").doc(uid).update({
-      "newTripStatus": "waiting",
-      "isOnline": true,
-    }).catchError((e) {
-      debugPrint("Error updating driver status: $e");
-    });
-  }
 
   void setAndGetLocationUpdates() {
     positionStreamHomePage?.cancel();
