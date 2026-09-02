@@ -29,7 +29,7 @@ class _HomePageState extends State<HomePage> {
   StreamSubscription<Position>? positionStreamHomePage;
   StreamSubscription<QuerySnapshot>? tripRequestStream;
 
-  void listenForTripRequests() {
+    void listenForTripRequests() {
     tripRequestStream?.cancel();
     tripRequestStream = FirebaseFirestore.instance
         .collection('rides')
@@ -39,7 +39,8 @@ class _HomePageState extends State<HomePage> {
       for (var change in snapshot.docChanges) {
         if (change.type == DocumentChangeType.added) {
           String tripID = change.doc.id;
-          if (mounted) {
+          // 📌 اضافه شدن شرط isDriverAvailable
+          if (mounted && isDriverAvailable) {
             PushNotificationSystem().retrieveTripRequestInfo(tripID, context);
           }
         }
@@ -48,6 +49,7 @@ class _HomePageState extends State<HomePage> {
       debugPrint("Error listening for trip requests: $error");
     });
   }
+
 
   Future<Position?> getCurrentLiveLocationOfDriver() async {
     try {
@@ -76,7 +78,7 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _loadDriverStatus() async {
+    Future<void> _loadDriverStatus() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     bool status = prefs.getBool('isDriverAvailable') ?? false;
     if (!mounted) return;
@@ -86,18 +88,19 @@ class _HomePageState extends State<HomePage> {
     });
 
     if (isDriverAvailable) {
-      await goOnlineNow();
-      setAndGetLocationUpdates();
-      listenForTripRequests();
+      await goOnlineNow(); // 📌 ابتدا ذخیره موقعیت آنلاین در Firestore
+      setAndGetLocationUpdates(); // سپس آپدیت لحظه‌ای جی‌پی‌اس
+      listenForTripRequests(); // در نهایت شنود درخواست‌های جدید
     }
   }
+
 
   Future<void> _saveDriverStatus(bool status) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setBool('isDriverAvailable', status);
   }
 
-  Future<void> goOnlineNow() async {
+    Future<void> goOnlineNow() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
     String uid = user.uid;
@@ -113,11 +116,20 @@ class _HomePageState extends State<HomePage> {
         "latitude": currentPositionOfDriver!.latitude,
         "longitude": currentPositionOfDriver!.longitude,
         "last_active": FieldValue.serverTimestamp(),
-        "status": "idle",
+        "status": "idle", // 📌 مطمئن شدن از ثبت وضعیت idle برای پذیرش سفر
       }, SetOptions(merge: true)).catchError((e) {
         debugPrint("Error updating onlineDrivers: $e");
       });
     }
+
+    await FirebaseFirestore.instance.collection("drivers").doc(uid).update({
+      "newTripStatus": "waiting",
+      "isOnline": true,
+    }).catchError((e) {
+      debugPrint("Error updating driver status: $e");
+    });
+  }
+
 
     await FirebaseFirestore.instance.collection("drivers").doc(uid).update({
       "newTripStatus": "waiting",
