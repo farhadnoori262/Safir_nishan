@@ -547,7 +547,7 @@ class _HomePageState extends State<HomePage> {
               ),
               styleString: 'assets/map/style.json',
               myLocationEnabled: true,
-              myLocationTrackingMode: MyLocationTrackingMode.Tracking,
+              myLocationtrackingMode: MyLocationtrackingMode.tracking,
               onMapCreated: _onMapCreated,
             ),
 
