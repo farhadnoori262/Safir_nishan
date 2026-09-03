@@ -1,4 +1,4 @@
-name: safir_drivers
+Name: safir_drivers
 description: "Safir Drivers Application - Internet Taxi Service"
 publish_to: 'none'
 
@@ -20,8 +20,11 @@ dependencies:
 
   audioplayers: ^6.0.0
 
-  # محاسبات جغرافیایی و GPS
+  # نقشه و محاسبات جغرافیایی
+  maplibre_gl: ^0.26.2
   latlong2: ^0.9.1
+
+  # موقعیت مکانی GPS
   geolocator: ^12.0.0
 
   connectivity_plus: ^6.0.4
@@ -79,7 +82,10 @@ flutter:
         - asset: assets/fonts/iranyekanwebbold.ttf
           weight: 700
 
+  # 👈 معرفی تمامی پوشه‌ها و فایل‌های مورد نیاز
   assets:
     - assets/translations/
     - assets/audio/fa/
     - assets/fonts/
+    - assets/images/
+    - assets/map/style.json
