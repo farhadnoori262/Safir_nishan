@@ -40,14 +40,13 @@ android {
 
     buildTypes {
         release {
-            // اضافه کردن امضا جهت برطرف ساختن خطای App not installed
-            signingConfig signingConfigs.debug
+            // خط signingConfig دیباگ حذف شد تا امضای اصلی Codemagic روی آن اعمال شود
             
-            // فعال‌سازی کاهش حجم فایل APK (از ۲۷ به ۲۲ مگابایت)
+            // کاهش حجم فایل (۲۲ مگابایت)
             minifyEnabled true
             shrinkResources true
             
-            // جلوگیری از اختلال در ورود گوگل و فایربیس
+            // عدم تداخل با گوگل و فایربیس
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
         debug {
@@ -64,7 +63,6 @@ dependencies {
     implementation platform('com.google.firebase:firebase-bom:32.7.0')
 }
 
-// مجبور کردن تمام ساب‌پروژه‌ها به استفاده از جاوا ۱۷
 subprojects {
     afterEvaluate { project ->
         if (project.hasProperty("android")) {
