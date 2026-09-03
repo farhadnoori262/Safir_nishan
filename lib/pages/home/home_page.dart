@@ -727,9 +727,26 @@ class _HomePageState extends State<HomePage> {
                                   String distance = '${tripData['distance'] ?? '5.2'}';
                                   String price = '${tripData['fareAmount'] ?? tripData['price'] ?? '120'}';
 
-                                  return Container(
-                                    margin: const EdgeInsets.only(top: 40, bottom: 16),
-                                    padding: const EdgeInsets.all(16),
+                                  return DraggableScrollableSheet(
+  initialChildSize: 0.42,
+  minChildSize: 0.15,
+  maxChildSize: 0.75,
+  snap: true,
+  snapSizes: const [
+    0.15,
+    0.42,
+    0.75,
+  ],
+  builder: (
+    context,
+    scrollController,
+  ) {
+    return Container(
+      margin: const EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: 8,
+      ),
+      padding: const EdgeInsets.all(16),
                                     decoration: BoxDecoration(
                                       color: AppColors.cardBackground,
                                       borderRadius: BorderRadius.circular(20),
