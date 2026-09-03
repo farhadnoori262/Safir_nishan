@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 
+import 'package:safir_drivers/controllers/navigation_controller.dart'; // 👈 اضافه شد
 import 'package:safir_drivers/pages/splash_screen.dart';
 import 'package:safir_drivers/providers/authentication_provider.dart';
 import 'package:safir_drivers/providers/dashboard_provider.dart';
@@ -100,6 +101,10 @@ class MyApp extends StatelessWidget {
         ),
         ChangeNotifierProvider(
           create: (_) => TripProvider(),
+        ),
+        // 👈 پروایدر مسیریابی اضافه شد
+        ChangeNotifierProvider(
+          create: (_) => NavigationController(),
         ),
       ],
       child: MaterialApp(
