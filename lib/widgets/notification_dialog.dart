@@ -173,9 +173,10 @@ class _NotificationDialogState extends State<NotificationDialog> {
     final String fareAmount = widget.fareAmount ?? "۰";
     final String currencyUnit = tr(context, 'currency_unit');
     final String bidAmount =
-        widget.bidAmount == "null" || widget.bidAmount == null || widget.bidAmount!.isEmpty
-            ? tr(context, 'no_bid_offer')
-            : "${widget.bidAmount} $currencyUnit";
+    widget.bidAmount == "null" || widget.bidAmount == null || widget.bidAmount!.isEmpty
+        ? tr(context, 'no_bid_offer')
+        : "${widget.bidAmount.toString().toPersianDigits(context)} $currencyUnit";
+
 
     return Directionality(
       textDirection: Directionality.of(context),
@@ -232,6 +233,7 @@ class _NotificationDialogState extends State<NotificationDialog> {
                               tr(context, 'label_pickup_location'),
                               style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontFamily: 'IranYekan'),
                             ),
+                            const SizedBox(height: 2),
                             Text(
                               widget.tripDetailsInfo?.pickupAddress ?? tr(context, 'unknown_address'),
                               maxLines: 2,
