@@ -280,5 +280,24 @@
   "settings_title": "Settings",
   "settings_language": "App Language",
   "select_language_title": "Select Language",
-  "lang_change_success": "Language changed successfully"
+  "lang_change_success": "Language changed successfully",
+  {
+  "title_new_trip_request": "New Ride Request",
+  "msg_please_wait": "Please wait...",
+  "label_pickup_location": "Pickup Location",
+  "label_dropoff_location": "Drop-off Location",
+  "label_standard_fare": "Standard Fare",
+  "label_passenger_bid": "Passenger Offer",
+  "no_bid_offer": "No Offer",
+  "btn_accept_trip": "Accept Ride",
+  "btn_decline_trip": "Decline Ride",
+  "title_collect_cash": "Collect Cash Payment",
+  "currency_unit": "AFN",
+  "msg_payment_guide": "Please collect the amount above in cash from the passenger.",
+  "btn_cash_received": "Payment Received",
+  "unknown_address": "Unknown Address",
+  "err_trip_cancelled": "This ride was cancelled by the passenger.",
+  "err_trip_not_found": "Ride not found or expired."
+}
+
 }
