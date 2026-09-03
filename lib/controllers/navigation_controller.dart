@@ -53,7 +53,6 @@ class StepInstruction {
 class NavigationController extends ChangeNotifier {
   static const double _snapToRouteDistanceMeters = 40.0;
   static const double _rerouteDistanceMeters = 55.0;
-  static const double _announceDistanceMeters = 70.0;
   static const double _stepReachedDistanceMeters = 16.0;
 
   int routeVersion = 0;
@@ -65,7 +64,6 @@ class NavigationController extends ChangeNotifier {
   bool isRerouting = false;
   bool isNavigating = false;
 
-  bool _isVoiceEnabled = true;
   bool _isDisposed = false;
 
   double distanceFromRoute = 0.0;
@@ -74,7 +72,6 @@ class NavigationController extends ChangeNotifier {
 
   final List<StepInstruction> _steps = [];
   final List<LatLng> routePoints = [];
-  final Set<int> _spokenSteps = {};
 
   int _currentStepIndex = 0;
   int _lastMatchedSegmentIndex = 0;
@@ -85,7 +82,8 @@ class NavigationController extends ChangeNotifier {
   String _currentInstruction = '';
   IconData _currentTurnIcon = Icons.straight_rounded;
 
-  bool get isVoiceEnabled => _isVoiceEnabled;
+  // 📌 رفع خطای getter بر روی home_page.dart
+  String get instructionText => navigationInstruction;
 
   int get distanceToNextTurn => distanceToNextStep.ceil();
 
@@ -108,27 +106,6 @@ class NavigationController extends ChangeNotifier {
 
   List<StepInstruction> get routeSteps =>
       List.unmodifiable(_steps);
-
-  void toggleVoice() {
-    _isVoiceEnabled = !_isVoiceEnabled;
-
-    if (!_isVoiceEnabled) {
-      VoiceGuidanceHelper.stop();
-    }
-
-    _safeNotifyListeners();
-  }
-
-  void speakInstruction(String text) {
-    if (!_isVoiceEnabled) return;
-
-    VoiceGuidanceHelper.speakStep(
-      'straight',
-      text,
-      0,
-      _activeLangCode,
-    );
-  }
 
   void updateInstruction({
     required String instruction,
@@ -175,8 +152,6 @@ class NavigationController extends ChangeNotifier {
         routePoints[1],
       );
     }
-
-    _speakStartInstruction();
 
     _safeNotifyListeners();
 
@@ -343,7 +318,6 @@ class NavigationController extends ChangeNotifier {
 
     _currentStepIndex = 0;
     _lastMatchedSegmentIndex = 0;
-    _spokenSteps.clear();
 
     distanceFromRoute = 0.0;
     distanceToNextStep = 0.0;
@@ -377,20 +351,6 @@ class NavigationController extends ChangeNotifier {
       step.location.latitude,
       step.location.longitude,
     );
-
-    if (distanceToNextStep <= _announceDistanceMeters &&
-        !_spokenSteps.contains(_currentStepIndex)) {
-      _spokenSteps.add(_currentStepIndex);
-
-      if (_isVoiceEnabled) {
-        VoiceGuidanceHelper.speakStep(
-          step.modifier,
-          step.streetName,
-          distanceToNextStep.round(),
-          _activeLangCode,
-        );
-      }
-    }
 
     if (distanceToNextStep <= _stepReachedDistanceMeters &&
         _currentStepIndex < _steps.length - 1) {
@@ -641,23 +601,9 @@ class NavigationController extends ChangeNotifier {
     }
   }
 
-  void _speakStartInstruction() {
-    if (!_isVoiceEnabled || _steps.isEmpty) return;
-
-    final firstStep = _steps.first;
-
-    VoiceGuidanceHelper.speakStep(
-      firstStep.modifier,
-      firstStep.streetName,
-      0,
-      _activeLangCode,
-    );
-  }
-
   void _clearRouteState() {
     _steps.clear();
     routePoints.clear();
-    _spokenSteps.clear();
 
     _currentStepIndex = 0;
     _lastMatchedSegmentIndex = 0;
@@ -682,7 +628,6 @@ class NavigationController extends ChangeNotifier {
 
     _clearRouteState();
 
-    VoiceGuidanceHelper.stop();
     _safeNotifyListeners();
   }
 
@@ -695,7 +640,6 @@ class NavigationController extends ChangeNotifier {
   @override
   void dispose() {
     _isDisposed = true;
-    VoiceGuidanceHelper.stop();
     super.dispose();
   }
 }
