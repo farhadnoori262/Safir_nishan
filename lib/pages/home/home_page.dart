@@ -561,6 +561,64 @@ class _HomePageState extends State<HomePage> {
                 child: const Icon(Icons.my_location, color: AppColors.primaryBrand),
               ),
             ),
+            Positioned(
+  top: 16,
+  left: 16,
+  child: Container(
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(14),
+      boxShadow: const [
+        BoxShadow(
+          color: Colors.black12,
+          blurRadius: 8,
+          offset: Offset(0, 3),
+        ),
+      ],
+    ),
+    child: ElevatedButton(
+      onPressed: _showStatusChangeModal,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: isDriverAvailable
+            ? Colors.red.shade600
+            : AppColors.primaryBrand,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        padding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 11,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 9,
+            height: 9,
+            decoration: BoxDecoration(
+              color: isDriverAvailable
+                  ? Colors.greenAccent
+                  : Colors.white70,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 7),
+          Text(
+            isDriverAvailable
+                ? 'go_offline'.tr()
+                : 'go_online'.tr(),
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    ),
+  ),
+),
 
             Column(
               children: [
@@ -862,9 +920,6 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
 
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  child: Container(
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
