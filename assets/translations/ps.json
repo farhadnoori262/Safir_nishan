@@ -280,5 +280,24 @@
   "active_trip": "جاري فعال سفر",
   "chat_with_passenger": "له سپرلي سره چټ",
   "go_offline": "آفلاین کېدل",
-  "go_online": "آنلاین کېدل"
+  "go_online": "آنلاین کېدل",
+  {
+  "title_new_trip_request": "د نوي سفر غوښتنه",
+  "msg_please_wait": "مهرباني وکړئ انتظار وکړئ...",
+  "label_pickup_location": "د سپرلۍ پیل ځای",
+  "label_dropoff_location": "د سپرلۍ پای ځای",
+  "label_standard_fare": "معیاري کرایه",
+  "label_passenger_bid": "د سپرلۍ وړاندیز",
+  "no_bid_offer": "وړاندیز نشته",
+  "btn_accept_trip": "سفر منل",
+  "btn_decline_trip": "سفر ردول",
+  "title_collect_cash": "د نغدو پیسو ترلاسه کول",
+  "currency_unit": "افغانۍ",
+  "msg_payment_guide": "پورتنۍ پیسې له سپرلۍ څخه نغدې ترلاسه کړئ.",
+  "btn_cash_received": "پیسې ترلاسه شوې",
+  "unknown_address": "نامعلوم ادرس",
+  "err_trip_cancelled": "دا سفر د سپرلۍ لخوا لغوه شو.",
+  "err_trip_not_found": "سفر ونه موندل شو یا پای ته رسیدلی."
+}
+
 }
