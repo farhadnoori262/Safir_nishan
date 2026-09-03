@@ -8,8 +8,6 @@ import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:maplibre_gl/maplibre_gl.dart';
 
-import '../helpers/voice_guidance_helper.dart';
-
 class StepInstruction {
   final String instruction;
   final String streetName;
