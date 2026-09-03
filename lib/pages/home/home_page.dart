@@ -10,9 +10,8 @@ import 'package:maplibre_gl/maplibre_gl.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:provider/provider.dart';
-import 'package:safir_drivers/controllers/navigation_controller.dart'; // یا آدرس دقیق فایل
 
+import 'package:safir_drivers/controllers/navigation_controller.dart';
 import 'package:safir_drivers/pages/chat_page.dart';
 import 'package:safir_drivers/providers/registration_provider.dart';
 import 'package:safir_drivers/utils/app_colors.dart';
@@ -26,6 +25,7 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  MapLibreMapController? mapController;
   Position? currentPositionOfDriver;
   bool isDriverAvailable = false;
   bool isLoading = false;
@@ -33,6 +33,10 @@ class _HomePageState extends State<HomePage> {
 
   StreamSubscription<Position>? positionStreamHomePage;
   StreamSubscription<QuerySnapshot>? tripRequestStream;
+
+  void _onMapCreated(MapLibreMapController controller) {
+    mapController = controller;
+  }
 
   void listenForTripRequests() {
     tripRequestStream?.cancel();
@@ -174,6 +178,14 @@ class _HomePageState extends State<HomePage> {
 
       if (!mounted) return;
 
+      final navController = context.read<NavigationController>();
+      if (navController.isNavigating) {
+        navController.updateDriverPosition(
+          LatLng(position.latitude, position.longitude),
+          langCode: context.locale.languageCode,
+        );
+      }
+
       if (isDriverAvailable) {
         final user = FirebaseAuth.instance.currentUser;
         if (user != null) {
@@ -243,21 +255,69 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  // متد آپدیت وضعیت سفر در فایربیس
-  Future<void> _updateTripStatus(String tripId, String newStatus) async {
+  Future<void> startTripNavigation(LatLng driverPos, LatLng destinationPos) async {
+    final navController = context.read<NavigationController>();
+
+    final routePoints = await navController.startNavigation(
+      driverPos,
+      destinationPos,
+      context.locale.languageCode,
+    );
+
+    if (routePoints.isNotEmpty && mapController != null) {
+      await mapController!.clearLines();
+      await mapController!.addLine(
+        LineOptions(
+          geometry: routePoints,
+          lineColor: "#006837",
+          lineWidth: 6.0,
+          lineOpacity: 0.8,
+        ),
+      );
+    }
+  }
+
+  Future<void> _updateTripStatus(String tripId, String newStatus, Map<String, dynamic> tripData) async {
     try {
       await FirebaseFirestore.instance.collection('rides').doc(tripId).update({
         'status': newStatus,
         'updated_at': FieldValue.serverTimestamp(),
       });
+
+      if (currentPositionOfDriver != null) {
+        LatLng driverLatLng = LatLng(currentPositionOfDriver!.latitude, currentPositionOfDriver!.longitude);
+
+        if (newStatus == 'accepted') {
+          GeoPoint? originPoint = tripData['originLatLng'] ?? tripData['pickup_location'];
+          if (originPoint != null) {
+            LatLng pickupLatLng = LatLng(originPoint.latitude, originPoint.longitude);
+            await startTripNavigation(driverLatLng, pickupLatLng);
+          }
+        } else if (newStatus == 'arrived' || newStatus == 'ontrip') {
+          GeoPoint? destinationPoint = tripData['destinationLatLng'] ?? tripData['dropoff_location'];
+          if (destinationPoint != null) {
+            LatLng dropoffLatLng = LatLng(destinationPoint.latitude, destinationPoint.longitude);
+            await startTripNavigation(driverLatLng, dropoffLatLng);
+          }
+        } else if (newStatus == 'completed') {
+          context.read<NavigationController>().stopNavigation();
+          if (mapController != null) {
+            await mapController!.clearLines();
+          }
+        }
+      }
     } catch (e) {
       debugPrint("Error updating trip status: $e");
     }
   }
 
-  // متد لغو سفر
   Future<void> _cancelTrip(String tripId) async {
     try {
+      context.read<NavigationController>().stopNavigation();
+      if (mapController != null) {
+        await mapController!.clearLines();
+      }
+
       await FirebaseFirestore.instance.collection('rides').doc(tripId).update({
         'status': 'canceled',
         'canceled_by': 'driver',
@@ -477,7 +537,6 @@ class _HomePageState extends State<HomePage> {
       body: SafeArea(
         child: Stack(
           children: [
-            // ۱. نقشه MapLibre در پس‌زمینه
             MapLibreMap(
               initialCameraPosition: CameraPosition(
                 target: LatLng(
@@ -489,9 +548,9 @@ class _HomePageState extends State<HomePage> {
               styleString: 'assets/map/style.json',
               myLocationEnabled: true,
               myLocationTrackingMode: MyLocationTrackingMode.Tracking,
+              onMapCreated: _onMapCreated,
             ),
 
-            // ۲. دکمه بازگشت به موقعیت فعلی روی نقشه
             Positioned(
               top: 16,
               right: 16,
@@ -503,7 +562,6 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
 
-            // ۳. محتوای اصلی و کارت‌های اطلاعات سفر (لایه رویی)
             Column(
               children: [
                 Expanded(
@@ -514,7 +572,6 @@ class _HomePageState extends State<HomePage> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          // استریم دریافت سفر فعال
                           if (currentUser != null && isDriverAvailable)
                             StreamBuilder<QuerySnapshot>(
                               stream: FirebaseFirestore.instance
@@ -555,7 +612,6 @@ class _HomePageState extends State<HomePage> {
                                     child: Column(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        // ۱. اطلاعات مسافر
                                         Row(
                                           children: [
                                             const CircleAvatar(
@@ -604,7 +660,6 @@ class _HomePageState extends State<HomePage> {
                                         ),
                                         const Divider(height: 20),
 
-                                        // ۲. مبدأ و مقصد
                                         Row(
                                           children: [
                                             Column(
@@ -639,7 +694,6 @@ class _HomePageState extends State<HomePage> {
                                         ),
                                         const SizedBox(height: 12),
 
-                                        // ۳. آمار سفر (زمان، مسافت، کرایه)
                                         Container(
                                           padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
                                           decoration: BoxDecoration(
@@ -658,24 +712,53 @@ class _HomePageState extends State<HomePage> {
                                         ),
                                         const SizedBox(height: 10),
 
-                                        // ۴. هشدار اعلان
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFFFFF8E1),
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                          child: Row(
-                                            children: const [
-                                              Icon(Icons.notifications_active_outlined, color: Colors.amber, size: 16),
-                                              SizedBox(width: 8),
-                                              Text('لطفاً به موقع به مقصد برسید', style: TextStyle(fontSize: 11)),
-                                            ],
-                                          ),
+                                        Consumer<NavigationController>(
+                                          builder: (context, nav, child) {
+                                            if (!nav.isNavigating || nav.instructionText.isEmpty) {
+                                              return Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFFFF8E1),
+                                                  borderRadius: BorderRadius.circular(8),
+                                                ),
+                                                child: Row(
+                                                  children: const [
+                                                    Icon(Icons.notifications_active_outlined, color: Colors.amber, size: 16),
+                                                    SizedBox(width: 8),
+                                                    Text('لطفاً به موقع به مقصد برسید', style: TextStyle(fontSize: 11)),
+                                                  ],
+                                                ),
+                                              );
+                                            }
+
+                                            return Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFE8F5E9),
+                                                borderRadius: BorderRadius.circular(10),
+                                                border: Border.all(color: const Color(0xFF006837), width: 1),
+                                              ),
+                                              child: Row(
+                                                children: [
+                                                  const Icon(Icons.navigation, color: Color(0xFF006837), size: 22),
+                                                  const SizedBox(width: 10),
+                                                  Expanded(
+                                                    child: Text(
+                                                      nav.instructionText,
+                                                      style: const TextStyle(
+                                                        fontSize: 13,
+                                                        fontWeight: FontWeight.bold,
+                                                        color: Color(0xFF006837),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            );
+                                          },
                                         ),
                                         const SizedBox(height: 12),
 
-                                        // ۵. دکمه اصلی اقدام
                                         SizedBox(
                                           width: double.infinity,
                                           height: 46,
@@ -686,11 +769,11 @@ class _HomePageState extends State<HomePage> {
                                             ),
                                             onPressed: () {
                                               if (status == 'accepted') {
-                                                _updateTripStatus(tripId, 'arrived');
+                                                _updateTripStatus(tripId, 'arrived', tripData);
                                               } else if (status == 'arrived') {
-                                                _updateTripStatus(tripId, 'ontrip');
+                                                _updateTripStatus(tripId, 'ontrip', tripData);
                                               } else if (status == 'ontrip' || status == 'in_progress') {
-                                                _updateTripStatus(tripId, 'completed');
+                                                _updateTripStatus(tripId, 'completed', tripData);
                                               }
                                             },
                                             child: Text(
@@ -701,7 +784,6 @@ class _HomePageState extends State<HomePage> {
                                         ),
                                         const SizedBox(height: 10),
 
-                                        // ۶. دکمه‌های فرعی (چت، اشتراک، لغو)
                                         Row(
                                           children: [
                                             Expanded(
@@ -780,7 +862,6 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
 
-                // دکمه آنلاین / آفلاین شدن
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   child: Container(
@@ -846,7 +927,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // تغییر عنوان دکمه اصلی بر اساس وضعیت سفر
   String _getActionButtonTitle(String status) {
     switch (status) {
       case 'accepted':
