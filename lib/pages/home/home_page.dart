@@ -490,24 +490,18 @@ class _HomePageState extends State<HomePage> {
               ),
               const Spacer(),
 
-              if (currentUser != null)
-                StreamBuilder<QuerySnapshot>(
-                  stream: FirebaseFirestore.instance
-                      .collection('rides')
-                      .where('status', whereIn: ['accepted', 'arrived', 'ontrip'])
-                      .snapshots(),
-                  builder: (context, snapshot) {
-                    if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
-                      DocumentSnapshot? activeTripDoc;
+              if (currentUser != null && isDriverAvailable)
 
-                      // پشتیبانی از هر دو کلید driverId و driver_id
-                      for (var doc in snapshot.data!.docs) {
-                        var data = doc.data() as Map<String, dynamic>;
-                        if (data['driverId'] == currentUser.uid || data['driver_id'] == currentUser.uid) {
-                          activeTripDoc = doc;
-                          break;
-                        }
-                      }
+                          StreamBuilder<QuerySnapshot>(  
+            stream: FirebaseFirestore.instance
+                .collection('rides')
+                .where('driverId', isEqualTo: currentUser.uid)
+                .where('status', whereIn: ['accepted', 'arrived', 'ontrip'])
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
+                var activeTripDoc = snapshot.data!.docs.first;
+
 
                       if (activeTripDoc != null) {
                         var tripData = activeTripDoc.data() as Map<String, dynamic>;
