@@ -289,7 +289,11 @@ class _NotificationDialogState extends State<NotificationDialog> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(tr(context, 'label_standard_fare'), style: const TextStyle(fontFamily: 'IranYekan', color: Colors.black54, fontSize: 13)),
-                        Text("$fareAmount $currencyUnit", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, fontFamily: 'IranYekan')),
+                        Text(
+                          "${fareAmount.toPersianDigits(context)} $currencyUnit", 
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, fontFamily: 'IranYekan'),
+                        ),
+
                       ],
                     ),
                     const SizedBox(height: 6),
