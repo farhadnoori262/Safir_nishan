@@ -30,6 +30,9 @@ class _HomePageState extends State<HomePage> {
   bool isDriverAvailable = false;
   bool isLoading = false;
   DateTime? driverOnlineTimestamp;
+  
+  String? activeTripId;
+  String? activeTripStatus;
 
   StreamSubscription<Position>? positionStreamHomePage;
   StreamSubscription<QuerySnapshot>? tripRequestStream;
@@ -276,6 +279,60 @@ class _HomePageState extends State<HomePage> {
       );
     }
   }
+  Future<void> _startPickupRoute(
+  String tripId,
+  Map<String, dynamic> tripData,
+) async {
+  try {
+    // اگر موقعیت راننده نداریم، ابتدا GPS را بگیر
+    if (currentPositionOfDriver == null) {
+      currentPositionOfDriver =
+          await getCurrentLiveLocationOfDriver();
+    }
+
+    if (currentPositionOfDriver == null) {
+      debugPrint('❌ موقعیت راننده موجود نیست');
+      return;
+    }
+
+    // گرفتن مبدأ مسافر
+    final dynamic originPoint =
+        tripData['originLatLng'] ??
+        tripData['pickup_location'];
+
+    if (originPoint is! GeoPoint) {
+      debugPrint('❌ مختصات مبدأ مسافر پیدا نشد');
+      return;
+    }
+
+    final LatLng driverPosition = LatLng(
+      currentPositionOfDriver!.latitude,
+      currentPositionOfDriver!.longitude,
+    );
+
+    final LatLng pickupPosition = LatLng(
+      originPoint.latitude,
+      originPoint.longitude,
+    );
+
+    debugPrint(
+      '🚗 Driver: ${driverPosition.latitude}, ${driverPosition.longitude}',
+    );
+
+    debugPrint(
+      '📍 Pickup: ${pickupPosition.latitude}, ${pickupPosition.longitude}',
+    );
+
+    // ساخت مسیر
+    await startTripNavigation(
+      driverPosition,
+      pickupPosition,
+    );
+
+  } catch (e) {
+    debugPrint('❌ Error starting pickup route: $e');
+  }
+}
 
   Future<void> _updateTripStatus(String tripId, String newStatus, Map<String, dynamic> tripData) async {
     try {
