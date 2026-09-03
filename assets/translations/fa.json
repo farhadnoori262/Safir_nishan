@@ -278,5 +278,24 @@
   "settings_title": "تنظیمات",
   "settings_language": "زبان برنامه",
   "select_language_title": "انتخاب زبان",
-  "lang_change_success": "زبان با موفقیت تغییر کرد"
+  "lang_change_success": "زبان با موفقیت تغییر کرد",
+  {
+  "title_new_trip_request": "درخواست سفر جدید",
+  "msg_please_wait": "لطفاً منتظر بمانید...",
+  "label_pickup_location": "مبدأ مسافر",
+  "label_dropoff_location": "مقصد مسافر",
+  "label_standard_fare": "کرایه استاندارد",
+  "label_passenger_bid": "پیشنهاد مسافر",
+  "no_bid_offer": "بدون پیشنهاد",
+  "btn_accept_trip": "قبول سفر",
+  "btn_decline_trip": "رد سفر",
+  "title_collect_cash": "دریافت کرایه نقدی",
+  "currency_unit": "افغانی",
+  "msg_payment_guide": "مبلغ فوق را نقداً از مسافر دریافت کنید.",
+  "btn_cash_received": "مبلغ دریافت شد",
+  "unknown_address": "آدرس نامشخص",
+  "err_trip_cancelled": "این سفر توسط مسافر لغو شد.",
+  "err_trip_not_found": "سفر یافت نشد یا منقضی شده است."
+}
+
 }
