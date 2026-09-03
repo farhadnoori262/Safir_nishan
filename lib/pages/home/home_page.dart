@@ -700,6 +700,23 @@ class _HomePageState extends State<HomePage> {
                                   var tripData = activeTripDoc.data() as Map<String, dynamic>;
                                   String tripId = activeTripDoc.id;
                                   String status = tripData['status'] ?? 'accepted';
+                                  if (status == 'accepted') {
+                                 if (activeTripId != tripId ||
+                                 activeTripStatus != status) {
+    
+                                 activeTripId = tripId;
+                                 activeTripStatus = status;
+
+                                 WidgetsBinding.instance.addPostFrameCallback((_) {
+                                 if (!mounted) return;
+
+                                _startPickupRoute(
+                                tripId,
+                                tripData,
+                                 );
+                               });
+                              }
+                                  }
 
                                   String passengerName = tripData['userName'] ?? tripData['full_name'] ?? 'passenger'.tr();
                                   String passengerPhone = tripData['userPhone'] ?? tripData['phone'] ?? '';
