@@ -335,44 +335,51 @@ class AuthenticationProvider extends ChangeNotifier {
   }
 
   Future<void> signInWithGoogle(
-      BuildContext context, VoidCallback onSuccess) async {
-    startGoogleLoading();
-    try {
-      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+    BuildContext context, VoidCallback onSuccess) async {
+  startGoogleLoading();
+  try {
+    final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
 
-      if (googleUser == null) {
-        stopGoogleLoading();
-        return; 
-      }
-
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
-
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-
-      final UserCredential userCredential =
-          await firebaseAuth.signInWithCredential(credential);
-      final User? user = userCredential.user;
-
-      if (user != null) {
-        _uid = user.uid;
-        _isGoogleSignedIn = true;
-        notifyListeners();
-      }
-      onSuccess();
-
+    if (googleUser == null) {
       stopGoogleLoading();
-    } on FirebaseAuthException catch (e) {
-      stopGoogleLoading();
-      if (context.mounted) {
-        commonMethods.displaySnackBar(
-            e.message ?? tr(context, 'err_google_sign_in'), context);
-      }
+      return; 
+    }
+
+    final GoogleSignInAuthentication googleAuth =
+        await googleUser.authentication;
+
+    final credential = GoogleAuthProvider.credential(
+      accessToken: googleAuth.accessToken,
+      idToken: googleAuth.idToken,
+    );
+
+    final UserCredential userCredential =
+        await firebaseAuth.signInWithCredential(credential);
+    final User? user = userCredential.user;
+
+    if (user != null) {
+      _uid = user.uid;
+      _isGoogleSignedIn = true;
+      notifyListeners();
+    }
+    
+    stopGoogleLoading();
+    onSuccess();
+
+  } on FirebaseAuthException catch (e) {
+    stopGoogleLoading();
+    if (context.mounted) {
+      commonMethods.displaySnackBar("Firebase Auth Error: ${e.message}", context);
+    }
+  } catch (e) {
+    // 📌 نمایش خطای دقیق گوگل روی صفحه گوشی
+    stopGoogleLoading();
+    if (context.mounted) {
+      commonMethods.displaySnackBar("Google Sign-In Error: $e", context);
     }
   }
+}
+
 
   Future<bool> checkIfDriverIsBlocked() async {
     try {
