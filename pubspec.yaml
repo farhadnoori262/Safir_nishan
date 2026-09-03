@@ -1,4 +1,4 @@
-Name: safir_drivers
+name: safir_drivers
 description: "Safir Drivers Application - Internet Taxi Service"
 publish_to: 'none'
 
