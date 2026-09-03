@@ -1,4 +1,4 @@
-plugins {
+Plugins {
     id "com.android.application"
     id "com.google.gms.google-services"
     id "kotlin-android"
@@ -40,13 +40,14 @@ android {
 
     buildTypes {
         release {
-            // خط signingConfig دیباگ حذف شد تا امضای اصلی Codemagic روی آن اعمال شود
+            // اضافه کردن امضا جهت برطرف ساختن خطای App not installed
+            signingConfig signingConfigs.debug
             
-            // کاهش حجم فایل (۲۲ مگابایت)
+            // فعال‌سازی کاهش حجم فایل APK (از ۲۷ به ۲۲ مگابایت)
             minifyEnabled true
             shrinkResources true
             
-            // عدم تداخل با گوگل و فایربیس
+            // جلوگیری از اختلال در ورود گوگل و فایربیس
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
         debug {
@@ -63,6 +64,7 @@ dependencies {
     implementation platform('com.google.firebase:firebase-bom:32.7.0')
 }
 
+// مجبور کردن تمام ساب‌پروژه‌ها به استفاده از جاوا ۱۷
 subprojects {
     afterEvaluate { project ->
         if (project.hasProperty("android")) {
