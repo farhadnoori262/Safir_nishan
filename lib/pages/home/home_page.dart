@@ -540,6 +540,64 @@ class _HomePageState extends State<HomePage> {
                 child: const Icon(Icons.my_location, color: AppColors.primaryBrand),
               ),
             ),
+            Positioned(
+  top: 16,
+  left: 16,
+  child: Container(
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(14),
+      boxShadow: const [
+        BoxShadow(
+          color: Colors.black12,
+          blurRadius: 8,
+          offset: Offset(0, 3),
+        ),
+      ],
+    ),
+    child: ElevatedButton(
+      onPressed: _showStatusChangeModal,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: isDriverAvailable
+            ? Colors.red.shade600
+            : AppColors.primaryBrand,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        padding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 11,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 9,
+            height: 9,
+            decoration: BoxDecoration(
+              color: isDriverAvailable
+                  ? Colors.greenAccent
+                  : Colors.white70,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 7),
+          Text(
+            isDriverAvailable
+                ? 'go_offline'.tr()
+                : 'go_online'.tr(),
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    ),
+  ),
+),
             Column(
               children: [
                 Expanded(
@@ -593,13 +651,39 @@ class _HomePageState extends State<HomePage> {
                                       '${tripData['distance'] ?? '5.2'}';
                                   String price =
                                       '${tripData['fareAmount'] ?? tripData['price'] ?? '120'}';
-                                  return Container(
-                                    margin: const EdgeInsets.only(
-                                        top: 40, bottom: 16),
-                                    padding: const EdgeInsets.all(16),
+                                  return DraggableScrollableSheet(
+  initialChildSize: 0.42,
+  minChildSize: 0.15,
+  maxChildSize: 0.75,
+  snap: true,
+  snapSizes: const [
+    0.15,
+    0.42,
+    0.75,
+  ],
+  builder: (
+    context,
+    scrollController,
+  ) {
+    return Container(
+      margin: const EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: 8,
+      ),
+      padding: const EdgeInsets.all(16),
                                     decoration: BoxDecoration(
-                                      color: AppColors.cardBackground,
-                                      borderRadius: BorderRadius.circular(20),
+  color: AppColors.cardBackground,
+  borderRadius: const BorderRadius.vertical(
+    top: Radius.circular(24),
+  ),
+  boxShadow: const [
+    BoxShadow(
+      color: Colors.black12,
+      blurRadius: 15,
+      offset: Offset(0, -3),
+    ),
+  ],
+),
                                       boxShadow: const [
                                         BoxShadow(
                                           color: Colors.black12,
@@ -608,8 +692,18 @@ class _HomePageState extends State<HomePage> {
                                         ),
                                       ],
                                     ),
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
+                                    Container(
+  width: 42,
+  height: 5,
+  margin: const EdgeInsets.only(bottom: 14),
+  decoration: BoxDecoration(
+    color: Colors.grey.shade400,
+    borderRadius: BorderRadius.circular(10),
+  ),
+),
+                                    child: SingleChildScrollView(
+                                    controller: scrollController,
+                                   child: Column(
                                       children: [
                                         Row(
                                           children: [
@@ -945,71 +1039,6 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ),
                 ),
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: (isDriverAvailable
-                                  ? Colors.red.shade900
-                                  : AppColors.primaryBrand)
-                              .withOpacity(0.25),
-                          blurRadius: 16,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
-                    ),
-                    child: ElevatedButton(
-                      onPressed: _showStatusChangeModal,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: isDriverAvailable
-                            ? Colors.red.shade600
-                            : AppColors.primaryBrand,
-                        foregroundColor: AppColors.buttonText,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            width: 12,
-                            height: 12,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: isDriverAvailable
-                                  ? Colors.greenAccent
-                                  : Colors.white70,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            isDriverAvailable
-                                ? 'go_offline'.tr()
-                                : 'go_online'.tr(),
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   String _getActionButtonTitle(String status) {
     switch (status) {
