@@ -5,6 +5,8 @@ workflows:
     instance_type: mac_mini_m2
 
     environment:
+      groups:
+        - safir_key # اتصال متغیرهای کلید آپلود شده در Codemagic
       flutter: 3.29.3
       java: 21
 
@@ -18,32 +20,22 @@ workflows:
         script: |
           flutter pub get
 
+      - name: Set up Keystore
+        script: |
+          echo $CM_KEYSTORE | base64 --decode > /tmp/release.jks
+
       - name: Get SHA-1
         script: |
-          mkdir -p "$HOME/.android"
-
-          if [ ! -f "$HOME/.android/debug.keystore" ]; then
-            keytool -genkeypair \
-              -v \
-              -keystore "$HOME/.android/debug.keystore" \
-              -storetype JKS \
-              -alias androiddebugkey \
-              -keyalg RSA \
-              -keysize 2048 \
-              -validity 10000 \
-              -storepass android \
-              -keypass android \
-              -dname "CN=Android Debug,O=Android,C=US"
-          fi
-
-          keytool -list -v \
-            -keystore "$HOME/.android/debug.keystore" \
-            -alias androiddebugkey \
-            -storepass android \
-            -keypass android
+          keytool -list -v -keystore /tmp/release.jks -alias $CM_KEY_ALIAS -storepass $CM_KEYSTORE_PASSWORD
 
       - name: Build Release APK
         script: |
+          cat <<EOF > android/key.properties
+          storePassword=$CM_KEYSTORE_PASSWORD
+          keyPassword=$CM_KEY_PASSWORD
+          keyAlias=$CM_KEY_ALIAS
+          storeFile=/tmp/release.jks
+          EOF
           flutter build apk --release --split-per-abi
 
     artifacts:
