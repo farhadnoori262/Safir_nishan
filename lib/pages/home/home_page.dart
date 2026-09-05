@@ -692,6 +692,16 @@ class _HomePageState extends State<HomePage> {
                                   String tripId = activeTripDoc.id;
                                   String status =
                                       tripData['status'] ?? 'accepted';
+                                  // شروع مسیر راننده به مبدأ، فقط یک بار
+if (status == 'accepted' && activeTripId != tripId) {
+  activeTripId = tripId;
+  activeTripStatus = status;
+
+  _startPickupRoute(
+    tripId,
+    tripData,
+  );
+}
                                   String passengerName = tripData['userName'] ??
                                       tripData['full_name'] ??
                                       'passenger'.tr();
