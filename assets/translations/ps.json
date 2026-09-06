@@ -20,8 +20,8 @@
   "route_preparing": "لاره د چمتو کیدو په حال کې ده...",
   "end_trip": "د سفر پای",
   "btn_arrived": "مبدأ ته ورسیدم",
-  "btn_start_trip": "سفر پیل کول",
-  "btn_end_trip": "سفر پای ته رسوول",
+  "btn_start_trip": "د سفر پیل (پای ته تګ)",
+  "btn_end_trip": "د سفر پای",
   "ending_trip": "د سفر پای ته رسولو په حال کې...",
   "otp_title": "د ایس ایم ایس کوډ تایید",
   "otp_subtitle": "خپل موبایل شمیرې ته لیږل شوی ۶ عددي کوډ داخل کړئ",
@@ -291,7 +291,6 @@
   "btn_sms_chat": "پیامکی چټ",
   "btn_cancel_trip": "سفر لغوه کول",
   "btn_arrived_pickup": "زه سپارونکي ته ورسیدم",
-  "btn_start_trip": "د سفر پیل (پای ته تګ)",
   "btn_end_trip": "د سفر پای",
   "msg_follow_navigation": "مهرباني وکړئ د نیویګیشن مطابق حرکت وکړئ",
   "passenger_phone_label": "د اړیکې شمیره",
@@ -300,5 +299,4 @@
   "estimated_fare_label": "تخمین شوې کرایه",
   "origin_label": "مبدأ",
   "destination_label": "مقصد"
-  
 }
