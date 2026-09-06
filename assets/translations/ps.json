@@ -285,5 +285,20 @@
   "btn_cash_received": "پیسې ترلاسه شوې",
   "unknown_address": "نامعلوم ادرس",
   "err_trip_cancelled": "دا سفر د سپرلۍ لخوا لغوه شو.",
-  "err_trip_not_found": "سفر ونه موندل شو یا پای ته رسیدلی."
+  "err_trip_not_found": "سفر ونه موندل شو یا پای ته رسیدلی.",
+  "btn_external_navigation_origin": "د سپارونکي پیل ځای ته نیویګیشن",
+  "btn_external_navigation_destination": "د سپارونکي مسير پای ته نیویګیشن",
+  "btn_sms_chat": "پیامکی چټ",
+  "btn_cancel_trip": "سفر لغوه کول",
+  "btn_arrived_pickup": "زه سپارونکي ته ورسیدم",
+  "btn_start_trip": "د سفر پیل (پای ته تګ)",
+  "btn_end_trip": "د سفر پای",
+  "msg_follow_navigation": "مهرباني وکړئ د نیویګیشن مطابق حرکت وکړئ",
+  "passenger_phone_label": "د اړیکې شمیره",
+  "estimated_time_label": "تخمین شوی وخت",
+  "estimated_distance_label": "فاصله",
+  "estimated_fare_label": "تخمین شوې کرایه",
+  "origin_label": "مبدأ",
+  "destination_label": "مقصد"
+
 }
