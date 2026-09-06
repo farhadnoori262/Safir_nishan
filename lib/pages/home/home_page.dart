@@ -151,6 +151,7 @@ class _HomePageState extends State<HomePage> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
     String uid = user.uid;
+    
 
     currentPositionOfDriver ??= await getCurrentLiveLocationOfDriver();
     if (currentPositionOfDriver != null) {
