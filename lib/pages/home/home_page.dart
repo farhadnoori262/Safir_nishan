@@ -476,30 +476,36 @@ class _HomePageState extends State<HomePage> {
                       Expanded(
                         child: ElevatedButton(
                           onPressed: isLoading
-                              ? null
-                              : () async {
-                                  setModalState(() => isLoading = true);
-                                  try {
-                                    if (!isDriverAvailable) {
-                                      if (mounted) {
-                                  setState(() => isDriverAvailable = true);
-                                   }
+    ? null
+    : () async {
+        setModalState(() => isLoading = true);
 
-                                   await _saveDriverStatus(true);
-                                   await goOnlineNow();
-                                    setAndGetLocationUpdates();
-                                     listenForTripRequests();
-                                    }
-                                    } else {
-                                      await goOfflineNow();
-                                      await _saveDriverStatus(false);
-                                      if (mounted) setState(() => isDriverAvailable = false);
-                                    }
-                                  } finally {
-                                    if (modalContext.mounted) Navigator.pop(modalContext);
-                                    isLoading = false;
-                                  }
-                                },
+        try {
+          if (!isDriverAvailable) {
+            if (mounted) {
+              setState(() => isDriverAvailable = true);
+            }
+
+            await _saveDriverStatus(true);
+            await goOnlineNow();
+            setAndGetLocationUpdates();
+            listenForTripRequests();
+          } else {
+            await goOfflineNow();
+            await _saveDriverStatus(false);
+
+            if (mounted) {
+              setState(() => isDriverAvailable = false);
+            }
+          }
+        } finally {
+          if (modalContext.mounted) {
+            Navigator.pop(modalContext);
+          }
+
+          isLoading = false;
+        }
+      },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: isDriverAvailable
                                 ? Colors.red.shade700
