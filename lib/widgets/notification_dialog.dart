@@ -128,14 +128,7 @@ class _NotificationDialogState extends State<NotificationDialog> {
           cMethods.turnOffLocationUpdatesForHomePage();
 
           if (mounted) {
-            Navigator.pop(context);
-            await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (c) =>
-                    NewTripPage(newTripDetailsInfo: widget.tripDetailsInfo),
-              ),
-            );
+           Navigator.pop(context);
           }
         } else if (currentStatus == "accepted") {
           if (mounted) {
