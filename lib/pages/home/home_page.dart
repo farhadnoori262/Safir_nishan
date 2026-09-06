@@ -52,9 +52,11 @@ class _HomePageState extends State<HomePage> {
     tripRequestStream?.cancel();
 
     driverOnlineTimestamp = DateTime.now().subtract(const Duration(seconds: 10));
+    
+    // فیلتر کردن بر اساس هر دو وضعیت pending و requested
     tripRequestStream = FirebaseFirestore.instance
         .collection('rides')
-        .where('status', isEqualTo: 'requested')
+        .where('status', whereIn: ['requested', 'pending'])
         .snapshots()
         .listen(
       (snapshot) {
@@ -64,8 +66,11 @@ class _HomePageState extends State<HomePage> {
             final String tripID = change.doc.id;
             final data = change.doc.data() as Map<String, dynamic>?;
             if (data == null) continue;
+
             final dynamic createdAtValue =
                 data['created_at'] ?? data['createdAt'] ?? data['timestamp'];
+
+            // پشتیبانی از Timestamp و انواع تاریخ در فایربیس
             if (createdAtValue is Timestamp) {
               final DateTime tripTime = createdAtValue.toDate();
               if (driverOnlineTimestamp != null &&
@@ -73,7 +78,15 @@ class _HomePageState extends State<HomePage> {
                 log("Trip $tripID is older than driver online time. Skipping.");
                 continue;
               }
+            } else if (createdAtValue is int) {
+              final DateTime tripTime =
+                  DateTime.fromMillisecondsSinceEpoch(createdAtValue);
+              if (driverOnlineTimestamp != null &&
+                  tripTime.isBefore(driverOnlineTimestamp!)) {
+                continue;
+              }
             }
+
             debugPrint("New valid trip request received: $tripID");
             if (mounted && isDriverAvailable) {
               PushNotificationSystem().retrieveTripRequestInfo(tripID, context);
@@ -180,7 +193,6 @@ class _HomePageState extends State<HomePage> {
 
       if (!mounted) return;
 
-      // هدایت خودکار دوربین روی راننده در صورت تمایل
       _animateMapToPosition(position.latitude, position.longitude);
 
       final navController = context.read<NavigationController>();
@@ -339,7 +351,6 @@ class _HomePageState extends State<HomePage> {
             currentPositionOfDriver!.latitude, currentPositionOfDriver!.longitude);
 
         if (newStatus == 'accepted') {
-          // مسیر به مبدأ
           GeoPoint? originPoint =
               tripData['originLatLng'] ?? tripData['pickup_location'];
           if (originPoint != null) {
@@ -348,12 +359,10 @@ class _HomePageState extends State<HomePage> {
             await startTripNavigation(driverLatLng, pickupLatLng);
           }
         } else if (newStatus == 'arrived') {
-          // مرحله ۴: راننده رسید به مبدأ
           setState(() {
             activeTripStatus = 'arrived';
           });
         } else if (newStatus == 'ontrip' || newStatus == 'in_progress') {
-          // مرحله ۵: شروع سفر - کشیدن مسیر جدید راننده → مقصد مسافر
           GeoPoint? destinationPoint =
               tripData['destinationLatLng'] ?? tripData['dropoff_location'];
           if (destinationPoint != null) {
@@ -365,7 +374,6 @@ class _HomePageState extends State<HomePage> {
             });
           }
         } else if (newStatus == 'completed') {
-          // مرحله ۶: پایان سفر - پاک‌سازی مسیر و بازگشت به وضعیت عادی
           context.read<NavigationController>().stopNavigation();
           if (mapController != null) {
             await mapController!.clearLines();
@@ -610,7 +618,6 @@ class _HomePageState extends State<HomePage> {
       body: SafeArea(
         child: Stack(
           children: [
-            // ۱. نقشه اصلی
             MapLibreMap(
               initialCameraPosition: CameraPosition(
                 target: LatLng(
@@ -625,7 +632,6 @@ class _HomePageState extends State<HomePage> {
               onMapCreated: _onMapCreated,
             ),
 
-            // ۲. دکمه انتقال دوربین به موقعیت جاری راننده
             Positioned(
               top: 16,
               right: 16,
@@ -637,7 +643,6 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
 
-            // ۳. دکمه آنلاین/آفلاین بالای صفحه
             Positioned(
               top: 16,
               left: 16,
@@ -697,7 +702,6 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
 
-            // ۴. BottomSheet مدیریت سفر (مراحل ۳ تا ۶)
             if (currentUser != null && isDriverAvailable)
               StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance
@@ -716,7 +720,6 @@ class _HomePageState extends State<HomePage> {
                     String tripId = activeTripDoc.id;
                     String status = tripData['status'] ?? 'accepted';
 
-                    // اگر سفر جدید قبول شده و هنوز روت کشیده نشده
                     if (status == 'accepted' && activeTripId != tripId) {
                       _startPickupRoute(tripId, tripData);
                     }
@@ -950,7 +953,6 @@ class _HomePageState extends State<HomePage> {
                                   },
                                 ),
                                 const SizedBox(height: 12),
-                                // دکمه تعویض وضعیت (مراحل ۴، ۵ و ۶)
                                 SizedBox(
                                   width: double.infinity,
                                   height: 46,
@@ -963,16 +965,13 @@ class _HomePageState extends State<HomePage> {
                                     ),
                                     onPressed: () {
                                       if (status == 'accepted') {
-                                        // مرحله ۴: اعلام رسیدن به مبدأ
                                         _updateTripStatus(
                                             tripId, 'arrived', tripData);
                                       } else if (status == 'arrived') {
-                                        // مرحله ۵: شروع سفر به مقصد
                                         _updateTripStatus(
                                             tripId, 'ontrip', tripData);
                                       } else if (status == 'ontrip' ||
                                           status == 'in_progress') {
-                                        // مرحله ۶: پایان سفر
                                         _updateTripStatus(
                                             tripId, 'completed', tripData);
                                       }
