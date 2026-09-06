@@ -20,7 +20,7 @@
   "route_preparing": "مسیر در حال آماده‌سازی است...",
   "end_trip": "پایان سفر",
   "btn_arrived": "به مبدا رسیدم",
-  "btn_start_trip": "شروع سفر",
+  "btn_start_trip": "شروع سفر (حرکت به مقصد)",
   "btn_end_trip": "پایان سفر",
   "ending_trip": "در حال اتمام سفر...",
   "otp_title": "تایید کد پیامک شده",
@@ -291,8 +291,6 @@
   "btn_sms_chat": "چت پیامکی",
   "btn_cancel_trip": "لغو سفر",
   "btn_arrived_pickup": "من به مسافر رسیدم",
-  "btn_start_trip": "شروع سفر (حرکت به مقصد)",
-  "btn_end_trip": "پایان سفر",
   "msg_follow_navigation": "لطفاً طبق مسیریابی حرکت کنید",
   "passenger_phone_label": "شماره تماس",
   "estimated_time_label": "زمان تخمینی",
@@ -300,5 +298,4 @@
   "estimated_fare_label": "کرایه تخمینی",
   "origin_label": "مبدأ",
   "destination_label": "مقصد"
-
 }
