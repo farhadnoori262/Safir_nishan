@@ -285,5 +285,20 @@
   "btn_cash_received": "Payment Received",
   "unknown_address": "Unknown Address",
   "err_trip_cancelled": "This ride was cancelled by the passenger.",
-  "err_trip_not_found": "Ride not found or expired."
+  "err_trip_not_found": "Ride not found or expired.",
+  "btn_external_navigation_origin": "Navigation to Passenger Pickup",
+  "btn_external_navigation_destination": "Navigation to Passenger Dropoff",
+  "btn_sms_chat": "SMS Chat",
+  "btn_cancel_trip": "Cancel Trip",
+  "btn_arrived_pickup": "I Have Arrived at Pickup",
+  "btn_start_trip": "Start Trip (Move to Destination)",
+  "btn_end_trip": "End Trip",
+  "msg_follow_navigation": "Please follow the navigation",
+  "passenger_phone_label": "Phone Number",
+  "estimated_time_label": "Est. Time",
+  "estimated_distance_label": "Distance",
+  "estimated_fare_label": "Est. Fare",
+  "origin_label": "Origin",
+  "destination_label": "Destination"
+
 }
