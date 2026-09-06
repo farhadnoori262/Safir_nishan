@@ -20,7 +20,7 @@
   "route_preparing": "Preparing route...",
   "end_trip": "End Trip",
   "btn_arrived": "Arrived at Pickup",
-  "btn_start_trip": "Start Trip",
+  "btn_start_trip": "Start Trip (Move to Destination)",
   "btn_end_trip": "End Trip",
   "ending_trip": "Ending trip...",
   "otp_title": "SMS Code Verification",
@@ -291,8 +291,6 @@
   "btn_sms_chat": "SMS Chat",
   "btn_cancel_trip": "Cancel Trip",
   "btn_arrived_pickup": "I Have Arrived at Pickup",
-  "btn_start_trip": "Start Trip (Move to Destination)",
-  "btn_end_trip": "End Trip",
   "msg_follow_navigation": "Please follow the navigation",
   "passenger_phone_label": "Phone Number",
   "estimated_time_label": "Est. Time",
@@ -300,5 +298,4 @@
   "estimated_fare_label": "Est. Fare",
   "origin_label": "Origin",
   "destination_label": "Destination"
-
 }
