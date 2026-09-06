@@ -441,10 +441,10 @@ class _HomePageState extends State<HomePage> {
           builder: (BuildContext context, StateSetter setModalState) {
             return Container(
               decoration: const BoxDecoration(
-                color: AppColors.cardBackground,
+                color: Colors.white,
                 borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(28),
-                  topRight: Radius.circular(28),
+                  topLeft: Radius.circular(32),
+                  topRight: Radius.circular(32),
                 ),
               ),
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
@@ -452,11 +452,11 @@ class _HomePageState extends State<HomePage> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    width: 40,
-                    height: 4,
+                    width: 48,
+                    height: 5,
                     decoration: BoxDecoration(
                       color: Colors.grey.shade300,
-                      borderRadius: BorderRadius.circular(2),
+                      borderRadius: BorderRadius.circular(10),
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -468,6 +468,7 @@ class _HomePageState extends State<HomePage> {
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
+                      color: Colors.black87,
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -476,49 +477,75 @@ class _HomePageState extends State<HomePage> {
                       Expanded(
                         child: ElevatedButton(
                           onPressed: isLoading
-    ? null
-    : () async {
-        setModalState(() => isLoading = true);
+                              ? null
+                              : () async {
+                                  setModalState(() => isLoading = true);
 
-        try {
-          if (!isDriverAvailable) {
-            if (mounted) {
-              setState(() => isDriverAvailable = true);
-            }
+                                  try {
+                                    if (!isDriverAvailable) {
+                                      if (mounted) {
+                                        setState(() => isDriverAvailable = true);
+                                      }
 
-            await _saveDriverStatus(true);
-            await goOnlineNow();
-            setAndGetLocationUpdates();
-            listenForTripRequests();
-          } else {
-            await goOfflineNow();
-            await _saveDriverStatus(false);
+                                      await _saveDriverStatus(true);
+                                      await goOnlineNow();
+                                      setAndGetLocationUpdates();
+                                      listenForTripRequests();
+                                    } else {
+                                      await goOfflineNow();
+                                      await _saveDriverStatus(false);
 
-            if (mounted) {
-              setState(() => isDriverAvailable = false);
-            }
-          }
-        } finally {
-          if (modalContext.mounted) {
-            Navigator.pop(modalContext);
-          }
+                                      if (mounted) {
+                                        setState(() => isDriverAvailable = false);
+                                      }
+                                    }
+                                  } finally {
+                                    if (modalContext.mounted) {
+                                      Navigator.pop(modalContext);
+                                    }
 
-          isLoading = false;
-        }
-      },
+                                    isLoading = false;
+                                  }
+                                },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: isDriverAvailable
-                                ? Colors.red.shade700
-                                : AppColors.primaryButton,
+                                ? const Color(0xFFE53935)
+                                : const Color(0xFF0F7D55),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 0,
                           ),
-                          child: Text('btn_confirm'.tr()),
+                          child: Text(
+                            'btn_confirm'.tr(),
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: OutlinedButton(
                           onPressed: () => Navigator.pop(modalContext),
-                          child: Text('btn_cancel'.tr()),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            side: BorderSide(color: Colors.grey.shade300),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: Text(
+                            'btn_cancel'.tr(),
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey.shade700,
+                            ),
+                          ),
                         ),
                       ),
                     ],
@@ -555,29 +582,72 @@ class _HomePageState extends State<HomePage> {
               onMapCreated: _onMapCreated,
             ),
 
+            // دکمه بازگشت به موقعیت من (سمت راست)
             Positioned(
-              top: 16,
+              top: 20,
               right: 16,
-              child: FloatingActionButton.small(
-                heroTag: 'recenter_btn',
-                backgroundColor: Colors.white,
-                onPressed: () => getCurrentLiveLocationOfDriver(),
-                child: const Icon(Icons.my_location, color: AppColors.primaryBrand),
+              child: Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.12),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: FloatingActionButton.small(
+                  heroTag: 'recenter_btn',
+                  elevation: 0,
+                  backgroundColor: Colors.white,
+                  onPressed: () => getCurrentLiveLocationOfDriver(),
+                  child: const Icon(Icons.my_location_rounded, color: Color(0xFF0F7D55), size: 22),
+                ),
               ),
             ),
 
+            // دکمه تغییر وضعیت آنلاین / آفلاین (سمت چپ) - اصلاح کاملا شفاف و روشن
             Positioned(
-              top: 16,
+              top: 20,
               left: 16,
-              child: ElevatedButton(
-                onPressed: _showStatusChangeModal,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: isDriverAvailable
-                      ? Colors.red.shade600
-                      : AppColors.primaryBrand,
-                ),
-                child: Text(
-                  isDriverAvailable ? 'go_offline'.tr() : 'go_online'.tr(),
+              child: Material(
+                elevation: 4,
+                shadowColor: Colors.black26,
+                borderRadius: BorderRadius.circular(30),
+                child: InkWell(
+                  onTap: _showStatusChangeModal,
+                  borderRadius: BorderRadius.circular(30),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: isDriverAvailable ? const Color(0xFFE53935) : const Color(0xFF0F7D55),
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 10,
+                          height: 10,
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          isDriverAvailable ? 'go_offline'.tr() : 'go_online'.tr(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -623,168 +693,231 @@ class _HomePageState extends State<HomePage> {
                         '${tripData['fareAmount'] ?? tripData['price'] ?? '120'}';
 
                     return DraggableScrollableSheet(
-                      initialChildSize: 0.60,
-                      minChildSize: 0.20,
-                      maxChildSize: 0.88,
+                      initialChildSize: 0.62,
+                      minChildSize: 0.22,
+                      maxChildSize: 0.90,
                       snap: true,
-                      snapSizes: const [0.20, 0.60, 0.88],
+                      snapSizes: const [0.22, 0.62, 0.90],
                       builder: (context, scrollController) {
                         return Container(
-                          decoration: const BoxDecoration(
-                            color: AppColors.cardBackground,
-                            borderRadius: BorderRadius.vertical(
-                              top: Radius.circular(24),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(28),
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black12,
-                                blurRadius: 15,
-                                offset: Offset(0, -3),
+                                color: Colors.black.withOpacity(0.08),
+                                blurRadius: 20,
+                                offset: const Offset(0, -6),
                               ),
                             ],
                           ),
                           child: SingleChildScrollView(
                             controller: scrollController,
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Container(
-                                  width: 40,
-                                  height: 4,
-                                  margin: const EdgeInsets.only(bottom: 12),
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey.shade300,
-                                    borderRadius: BorderRadius.circular(10),
+                                // دستگیره بالای کشو
+                                Center(
+                                  child: Container(
+                                    width: 44,
+                                    height: 5,
+                                    margin: const EdgeInsets.only(bottom: 16),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.shade300,
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
                                   ),
                                 ),
-                                // ۱. مشخصات مسافر
-                                Row(
-                                  children: [
-                                    CircleAvatar(
-                                      radius: 22,
-                                      backgroundColor: Colors.green.shade700,
-                                      child: const Icon(Icons.person, color: Colors.white, size: 26),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            passengerName,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 16,
-                                            ),
-                                          ),
-                                          Row(
-                                            children: [
-                                              const Icon(Icons.star, color: Colors.amber, size: 15),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                passengerRating,
-                                                style: const TextStyle(
-                                                    fontSize: 12, fontWeight: FontWeight.bold),
-                                              ),
-                                            ],
-                                          ),
-                                          Text(
-                                            '${'passenger_phone_label'.tr()}: $passengerPhone',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              color: Colors.grey.shade600,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    IconButton(
-                                      onPressed: () => _makePhoneCall(passengerPhone),
-                                      icon: const Icon(Icons.phone, color: Colors.green, size: 24),
-                                    ),
-                                  ],
-                                ),
-                                const Divider(height: 16),
-                                // ۲. آدرس مبدأ و مقصد
-                                Row(
-                                  children: [
-                                    Column(
-                                      children: [
-                                        const Icon(Icons.circle, color: Colors.green, size: 8),
-                                        Container(height: 18, width: 2, color: Colors.grey.shade300),
-                                        const Icon(Icons.location_on, color: Colors.red, size: 12),
-                                      ],
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text('${'origin_label'.tr()}: $originAddress',
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(fontSize: 12)),
-                                          const SizedBox(height: 6),
-                                          Text('${'destination_label'.tr()}: $destinationAddress',
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(fontSize: 12)),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 10),
-                                // ۳. قیمت و مسافت
+
+                                // ۱. مشخصات مسافر (کارت مجزا)
                                 Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                                  padding: const EdgeInsets.all(14),
                                   decoration: BoxDecoration(
-                                    color: Colors.grey.shade50,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                                    children: [
-                                      _buildInfoItem('estimated_time_label'.tr(), '$duration min', Icons.access_time),
-                                      _buildInfoItem('estimated_distance_label'.tr(), '$distance km', Icons.alt_route),
-                                      _buildInfoItem('estimated_fare_label'.tr(), '$price AFN', Icons.payments_outlined),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                // کادر راهنما
-                                Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
-                                  decoration: BoxDecoration(
-                                    color: Colors.amber.shade50,
-                                    borderRadius: BorderRadius.circular(8),
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(color: Colors.grey.shade200),
                                   ),
                                   child: Row(
                                     children: [
-                                      const Icon(Icons.notifications_active_outlined, color: Colors.amber, size: 16),
-                                      const SizedBox(width: 6),
+                                      Container(
+                                        width: 48,
+                                        height: 48,
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF0F7D55).withOpacity(0.12),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                          Icons.person_rounded,
+                                          color: Color(0xFF0F7D55),
+                                          size: 28,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
                                       Expanded(
-                                        child: Text(
-                                          'msg_follow_navigation'.tr(),
-                                          style: const TextStyle(fontSize: 11, color: Colors.brown),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              passengerName,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 16,
+                                                color: Colors.black87,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Row(
+                                              children: [
+                                                const Icon(Icons.star_rounded, color: Colors.amber, size: 16),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  passengerRating,
+                                                  style: const TextStyle(
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: Colors.black87,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 10),
+                                                Text(
+                                                  passengerPhone,
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: Colors.grey.shade600,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Material(
+                                        color: const Color(0xFFE8F5E9),
+                                        shape: const CircleBorder(),
+                                        child: IconButton(
+                                          onPressed: () => _makePhoneCall(passengerPhone),
+                                          icon: const Icon(Icons.phone_in_talk_rounded, color: Color(0xFF2E7D32), size: 22),
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
-                                const SizedBox(height: 10),
-                                // ۴. دکمه اصلی عملیات سفر (سبز رنگ)
+
+                                const SizedBox(height: 12),
+
+                                // ۲. کارت آدرس‌های مبدأ و مقصد
+                                Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(color: Colors.grey.shade200),
+                                  ),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Column(
+                                        children: [
+                                          const Icon(Icons.circle, color: Color(0xFF0F7D55), size: 12),
+                                          Container(
+                                            height: 32,
+                                            width: 2,
+                                            color: Colors.grey.shade300,
+                                          ),
+                                          const Icon(Icons.location_on_rounded, color: Color(0xFFE53935), size: 16),
+                                        ],
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              '${'origin_label'.tr()}: $originAddress',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.black87,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 20),
+                                            Text(
+                                              '${'destination_label'.tr()}: $destinationAddress',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.black87,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
+                                const SizedBox(height: 12),
+
+                                // ۳. قیمت و مسافت (کارت‌های جداگانه با ظاهر شیک)
+                                Row(
+                                  children: [
+                                    Expanded(child: _buildInfoCard('estimated_time_label'.tr(), '$duration min', Icons.access_time_rounded, Colors.orange)),
+                                    const SizedBox(width: 8),
+                                    Expanded(child: _buildInfoCard('estimated_distance_label'.tr(), '$distance km', Icons.alt_route_rounded, Colors.blue)),
+                                    const SizedBox(width: 8),
+                                    Expanded(child: _buildInfoCard('estimated_fare_label'.tr(), '$price AFN', Icons.account_balance_wallet_rounded, Colors.green)),
+                                  ],
+                                ),
+
+                                const SizedBox(height: 12),
+
+                                // کادر راهنمای سفر
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFFF8E1),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: Colors.amber.shade200),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.notifications_active_outlined, color: Colors.amber, size: 18),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          'msg_follow_navigation'.tr(),
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF795548),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
+                                const SizedBox(height: 16),
+
+                                // ۴. دکمه اصلی وضعیت سفر (سبز برجسته و کاملا واضح)
                                 SizedBox(
                                   width: double.infinity,
-                                  height: 46,
+                                  height: 50,
                                   child: ElevatedButton(
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF006837),
+                                      backgroundColor: const Color(0xFF0F7D55),
                                       shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(10)),
-                                      elevation: 0,
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                      elevation: 2,
                                     ),
                                     onPressed: () {
                                       if (status == 'accepted') {
@@ -798,25 +931,29 @@ class _HomePageState extends State<HomePage> {
                                     child: Text(
                                       _getActionButtonTitle(status),
                                       style: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white),
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
                                     ),
                                   ),
                                 ),
-                                const SizedBox(height: 8),
+
+                                const SizedBox(height: 10),
+
                                 // ۵. دکمه‌های چت و لغو
                                 Row(
                                   children: [
                                     Expanded(
                                       child: SizedBox(
-                                        height: 38,
+                                        height: 44,
                                         child: ElevatedButton.icon(
                                           style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.blue[50],
+                                            backgroundColor: const Color(0xFFE3F2FD),
                                             elevation: 0,
                                             shape: RoundedRectangleBorder(
-                                                borderRadius: BorderRadius.circular(8)),
+                                              borderRadius: BorderRadius.circular(12),
+                                            ),
                                           ),
                                           onPressed: () {
                                             Navigator.push(
@@ -830,100 +967,113 @@ class _HomePageState extends State<HomePage> {
                                               ),
                                             );
                                           },
-                                          icon: const Icon(Icons.chat_bubble_outline,
-                                              color: Colors.blue, size: 16),
-                                          label: Text('btn_sms_chat'.tr(),
-                                              style: const TextStyle(
-                                                  color: Colors.blue, fontSize: 11)),
+                                          icon: const Icon(Icons.chat_bubble_outline_rounded,
+                                              color: Color(0xFF1E88E5), size: 18),
+                                          label: Text(
+                                            'btn_sms_chat'.tr(),
+                                            style: const TextStyle(
+                                              color: Color(0xFF1E88E5),
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
                                         ),
                                       ),
                                     ),
                                     if (status != 'ontrip' && status != 'in_progress') ...[
-                                      const SizedBox(width: 8),
+                                      const SizedBox(width: 10),
                                       Expanded(
                                         child: SizedBox(
-                                          height: 38,
+                                          height: 44,
                                           child: ElevatedButton(
                                             style: ElevatedButton.styleFrom(
-                                              backgroundColor: Colors.red[50],
+                                              backgroundColor: const Color(0xFFFFEBEE),
                                               elevation: 0,
                                               shape: RoundedRectangleBorder(
-                                                  borderRadius: BorderRadius.circular(8)),
+                                                borderRadius: BorderRadius.circular(12),
+                                              ),
                                             ),
                                             onPressed: () => _cancelTrip(tripId),
-                                            child: Text('btn_cancel_trip'.tr(),
-                                                style: const TextStyle(
-                                                    color: Colors.red,
-                                                    fontSize: 11,
-                                                    fontWeight: FontWeight.bold)),
+                                            child: Text(
+                                              'btn_cancel_trip'.tr(),
+                                              style: const TextStyle(
+                                                color: Color(0xFFE53935),
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
                                           ),
                                         ),
                                       ),
                                     ],
                                   ],
                                 ),
+
                                 const SizedBox(height: 10),
-                                // 🔹 ۶. دکمه آبی مسیریابی خارجی (پایین‌ترین بخش کشو)
+
+                                // 🔹 ۶. دکمه مسیریابی خارجی
                                 SizedBox(
                                   width: double.infinity,
-                                  height: 46,
+                                  height: 50,
                                   child: ElevatedButton.icon(
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF1976D2),
+                                      backgroundColor: const Color(0xFF1565C0),
                                       shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(10)),
-                                      elevation: 0,
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                      elevation: 1,
                                     ),
                                     onPressed: () async {
-  double? latitude;
-  double? longitude;
+                                      double? latitude;
+                                      double? longitude;
 
-  if (status == 'accepted' || status == 'arrived') {
-    final dynamic originPoint = tripData['originLatLng'] ??
-        tripData['pickup_location'] ??
-        tripData['from'];
+                                      if (status == 'accepted' || status == 'arrived') {
+                                        final dynamic originPoint = tripData['originLatLng'] ??
+                                            tripData['pickup_location'] ??
+                                            tripData['from'];
 
-    if (originPoint is GeoPoint) {
-      latitude = originPoint.latitude;
-      longitude = originPoint.longitude;
-    } else {
-      latitude = double.tryParse(tripData['from_lat']?.toString() ?? '');
-      longitude = double.tryParse(tripData['from_lng']?.toString() ?? '');
-    }
-  } else {
-    final dynamic destinationPoint = tripData['destinationLatLng'] ??
-        tripData['dropoff_location'] ??
-        tripData['to'];
+                                        if (originPoint is GeoPoint) {
+                                          latitude = originPoint.latitude;
+                                          longitude = originPoint.longitude;
+                                        } else {
+                                          latitude = double.tryParse(tripData['from_lat']?.toString() ?? '');
+                                          longitude = double.tryParse(tripData['from_lng']?.toString() ?? '');
+                                        }
+                                      } else {
+                                        final dynamic destinationPoint = tripData['destinationLatLng'] ??
+                                            tripData['dropoff_location'] ??
+                                            tripData['to'];
 
-    if (destinationPoint is GeoPoint) {
-      latitude = destinationPoint.latitude;
-      longitude = destinationPoint.longitude;
-    } else {
-      latitude = double.tryParse(tripData['to_lat']?.toString() ?? '');
-      longitude = double.tryParse(tripData['to_lng']?.toString() ?? '');
-    }
-  }
+                                        if (destinationPoint is GeoPoint) {
+                                          latitude = destinationPoint.latitude;
+                                          longitude = destinationPoint.longitude;
+                                        } else {
+                                          latitude = double.tryParse(tripData['to_lat']?.toString() ?? '');
+                                          longitude = double.tryParse(tripData['to_lng']?.toString() ?? '');
+                                        }
+                                      }
 
-  if (latitude != null && longitude != null) {
-    await _openExternalMap(latitude, longitude);
-  } else if (mounted) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('مختصات مبدأ یا مقصد این سفر پیدا نشد.'),
-      ),
-    );
-  }
-},
-                                    icon: const Icon(Icons.navigation_outlined,
-                                        color: Colors.white, size: 18),
+                                      if (latitude != null && longitude != null) {
+                                        await _openExternalMap(latitude, longitude);
+                                      } else if (mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('مختصات مبدأ یا مقصد این سفر پیدا نشد.'),
+                                          ),
+                                        );
+                                      }
+                                    },
+                                    icon: const Icon(Icons.near_me_rounded,
+                                        color: Colors.white, size: 20),
                                     label: Text(
                                       (status == 'accepted' || status == 'arrived')
                                           ? 'btn_external_navigation_origin'.tr()
                                           : 'btn_external_navigation_destination'.tr(),
                                       style: const TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white),
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -957,15 +1107,36 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Widget _buildInfoItem(String label, String value, IconData icon) {
-    return Column(
-      children: [
-        Icon(icon, size: 16, color: Colors.grey[600]),
-        const SizedBox(height: 2),
-        Text(value,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-        Text(label, style: TextStyle(color: Colors.grey[600], fontSize: 9)),
-      ],
+  Widget _buildInfoCard(String label, String value, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.grey.shade600,
+              fontSize: 10,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
