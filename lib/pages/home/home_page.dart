@@ -480,11 +480,15 @@ class _HomePageState extends State<HomePage> {
                                   setModalState(() => isLoading = true);
                                   try {
                                     if (!isDriverAvailable) {
-                                      await goOnlineNow();
-                                      setAndGetLocationUpdates();
-                                      listenForTripRequests();
-                                      await _saveDriverStatus(true);
-                                      if (mounted) setState(() => isDriverAvailable = true);
+                                      if (mounted) {
+                                  setState(() => isDriverAvailable = true);
+                                   }
+
+                                   await _saveDriverStatus(true);
+                                   await goOnlineNow();
+                                    setAndGetLocationUpdates();
+                                     listenForTripRequests();
+                                    }
                                     } else {
                                       await goOfflineNow();
                                       await _saveDriverStatus(false);
