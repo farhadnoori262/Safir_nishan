@@ -46,6 +46,26 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  // 🔹 متد استخراج ایمن LatLng از فایربیس با هر ساختار داده‌ای
+  LatLng? _extractLatLng(Map<String, dynamic> data, List<String> keys, {String? latKey, String? lngKey}) {
+    for (String key in keys) {
+      final value = data[key];
+      if (value is GeoPoint) {
+        return LatLng(value.latitude, value.longitude);
+      } else if (value is Map) {
+        final lat = double.tryParse(value['latitude']?.toString() ?? value['lat']?.toString() ?? '');
+        final lng = double.tryParse(value['longitude']?.toString() ?? value['lng']?.toString() ?? '');
+        if (lat != null && lng != null) return LatLng(lat, lng);
+      }
+    }
+    if (latKey != null && lngKey != null) {
+      final lat = double.tryParse(data[latKey]?.toString() ?? '');
+      final lng = double.tryParse(data[lngKey]?.toString() ?? '');
+      if (lat != null && lng != null) return LatLng(lat, lng);
+    }
+    return null;
+  }
+
   void listenForTripRequests() {
     tripRequestStream?.cancel();
     driverOnlineTimestamp ??= DateTime.now();
@@ -274,7 +294,7 @@ class _HomePageState extends State<HomePage> {
       await mapController!.addLine(
         LineOptions(
           geometry: points,
-          lineColor: "#2196F3",
+          lineColor: "#0F7D55",
           lineWidth: 6.0,
           lineOpacity: 0.85,
           lineJoin: 'round',
@@ -285,40 +305,69 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _startPickupRoute(
-    String tripId,
-    Map<String, dynamic> tripData,
-  ) async {
+  // 🔹 رسم مسیر از موتر تا مبدأ مسافر
+  Future<void> _startPickupRoute(String tripId, Map<String, dynamic> tripData) async {
     try {
-      if (currentPositionOfDriver == null) {
-        currentPositionOfDriver = await getCurrentLiveLocationOfDriver();
-      }
-
+      currentPositionOfDriver ??= await getCurrentLiveLocationOfDriver();
       if (currentPositionOfDriver == null) return;
 
-      final dynamic originPoint =
-          tripData['originLatLng'] ?? tripData['pickup_location'];
+      LatLng? pickupLatLng = _extractLatLng(
+        tripData, 
+        ['originLatLng', 'pickup_location', 'pickupLatLng', 'origin'],
+        latKey: 'from_lat',
+        lngKey: 'from_lng',
+      );
 
-      if (originPoint is! GeoPoint) return;
+      if (pickupLatLng == null) {
+        debugPrint("❌ مختصات مبدأ پیدا نشد.");
+        return;
+      }
 
       final LatLng driverPosition = LatLng(
         currentPositionOfDriver!.latitude,
         currentPositionOfDriver!.longitude,
       );
 
-      final LatLng pickupPosition = LatLng(
-        originPoint.latitude,
-        originPoint.longitude,
-      );
-
       activeTripId = tripId;
       activeTripStatus = 'accepted';
 
-      await startTripNavigation(driverPosition, pickupPosition);
-
+      await startTripNavigation(driverPosition, pickupLatLng);
       if (mounted) setState(() {});
     } catch (e) {
       debugPrint('❌ خطا در مسیر مبدأ: $e');
+    }
+  }
+
+  // 🔹 رسم مسیر از مبدأ تا مقصد مسافر
+  Future<void> _startDestinationRoute(String tripId, Map<String, dynamic> tripData) async {
+    try {
+      currentPositionOfDriver ??= await getCurrentLiveLocationOfDriver();
+      if (currentPositionOfDriver == null) return;
+
+      LatLng? dropoffLatLng = _extractLatLng(
+        tripData, 
+        ['destinationLatLng', 'dropoff_location', 'dropoffLatLng', 'destination'],
+        latKey: 'to_lat',
+        lngKey: 'to_lng',
+      );
+
+      if (dropoffLatLng == null) {
+        debugPrint("❌ مختصات مقصد پیدا نشد.");
+        return;
+      }
+
+      final LatLng driverPosition = LatLng(
+        currentPositionOfDriver!.latitude,
+        currentPositionOfDriver!.longitude,
+      );
+
+      activeTripId = tripId;
+      activeTripStatus = 'ontrip';
+
+      await startTripNavigation(driverPosition, dropoffLatLng);
+      if (mounted) setState(() {});
+    } catch (e) {
+      debugPrint('❌ خطا در مسیر مقصد: $e');
     }
   }
 
@@ -344,43 +393,23 @@ class _HomePageState extends State<HomePage> {
         'updated_at': FieldValue.serverTimestamp(),
       });
 
-      if (currentPositionOfDriver != null) {
-        LatLng driverLatLng = LatLng(
-            currentPositionOfDriver!.latitude, currentPositionOfDriver!.longitude);
-
-        if (newStatus == 'accepted') {
-          GeoPoint? originPoint =
-              tripData['originLatLng'] ?? tripData['pickup_location'];
-          if (originPoint != null) {
-            LatLng pickupLatLng =
-                LatLng(originPoint.latitude, originPoint.longitude);
-            await startTripNavigation(driverLatLng, pickupLatLng);
-          }
-        } else if (newStatus == 'arrived') {
-          setState(() {
-            activeTripStatus = 'arrived';
-          });
-        } else if (newStatus == 'ontrip' || newStatus == 'in_progress') {
-          GeoPoint? destinationPoint =
-              tripData['destinationLatLng'] ?? tripData['dropoff_location'];
-          if (destinationPoint != null) {
-            LatLng dropoffLatLng =
-                LatLng(destinationPoint.latitude, destinationPoint.longitude);
-            await startTripNavigation(driverLatLng, dropoffLatLng);
-            setState(() {
-              activeTripStatus = 'ontrip';
-            });
-          }
-        } else if (newStatus == 'completed') {
-          context.read<NavigationController>().stopNavigation();
-          if (mapController != null) {
-            await mapController!.clearLines();
-          }
-          setState(() {
-            activeTripId = null;
-            activeTripStatus = null;
-          });
+      if (newStatus == 'accepted') {
+        await _startPickupRoute(tripId, tripData);
+      } else if (newStatus == 'arrived') {
+        setState(() {
+          activeTripStatus = 'arrived';
+        });
+      } else if (newStatus == 'ontrip' || newStatus == 'in_progress') {
+        await _startDestinationRoute(tripId, tripData);
+      } else if (newStatus == 'completed') {
+        context.read<NavigationController>().stopNavigation();
+        if (mapController != null) {
+          await mapController!.clearLines();
         }
+        setState(() {
+          activeTripId = null;
+          activeTripStatus = null;
+        });
       }
     } catch (e) {
       debugPrint("Error updating trip status: $e");
@@ -582,7 +611,6 @@ class _HomePageState extends State<HomePage> {
               onMapCreated: _onMapCreated,
             ),
 
-            // دکمه بازگشت به موقعیت من (سمت راست)
             Positioned(
               top: 20,
               right: 16,
@@ -607,7 +635,6 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
 
-            // دکمه تغییر وضعیت آنلاین / آفلاین (سمت چپ) - اصلاح کاملا شفاف و روشن
             Positioned(
               top: 20,
               left: 16,
@@ -656,7 +683,7 @@ class _HomePageState extends State<HomePage> {
               StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance
                     .collection('rides')
-                    .where('driverId', isEqualTo: currentUser.uid)
+                    .where('driver_id', isEqualTo: currentUser.uid)
                     .where('status', whereIn: [
                   'accepted',
                   'arrived',
@@ -670,8 +697,20 @@ class _HomePageState extends State<HomePage> {
                     String tripId = activeTripDoc.id;
                     String status = tripData['status'] ?? 'accepted';
 
-                    if (status == 'accepted' && activeTripId != tripId) {
-                      _startPickupRoute(tripId, tripData);
+                    // 🔹 فراخوانی خودکار ترسیم خط مسیر بر اساس وضعیت سفر
+                    if (activeTripId != tripId || activeTripStatus != status) {
+                      activeTripId = tripId;
+                      activeTripStatus = status;
+
+                      if (status == 'accepted') {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          _startPickupRoute(tripId, tripData);
+                        });
+                      } else if (status == 'ontrip' || status == 'in_progress') {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          _startDestinationRoute(tripId, tripData);
+                        });
+                      }
                     }
 
                     String passengerName = tripData['userName'] ??
@@ -719,7 +758,6 @@ class _HomePageState extends State<HomePage> {
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                // دستگیره بالای کشو
                                 Center(
                                   child: Container(
                                     width: 44,
@@ -732,7 +770,6 @@ class _HomePageState extends State<HomePage> {
                                   ),
                                 ),
 
-                                // ۱. مشخصات مسافر (کارت مجزا)
                                 Container(
                                   padding: const EdgeInsets.all(14),
                                   decoration: BoxDecoration(
@@ -808,7 +845,6 @@ class _HomePageState extends State<HomePage> {
 
                                 const SizedBox(height: 12),
 
-                                // ۲. کارت آدرس‌های مبدأ و مقصد
                                 Container(
                                   padding: const EdgeInsets.all(16),
                                   decoration: BoxDecoration(
@@ -865,7 +901,6 @@ class _HomePageState extends State<HomePage> {
 
                                 const SizedBox(height: 12),
 
-                                // ۳. قیمت و مسافت (کارت‌های جداگانه با ظاهر شیک)
                                 Row(
                                   children: [
                                     Expanded(child: _buildInfoCard('estimated_time_label'.tr(), '$duration min', Icons.access_time_rounded, Colors.orange)),
@@ -878,7 +913,6 @@ class _HomePageState extends State<HomePage> {
 
                                 const SizedBox(height: 12),
 
-                                // کادر راهنمای سفر
                                 Container(
                                   width: double.infinity,
                                   padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
@@ -907,7 +941,6 @@ class _HomePageState extends State<HomePage> {
 
                                 const SizedBox(height: 16),
 
-                                // ۴. دکمه اصلی وضعیت سفر (سبز برجسته و کاملا واضح)
                                 SizedBox(
                                   width: double.infinity,
                                   height: 50,
@@ -941,7 +974,6 @@ class _HomePageState extends State<HomePage> {
 
                                 const SizedBox(height: 10),
 
-                                // ۵. دکمه‌های چت و لغو
                                 Row(
                                   children: [
                                     Expanded(
@@ -1011,7 +1043,6 @@ class _HomePageState extends State<HomePage> {
 
                                 const SizedBox(height: 10),
 
-                                // 🔹 ۶. دکمه مسیریابی خارجی
                                 SizedBox(
                                   width: double.infinity,
                                   height: 50,
@@ -1024,37 +1055,25 @@ class _HomePageState extends State<HomePage> {
                                       elevation: 1,
                                     ),
                                     onPressed: () async {
-                                      double? latitude;
-                                      double? longitude;
-
+                                      LatLng? targetPos;
                                       if (status == 'accepted' || status == 'arrived') {
-                                        final dynamic originPoint = tripData['originLatLng'] ??
-                                            tripData['pickup_location'] ??
-                                            tripData['from'];
-
-                                        if (originPoint is GeoPoint) {
-                                          latitude = originPoint.latitude;
-                                          longitude = originPoint.longitude;
-                                        } else {
-                                          latitude = double.tryParse(tripData['from_lat']?.toString() ?? '');
-                                          longitude = double.tryParse(tripData['from_lng']?.toString() ?? '');
-                                        }
+                                        targetPos = _extractLatLng(
+                                          tripData, 
+                                          ['originLatLng', 'pickup_location', 'pickupLatLng', 'origin'],
+                                          latKey: 'from_lat',
+                                          lngKey: 'from_lng',
+                                        );
                                       } else {
-                                        final dynamic destinationPoint = tripData['destinationLatLng'] ??
-                                            tripData['dropoff_location'] ??
-                                            tripData['to'];
-
-                                        if (destinationPoint is GeoPoint) {
-                                          latitude = destinationPoint.latitude;
-                                          longitude = destinationPoint.longitude;
-                                        } else {
-                                          latitude = double.tryParse(tripData['to_lat']?.toString() ?? '');
-                                          longitude = double.tryParse(tripData['to_lng']?.toString() ?? '');
-                                        }
+                                        targetPos = _extractLatLng(
+                                          tripData, 
+                                          ['destinationLatLng', 'dropoff_location', 'dropoffLatLng', 'destination'],
+                                          latKey: 'to_lat',
+                                          lngKey: 'to_lng',
+                                        );
                                       }
 
-                                      if (latitude != null && longitude != null) {
-                                        await _openExternalMap(latitude, longitude);
+                                      if (targetPos != null) {
+                                        await _openExternalMap(targetPos.latitude, targetPos.longitude);
                                       } else if (mounted) {
                                         ScaffoldMessenger.of(context).showSnackBar(
                                           const SnackBar(
