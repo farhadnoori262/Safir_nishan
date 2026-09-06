@@ -48,7 +48,7 @@ class _HomePageState extends State<HomePage> {
 
   void listenForTripRequests() {
     tripRequestStream?.cancel();
-    driverOnlineTimestamp = DateTime.now().subtract(const Duration(seconds: 10));
+    driverOnlineTimestamp ??= DateTime.now();
 
     tripRequestStream = FirebaseFirestore.instance
         .collection('rides')
