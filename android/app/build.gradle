@@ -40,14 +40,12 @@ android {
 
     buildTypes {
         release {
-            // اضافه کردن امضا جهت برطرف ساختن خطای App not installed
-            signingConfig signingConfigs.debug
+            // خط signingConfig از اینجا حذف شد تا Codemagic خودش امضای release.jks را اعمال کند
             
-            // فعال‌سازی کاهش حجم فایل APK (از ۲۷ به ۲۲ مگابایت)
-            minifyEnabled true
-            shrinkResources true
+            // غیرفعال‌سازی temporary minify جهت جلوگیری از حذف کلاس‌های Google Sign-In توسط Proguard
+            minifyEnabled false
+            shrinkResources false
             
-            // جلوگیری از اختلال در ورود گوگل و فایربیس
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
         debug {
