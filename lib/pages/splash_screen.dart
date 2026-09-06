@@ -19,16 +19,23 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen> {
   bool _isLoading = true;
   bool _hasError = false;
-  Widget? _targetScreen;
 
-  // 🔴 کلید حالت تست: وقتی روی true باشد، ثبت نام را کلا دور میزند و مستقیم میرود روی داشبورد/نقشه
-  // 🟢 وقتی خواستی خروجی اصلی برای مشتری بگیری این را false کن
-  static const bool isDebugMode = true;
+  // 🟢 حالت تست غیرفعال شد تا روند واقعی برنامه اجرا شود
+  static const bool isDebugMode = false;
 
   @override
   void initState() {
     super.initState();
     _checkAuthAndNavigation();
+  }
+
+  Future<void> _navigateTo(Widget screen) async {
+    if (!mounted) return;
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => screen),
+      (route) => false,
+    );
   }
 
   Future<void> _checkAuthAndNavigation() async {
@@ -37,36 +44,22 @@ class _SplashScreenState extends State<SplashScreen> {
       _hasError = false;
     });
 
-    // ⚡ اگر در حال تست و توسعه هستی، مستقیما برو به Dashboard
-    if (isDebugMode) {
-      await Future.delayed(const Duration(milliseconds: 500)); // مکث کوتاه برای نمایش لوگو
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-        _targetScreen = const Dashboard();
-      });
-      return;
-    }
-
     try {
       User? user = FirebaseAuth.instance.currentUser;
 
-      if (!mounted) return;
-
+      // ۱. اگر کاربر لاگین نکرده باشد، هدایت به صفحه ثبت‌نام / ورود
       if (user == null) {
-        setState(() {
-          _isLoading = false;
-          _targetScreen = const RegisterScreen();
-        });
+        await _navigateTo(const RegisterScreen());
         return;
       }
 
       final authProvider = Provider.of<AuthenticationProvider>(context, listen: false);
 
+      // ۲. بررسی وجود حساب کاربر در دیتابیس
       bool userExists = true;
       try {
         userExists = await authProvider.checkUserExistById().timeout(
-          const Duration(seconds: 7),
+          const Duration(seconds: 5),
           onTimeout: () => true,
         );
       } catch (_) {
@@ -74,14 +67,11 @@ class _SplashScreenState extends State<SplashScreen> {
       }
 
       if (!userExists) {
-        if (!mounted) return;
-        setState(() {
-          _isLoading = false;
-          _targetScreen = const RegisterScreen();
-        });
+        await _navigateTo(const RegisterScreen());
         return;
       }
 
+      // ۳. بررسی مسدود نبودن راننده
       bool isBlocked = false;
       try {
         isBlocked = await authProvider.checkIfDriverIsBlocked().timeout(
@@ -93,32 +83,18 @@ class _SplashScreenState extends State<SplashScreen> {
       }
 
       if (isBlocked) {
-        if (!mounted) return;
-        setState(() {
-          _isLoading = false;
-          _targetScreen = const BlockedScreen();
-        });
+        await _navigateTo(const BlockedScreen());
         return;
       }
 
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-        _targetScreen = const Dashboard();
-      });
+      // ۴. اگر راننده قبلاً لاگین کرده و مشکلی ندارد -> ورود مستقیم به داشبورد
+      await _navigateTo(const Dashboard());
 
     } catch (e) {
-      if (!mounted) return;
       if (FirebaseAuth.instance.currentUser != null) {
-        setState(() {
-          _isLoading = false;
-          _targetScreen = const Dashboard();
-        });
+        await _navigateTo(const Dashboard());
       } else {
-        setState(() {
-          _isLoading = false;
-          _hasError = true;
-        });
+        await _navigateTo(const RegisterScreen());
       }
     }
   }
@@ -190,29 +166,25 @@ class _SplashScreenState extends State<SplashScreen> {
       );
     }
 
-    if (_isLoading || _targetScreen == null) {
-      return Scaffold(
-        backgroundColor: AppColors.primaryBrand,
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Image.asset(
-                'assets/images/splash.png',
-                width: 140,
-                fit: BoxFit.contain,
-              ),
-              const SizedBox(height: 32),
-              const CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(AppColors.buttonText),
-                strokeWidth: 3,
-              ),
-            ],
-          ),
+    return Scaffold(
+      backgroundColor: AppColors.primaryBrand,
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Image.asset(
+              'assets/images/splash.png',
+              width: 140,
+              fit: BoxFit.contain,
+            ),
+            const SizedBox(height: 32),
+            const CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(AppColors.buttonText),
+              strokeWidth: 3,
+            ),
+          ],
         ),
-      );
-    }
-
-    return _targetScreen!;
+      ),
+    );
   }
 }
