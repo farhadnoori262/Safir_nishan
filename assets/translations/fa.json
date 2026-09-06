@@ -285,5 +285,20 @@
   "btn_cash_received": "مبلغ دریافت شد",
   "unknown_address": "آدرس نامشخص",
   "err_trip_cancelled": "این سفر توسط مسافر لغو شد.",
-  "err_trip_not_found": "سفر یافت نشد یا منقضی شده است."
+  "err_trip_not_found": "سفر یافت نشد یا منقضی شده است.",
+  "btn_external_navigation_origin": "مسیریابی به مبدأ مسافر",
+  "btn_external_navigation_destination": "مسیریابی به مقصد مسافر",
+  "btn_sms_chat": "چت پیامکی",
+  "btn_cancel_trip": "لغو سفر",
+  "btn_arrived_pickup": "من به مسافر رسیدم",
+  "btn_start_trip": "شروع سفر (حرکت به مقصد)",
+  "btn_end_trip": "پایان سفر",
+  "msg_follow_navigation": "لطفاً طبق مسیریابی حرکت کنید",
+  "passenger_phone_label": "شماره تماس",
+  "estimated_time_label": "زمان تخمینی",
+  "estimated_distance_label": "مسافت",
+  "estimated_fare_label": "کرایه تخمینی",
+  "origin_label": "مبدأ",
+  "destination_label": "مقصد"
+
 }
