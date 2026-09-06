@@ -40,27 +40,22 @@ class _HomePageState extends State<HomePage> {
     mapController = controller;
   }
 
-  // ۱. متد انتقال دوربین نقشه به موقعیت جدید راننده
   void _animateMapToPosition(double lat, double lng) {
     mapController?.animateCamera(
       CameraUpdate.newLatLng(LatLng(lat, lng)),
     );
   }
 
-  // ۲. گوش دادن به درخواست‌های جدید سفر
   void listenForTripRequests() {
     tripRequestStream?.cancel();
-
     driverOnlineTimestamp = DateTime.now().subtract(const Duration(seconds: 10));
-    
-    // فیلتر کردن بر اساس هر دو وضعیت pending و requested
+
     tripRequestStream = FirebaseFirestore.instance
         .collection('rides')
         .where('status', whereIn: ['requested', 'pending'])
         .snapshots()
         .listen(
       (snapshot) {
-        debugPrint("Total active trip requests found: ${snapshot.docs.length}");
         for (final change in snapshot.docChanges) {
           if (change.type == DocumentChangeType.added) {
             final String tripID = change.doc.id;
@@ -70,12 +65,10 @@ class _HomePageState extends State<HomePage> {
             final dynamic createdAtValue =
                 data['created_at'] ?? data['createdAt'] ?? data['timestamp'];
 
-            // پشتیبانی از Timestamp و انواع تاریخ در فایربیس
             if (createdAtValue is Timestamp) {
               final DateTime tripTime = createdAtValue.toDate();
               if (driverOnlineTimestamp != null &&
                   tripTime.isBefore(driverOnlineTimestamp!)) {
-                log("Trip $tripID is older than driver online time. Skipping.");
                 continue;
               }
             } else if (createdAtValue is int) {
@@ -87,7 +80,6 @@ class _HomePageState extends State<HomePage> {
               }
             }
 
-            debugPrint("New valid trip request received: $tripID");
             if (mounted && isDriverAvailable) {
               PushNotificationSystem().retrieveTripRequestInfo(tripID, context);
             }
@@ -100,7 +92,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // گرفتن موقعیت زنده راننده
   Future<Position?> getCurrentLiveLocationOfDriver() async {
     try {
       LocationPermission permission = await Geolocator.checkPermission();
@@ -156,7 +147,6 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  // آنلاین شدن راننده
   Future<void> goOnlineNow() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -180,7 +170,6 @@ class _HomePageState extends State<HomePage> {
     await updateDriverStatus(uid);
   }
 
-  // مرحله ۱ و ۵: به‌روزرسانی موقعیت راننده به‌صورت زنده (GPS Stream) + فایربیس
   void setAndGetLocationUpdates() {
     positionStreamHomePage?.cancel();
     positionStreamHomePage = Geolocator.getPositionStream(
@@ -201,7 +190,12 @@ class _HomePageState extends State<HomePage> {
           LatLng(position.latitude, position.longitude),
           langCode: context.locale.languageCode,
         );
+
+        if (mapController != null && navController.currentRoutePoints.isNotEmpty) {
+          _drawRoutePolyline(navController.currentRoutePoints);
+        }
       }
+
       if (isDriverAvailable) {
         final user = FirebaseAuth.instance.currentUser;
         if (user != null) {
@@ -223,7 +217,6 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  // آفلاین شدن راننده
   Future<void> goOfflineNow() async {
     await positionStreamHomePage?.cancel();
     positionStreamHomePage = null;
@@ -266,7 +259,31 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  // مرحله ۳: قبول سفر و رسم مسیر راننده → مبدأ مسافر
+  Future<void> _openExternalMap(double lat, double lng) async {
+    final Uri url = Uri.parse('https://www.google.com/maps/search/?api=1&query=$lat,$lng');
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  Future<void> _drawRoutePolyline(List<LatLng> points) async {
+    if (mapController == null || points.isEmpty) return;
+    try {
+      await mapController!.clearLines();
+      await mapController!.addLine(
+        LineOptions(
+          geometry: points,
+          lineColor: "#2196F3",
+          lineWidth: 6.0,
+          lineOpacity: 0.85,
+          lineJoin: 'round',
+        ),
+      );
+    } catch (e) {
+      debugPrint("خطا در رسم خط مسیر: $e");
+    }
+  }
+
   Future<void> _startPickupRoute(
     String tripId,
     Map<String, dynamic> tripData,
@@ -276,18 +293,12 @@ class _HomePageState extends State<HomePage> {
         currentPositionOfDriver = await getCurrentLiveLocationOfDriver();
       }
 
-      if (currentPositionOfDriver == null) {
-        debugPrint('❌ موقعیت فعلی راننده پیدا نشد');
-        return;
-      }
+      if (currentPositionOfDriver == null) return;
 
       final dynamic originPoint =
           tripData['originLatLng'] ?? tripData['pickup_location'];
 
-      if (originPoint is! GeoPoint) {
-        debugPrint('❌ مختصات مبدأ مسافر پیدا نشد');
-        return;
-      }
+      if (originPoint is! GeoPoint) return;
 
       final LatLng driverPosition = LatLng(
         currentPositionOfDriver!.latitude,
@@ -302,20 +313,14 @@ class _HomePageState extends State<HomePage> {
       activeTripId = tripId;
       activeTripStatus = 'accepted';
 
-      await startTripNavigation(
-        driverPosition,
-        pickupPosition,
-      );
+      await startTripNavigation(driverPosition, pickupPosition);
 
-      if (mounted) {
-        setState(() {});
-      }
+      if (mounted) setState(() {});
     } catch (e) {
       debugPrint('❌ خطا در مسیر مبدأ: $e');
     }
   }
 
-  // ترسیم مسیر روی نقشه
   Future<void> startTripNavigation(LatLng driverPos, LatLng destinationPos) async {
     final navController = context.read<NavigationController>();
 
@@ -324,20 +329,12 @@ class _HomePageState extends State<HomePage> {
       destinationPos,
       context.locale.languageCode,
     );
-    if (routePoints.isNotEmpty && mapController != null) {
-      await mapController!.clearLines();
-      await mapController!.addLine(
-        LineOptions(
-          geometry: routePoints,
-          lineColor: "#006837",
-          lineWidth: 6.0,
-          lineOpacity: 0.8,
-        ),
-      );
+
+    if (routePoints.isNotEmpty) {
+      await _drawRoutePolyline(routePoints);
     }
   }
 
-  // مراحل ۴، ۵ و ۶: تغییر وضعیت‌های سفر و کشیدن مسیر جدید یا پاک‌سازی
   Future<void> _updateTripStatus(
       String tripId, String newStatus, Map<String, dynamic> tripData) async {
     try {
@@ -389,7 +386,6 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  // لغو سفر
   Future<void> _cancelTrip(String tripId) async {
     try {
       context.read<NavigationController>().stopNavigation();
@@ -449,13 +445,6 @@ class _HomePageState extends State<HomePage> {
                   topLeft: Radius.circular(28),
                   topRight: Radius.circular(28),
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black12,
-                    blurRadius: 15,
-                    spreadRadius: 2,
-                  ),
-                ],
               ),
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
               child: Column(
@@ -470,19 +459,6 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryBrand.withOpacity(0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.power_settings_new,
-                      color: AppColors.primaryBrand,
-                      size: 32,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
                   Text(
                     (!isDriverAvailable)
                         ? 'change_to_online_title'.tr()
@@ -490,20 +466,7 @@ class _HomePageState extends State<HomePage> {
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       fontSize: 18,
-                      color: AppColors.textPrimary,
                       fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    (!isDriverAvailable)
-                        ? 'change_to_online_desc'.tr()
-                        : 'change_to_offline_desc'.tr(),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 13,
-                      height: 1.5,
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -514,36 +477,21 @@ class _HomePageState extends State<HomePage> {
                           onPressed: isLoading
                               ? null
                               : () async {
-                                  setModalState(() {
-                                    isLoading = true;
-                                  });
-
+                                  setModalState(() => isLoading = true);
                                   try {
                                     if (!isDriverAvailable) {
                                       await goOnlineNow();
                                       setAndGetLocationUpdates();
                                       listenForTripRequests();
                                       await _saveDriverStatus(true);
-                                      if (mounted) {
-                                        setState(() {
-                                          isDriverAvailable = true;
-                                        });
-                                      }
+                                      if (mounted) setState(() => isDriverAvailable = true);
                                     } else {
                                       await goOfflineNow();
                                       await _saveDriverStatus(false);
-                                      if (mounted) {
-                                        setState(() {
-                                          isDriverAvailable = false;
-                                        });
-                                      }
+                                      if (mounted) setState(() => isDriverAvailable = false);
                                     }
-                                  } catch (e) {
-                                    debugPrint("Error changing status: $e");
                                   } finally {
-                                    if (modalContext.mounted) {
-                                      Navigator.pop(modalContext);
-                                    }
+                                    if (modalContext.mounted) Navigator.pop(modalContext);
                                     isLoading = false;
                                   }
                                 },
@@ -551,55 +499,19 @@ class _HomePageState extends State<HomePage> {
                             backgroundColor: isDriverAvailable
                                 ? Colors.red.shade700
                                 : AppColors.primaryButton,
-                            foregroundColor: AppColors.buttonText,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
                           ),
-                          child: isLoading
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : Text(
-                                  'btn_confirm'.tr(),
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 15,
-                                  ),
-                                ),
+                          child: Text('btn_confirm'.tr()),
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: OutlinedButton(
-                          onPressed:
-                              isLoading ? null : () => Navigator.pop(modalContext),
-                          style: OutlinedButton.styleFrom(
-                            side: BorderSide(color: Colors.grey.shade300),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                          ),
-                          child: Text(
-                            'btn_cancel'.tr(),
-                            style: const TextStyle(
-                              color: AppColors.textPrimary,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                          onPressed: () => Navigator.pop(modalContext),
+                          child: Text('btn_cancel'.tr()),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 10),
                 ],
               ),
             );
@@ -646,58 +558,15 @@ class _HomePageState extends State<HomePage> {
             Positioned(
               top: 16,
               left: 16,
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Colors.black12,
-                      blurRadius: 8,
-                      offset: Offset(0, 3),
-                    ),
-                  ],
+              child: ElevatedButton(
+                onPressed: _showStatusChangeModal,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isDriverAvailable
+                      ? Colors.red.shade600
+                      : AppColors.primaryBrand,
                 ),
-                child: ElevatedButton(
-                  onPressed: _showStatusChangeModal,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: isDriverAvailable
-                        ? Colors.red.shade600
-                        : AppColors.primaryBrand,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 11,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 9,
-                        height: 9,
-                        decoration: BoxDecoration(
-                          color: isDriverAvailable
-                              ? Colors.greenAccent
-                              : Colors.white70,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 7),
-                      Text(
-                        isDriverAvailable
-                            ? 'go_offline'.tr()
-                            : 'go_online'.tr(),
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
+                child: Text(
+                  isDriverAvailable ? 'go_offline'.tr() : 'go_online'.tr(),
                 ),
               ),
             ),
@@ -733,21 +602,21 @@ class _HomePageState extends State<HomePage> {
                         '${tripData['userRating'] ?? tripData['rating'] ?? '4.8'}';
                     String originAddress = tripData['originAddress'] ??
                         tripData['pickup_address'] ??
-                        'مبدأ مشخص نشده';
+                        '';
                     String destinationAddress = tripData['destinationAddress'] ??
                         tripData['dropoff_address'] ??
-                        'مقصد مشخص نشده';
+                        '';
                     String duration = '${tripData['duration'] ?? '15'}';
                     String distance = '${tripData['distance'] ?? '5.2'}';
                     String price =
                         '${tripData['fareAmount'] ?? tripData['price'] ?? '120'}';
 
                     return DraggableScrollableSheet(
-                      initialChildSize: 0.45,
-                      minChildSize: 0.18,
-                      maxChildSize: 0.75,
+                      initialChildSize: 0.60,
+                      minChildSize: 0.20,
+                      maxChildSize: 0.88,
                       snap: true,
-                      snapSizes: const [0.18, 0.45, 0.75],
+                      snapSizes: const [0.20, 0.60, 0.88],
                       builder: (context, scrollController) {
                         return Container(
                           decoration: const BoxDecoration(
@@ -765,194 +634,137 @@ class _HomePageState extends State<HomePage> {
                           ),
                           child: SingleChildScrollView(
                             controller: scrollController,
-                            padding: const EdgeInsets.all(16),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Container(
-                                  width: 42,
-                                  height: 5,
-                                  margin: const EdgeInsets.only(bottom: 14),
+                                  width: 40,
+                                  height: 4,
+                                  margin: const EdgeInsets.only(bottom: 12),
                                   decoration: BoxDecoration(
-                                    color: Colors.grey.shade400,
+                                    color: Colors.grey.shade300,
                                     borderRadius: BorderRadius.circular(10),
                                   ),
                                 ),
+                                // ۱. مشخصات مسافر
                                 Row(
                                   children: [
-                                    const CircleAvatar(
-                                      radius: 24,
-                                      backgroundColor: AppColors.primaryBrand,
-                                      child: Icon(Icons.person,
-                                          color: Colors.white, size: 28),
+                                    CircleAvatar(
+                                      radius: 22,
+                                      backgroundColor: Colors.green.shade700,
+                                      child: const Icon(Icons.person, color: Colors.white, size: 26),
                                     ),
                                     const SizedBox(width: 12),
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
+                                        crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                             passengerName,
                                             style: const TextStyle(
                                               fontWeight: FontWeight.bold,
                                               fontSize: 16,
-                                              color: AppColors.textPrimary,
                                             ),
                                           ),
                                           Row(
                                             children: [
-                                              const Icon(Icons.star,
-                                                  color: Colors.amber, size: 16),
+                                              const Icon(Icons.star, color: Colors.amber, size: 15),
                                               const SizedBox(width: 4),
                                               Text(
                                                 passengerRating,
                                                 style: const TextStyle(
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.bold),
+                                                    fontSize: 12, fontWeight: FontWeight.bold),
                                               ),
                                             ],
                                           ),
                                           Text(
-                                            'شماره تماس: $passengerPhone',
-                                            style: const TextStyle(
+                                            '${'passenger_phone_label'.tr()}: $passengerPhone',
+                                            style: TextStyle(
                                               fontSize: 11,
-                                              color: AppColors.textSecondary,
+                                              color: Colors.grey.shade600,
                                             ),
                                           ),
                                         ],
                                       ),
                                     ),
                                     IconButton(
-                                      onPressed: () =>
-                                          _makePhoneCall(passengerPhone),
-                                      icon: const Icon(Icons.phone,
-                                          color: Colors.green, size: 26),
+                                      onPressed: () => _makePhoneCall(passengerPhone),
+                                      icon: const Icon(Icons.phone, color: Colors.green, size: 24),
                                     ),
                                   ],
                                 ),
-                                const Divider(height: 20),
+                                const Divider(height: 16),
+                                // ۲. آدرس مبدأ و مقصد
                                 Row(
                                   children: [
                                     Column(
                                       children: [
-                                        const Icon(Icons.circle,
-                                            color: Colors.green, size: 10),
-                                        Container(
-                                            height: 20,
-                                            width: 2,
-                                            color: Colors.grey.shade300),
-                                        const Icon(Icons.location_on,
-                                            color: Colors.red, size: 14),
+                                        const Icon(Icons.circle, color: Colors.green, size: 8),
+                                        Container(height: 18, width: 2, color: Colors.grey.shade300),
+                                        const Icon(Icons.location_on, color: Colors.red, size: 12),
                                       ],
                                     ),
-                                    const SizedBox(width: 12),
+                                    const SizedBox(width: 10),
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
+                                        crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          Text(
-                                            'مبدأ: $originAddress',
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(fontSize: 12),
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            'مقصد: $destinationAddress',
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(fontSize: 12),
-                                          ),
+                                          Text('${'origin_label'.tr()}: $originAddress',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(fontSize: 12)),
+                                          const SizedBox(height: 6),
+                                          Text('${'destination_label'.tr()}: $destinationAddress',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(fontSize: 12)),
                                         ],
                                       ),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 12),
+                                const SizedBox(height: 10),
+                                // ۳. قیمت و مسافت
                                 Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      vertical: 8, horizontal: 6),
+                                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
                                   decoration: BoxDecoration(
                                     color: Colors.grey.shade50,
                                     borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                        color: Colors.grey.shade200),
                                   ),
                                   child: Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceAround,
+                                    mainAxisAlignment: MainAxisAlignment.spaceAround,
                                     children: [
-                                      _buildInfoItem('زمان تخمینی',
-                                          '$duration دقیقه', Icons.access_time),
-                                      _buildInfoItem('مسافت',
-                                          '$distance km', Icons.alt_route),
-                                      _buildInfoItem('کرایه تخمینی',
-                                          '$price AFN', Icons.payments_outlined),
+                                      _buildInfoItem('estimated_time_label'.tr(), '$duration min', Icons.access_time),
+                                      _buildInfoItem('estimated_distance_label'.tr(), '$distance km', Icons.alt_route),
+                                      _buildInfoItem('estimated_fare_label'.tr(), '$price AFN', Icons.payments_outlined),
                                     ],
                                   ),
                                 ),
                                 const SizedBox(height: 10),
-                                Consumer<NavigationController>(
-                                  builder: (context, nav, child) {
-                                    if (!nav.isNavigating ||
-                                        nav.instructionText.isEmpty) {
-                                      return Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 10, vertical: 6),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFFFF8E1),
-                                          borderRadius:
-                                              BorderRadius.circular(8),
+                                // کادر راهنما
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
+                                  decoration: BoxDecoration(
+                                    color: Colors.amber.shade50,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.notifications_active_outlined, color: Colors.amber, size: 16),
+                                      const SizedBox(width: 6),
+                                      Expanded(
+                                        child: Text(
+                                          'msg_follow_navigation'.tr(),
+                                          style: const TextStyle(fontSize: 11, color: Colors.brown),
                                         ),
-                                        child: Row(
-                                          children: const [
-                                            Icon(
-                                                Icons
-                                                    .notifications_active_outlined,
-                                                color: Colors.amber,
-                                                size: 16),
-                                            SizedBox(width: 8),
-                                            Text('لطفاً طبق مسیریابی حرکت کنید',
-                                                style: TextStyle(fontSize: 11)),
-                                          ],
-                                        ),
-                                      );
-                                    }
-                                    return Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 12, vertical: 10),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFE8F5E9),
-                                        borderRadius:
-                                            BorderRadius.circular(10),
-                                        border: Border.all(
-                                            color: const Color(0xFF006837),
-                                            width: 1),
                                       ),
-                                      child: Row(
-                                        children: [
-                                          const Icon(Icons.navigation,
-                                              color: Color(0xFF006837),
-                                              size: 22),
-                                          const SizedBox(width: 10),
-                                          Expanded(
-                                            child: Text(
-                                              nav.instructionText,
-                                              style: const TextStyle(
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.bold,
-                                                color: Color(0xFF006837),
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  },
+                                    ],
+                                  ),
                                 ),
-                                const SizedBox(height: 12),
+                                const SizedBox(height: 10),
+                                // ۴. دکمه اصلی عملیات سفر (سبز رنگ)
                                 SizedBox(
                                   width: double.infinity,
                                   height: 46,
@@ -960,42 +772,40 @@ class _HomePageState extends State<HomePage> {
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: const Color(0xFF006837),
                                       shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(12)),
+                                          borderRadius: BorderRadius.circular(10)),
+                                      elevation: 0,
                                     ),
                                     onPressed: () {
                                       if (status == 'accepted') {
-                                        _updateTripStatus(
-                                            tripId, 'arrived', tripData);
+                                        _updateTripStatus(tripId, 'arrived', tripData);
                                       } else if (status == 'arrived') {
-                                        _updateTripStatus(
-                                            tripId, 'ontrip', tripData);
-                                      } else if (status == 'ontrip' ||
-                                          status == 'in_progress') {
-                                        _updateTripStatus(
-                                            tripId, 'completed', tripData);
+                                        _updateTripStatus(tripId, 'ontrip', tripData);
+                                      } else if (status == 'ontrip' || status == 'in_progress') {
+                                        _updateTripStatus(tripId, 'completed', tripData);
                                       }
                                     },
                                     child: Text(
                                       _getActionButtonTitle(status),
                                       style: const TextStyle(
-                                          fontSize: 15,
+                                          fontSize: 14,
                                           fontWeight: FontWeight.bold,
                                           color: Colors.white),
                                     ),
                                   ),
                                 ),
-                                const SizedBox(height: 10),
+                                const SizedBox(height: 8),
+                                // ۵. دکمه‌های چت و لغو
                                 Row(
                                   children: [
                                     Expanded(
                                       child: SizedBox(
-                                        height: 36,
+                                        height: 38,
                                         child: ElevatedButton.icon(
                                           style: ElevatedButton.styleFrom(
                                             backgroundColor: Colors.blue[50],
                                             elevation: 0,
-                                            padding: EdgeInsets.zero,
+                                            shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(8)),
                                           ),
                                           onPressed: () {
                                             Navigator.push(
@@ -1004,48 +814,81 @@ class _HomePageState extends State<HomePage> {
                                                 builder: (context) => ChatPage(
                                                   tripId: tripId,
                                                   passengerName: passengerName,
-                                                  passengerPhone:
-                                                      passengerPhone,
+                                                  passengerPhone: passengerPhone,
                                                 ),
                                               ),
                                             );
                                           },
-                                          icon: const Icon(
-                                              Icons.chat_bubble_outline,
-                                              color: Colors.blue,
-                                              size: 16),
-                                          label: const Text('چت پیامکی',
-                                              style: TextStyle(
-                                                  color: Colors.blue,
-                                                  fontSize: 11)),
+                                          icon: const Icon(Icons.chat_bubble_outline,
+                                              color: Colors.blue, size: 16),
+                                          label: Text('btn_sms_chat'.tr(),
+                                              style: const TextStyle(
+                                                  color: Colors.blue, fontSize: 11)),
                                         ),
                                       ),
                                     ),
-                                    const SizedBox(width: 6),
-                                    if (status != 'ontrip' &&
-                                        status != 'in_progress') ...[
+                                    if (status != 'ontrip' && status != 'in_progress') ...[
+                                      const SizedBox(width: 8),
                                       Expanded(
                                         child: SizedBox(
-                                          height: 36,
+                                          height: 38,
                                           child: ElevatedButton(
                                             style: ElevatedButton.styleFrom(
                                               backgroundColor: Colors.red[50],
                                               elevation: 0,
-                                              padding: EdgeInsets.zero,
+                                              shape: RoundedRectangleBorder(
+                                                  borderRadius: BorderRadius.circular(8)),
                                             ),
-                                            onPressed: () =>
-                                                _cancelTrip(tripId),
-                                            child: const Text('لغو سفر',
-                                                style: TextStyle(
+                                            onPressed: () => _cancelTrip(tripId),
+                                            child: Text('btn_cancel_trip'.tr(),
+                                                style: const TextStyle(
                                                     color: Colors.red,
                                                     fontSize: 11,
-                                                    fontWeight:
-                                                        FontWeight.bold)),
+                                                    fontWeight: FontWeight.bold)),
                                           ),
                                         ),
                                       ),
                                     ],
                                   ],
+                                ),
+                                const SizedBox(height: 10),
+                                // 🔹 ۶. دکمه آبی مسیریابی خارجی (پایین‌ترین بخش کشو)
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 46,
+                                  child: ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF1976D2),
+                                      shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(10)),
+                                      elevation: 0,
+                                    ),
+                                    onPressed: () {
+                                      GeoPoint? targetPoint;
+                                      if (status == 'accepted' || status == 'arrived') {
+                                        targetPoint = tripData['originLatLng'] ??
+                                            tripData['pickup_location'];
+                                      } else {
+                                        targetPoint = tripData['destinationLatLng'] ??
+                                            tripData['dropoff_location'];
+                                      }
+                                      if (targetPoint != null) {
+                                        _openExternalMap(
+                                            targetPoint.latitude, targetPoint.longitude);
+                                      }
+                                    },
+                                    icon: const Icon(Icons.navigation_outlined,
+                                        color: Colors.white, size: 18),
+                                    label: Text(
+                                      (status == 'accepted' || status == 'arrived')
+                                          ? 'btn_external_navigation_origin'.tr()
+                                          : 'btn_external_navigation_destination'.tr(),
+                                      style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white),
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),
@@ -1066,14 +909,14 @@ class _HomePageState extends State<HomePage> {
   String _getActionButtonTitle(String status) {
     switch (status) {
       case 'accepted':
-        return 'من به مسافر رسیدم';
+        return 'btn_arrived_pickup'.tr();
       case 'arrived':
-        return 'شروع سفر (حرکت به مقصد)';
+        return 'btn_start_trip'.tr();
       case 'ontrip':
       case 'in_progress':
-        return 'پایان سفر';
+        return 'btn_end_trip'.tr();
       default:
-        return 'من به مسافر رسیدم';
+        return 'btn_arrived_pickup'.tr();
     }
   }
 
