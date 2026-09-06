@@ -39,65 +39,70 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _checkAuthAndNavigation() async {
-    setState(() {
-      _isLoading = true;
-      _hasError = false;
-    });
+  if (!mounted) return;
 
+  setState(() {
+    _isLoading = true;
+    _hasError = false;
+  });
+
+  try {
+    final User? user = await FirebaseAuth.instance.authStateChanges().first;
+
+    if (user == null) {
+      await _navigateTo(const RegisterScreen());
+      return;
+    }
+
+    final authProvider =
+        Provider.of<AuthenticationProvider>(context, listen: false);
+
+    bool userExists = true;
     try {
-      User? user = FirebaseAuth.instance.currentUser;
+      userExists = await authProvider.checkUserExistById().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => true,
+      );
+    } catch (_) {
+      userExists = true;
+    }
 
-      // ۱. اگر کاربر لاگین نکرده باشد، هدایت به صفحه ثبت‌نام / ورود
-      if (user == null) {
-        await _navigateTo(const RegisterScreen());
-        return;
-      }
+    if (!userExists) {
+      await _navigateTo(const RegisterScreen());
+      return;
+    }
 
-      final authProvider = Provider.of<AuthenticationProvider>(context, listen: false);
+    bool isBlocked = false;
+    try {
+      isBlocked = await authProvider.checkIfDriverIsBlocked().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => false,
+      );
+    } catch (_) {
+      isBlocked = false;
+    }
 
-      // ۲. بررسی وجود حساب کاربر در دیتابیس
-      bool userExists = true;
-      try {
-        userExists = await authProvider.checkUserExistById().timeout(
-          const Duration(seconds: 5),
-          onTimeout: () => true,
-        );
-      } catch (_) {
-        userExists = true;
-      }
+    if (isBlocked) {
+      await _navigateTo(const BlockedScreen());
+      return;
+    }
 
-      if (!userExists) {
-        await _navigateTo(const RegisterScreen());
-        return;
-      }
+    await _navigateTo(const Dashboard());
+  } catch (e) {
+    if (!mounted) return;
 
-      // ۳. بررسی مسدود نبودن راننده
-      bool isBlocked = false;
-      try {
-        isBlocked = await authProvider.checkIfDriverIsBlocked().timeout(
-          const Duration(seconds: 5),
-          onTimeout: () => false,
-        );
-      } catch (_) {
-        isBlocked = false;
-      }
+    final User? currentUser = FirebaseAuth.instance.currentUser;
 
-      if (isBlocked) {
-        await _navigateTo(const BlockedScreen());
-        return;
-      }
-
-      // ۴. اگر راننده قبلاً لاگین کرده و مشکلی ندارد -> ورود مستقیم به داشبورد
+    if (currentUser != null) {
       await _navigateTo(const Dashboard());
-
-    } catch (e) {
-      if (FirebaseAuth.instance.currentUser != null) {
-        await _navigateTo(const Dashboard());
-      } else {
-        await _navigateTo(const RegisterScreen());
-      }
+    } else {
+      setState(() {
+        _isLoading = false;
+        _hasError = true;
+      });
     }
   }
+}
 
   @override
   Widget build(BuildContext context) {
