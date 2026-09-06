@@ -874,20 +874,46 @@ class _HomePageState extends State<HomePage> {
                                           borderRadius: BorderRadius.circular(10)),
                                       elevation: 0,
                                     ),
-                                    onPressed: () {
-                                      GeoPoint? targetPoint;
-                                      if (status == 'accepted' || status == 'arrived') {
-                                        targetPoint = tripData['originLatLng'] ??
-                                            tripData['pickup_location'];
-                                      } else {
-                                        targetPoint = tripData['destinationLatLng'] ??
-                                            tripData['dropoff_location'];
-                                      }
-                                      if (targetPoint != null) {
-                                        _openExternalMap(
-                                            targetPoint.latitude, targetPoint.longitude);
-                                      }
-                                    },
+                                    onPressed: () async {
+  double? latitude;
+  double? longitude;
+
+  if (status == 'accepted' || status == 'arrived') {
+    final dynamic originPoint = tripData['originLatLng'] ??
+        tripData['pickup_location'] ??
+        tripData['from'];
+
+    if (originPoint is GeoPoint) {
+      latitude = originPoint.latitude;
+      longitude = originPoint.longitude;
+    } else {
+      latitude = double.tryParse(tripData['from_lat']?.toString() ?? '');
+      longitude = double.tryParse(tripData['from_lng']?.toString() ?? '');
+    }
+  } else {
+    final dynamic destinationPoint = tripData['destinationLatLng'] ??
+        tripData['dropoff_location'] ??
+        tripData['to'];
+
+    if (destinationPoint is GeoPoint) {
+      latitude = destinationPoint.latitude;
+      longitude = destinationPoint.longitude;
+    } else {
+      latitude = double.tryParse(tripData['to_lat']?.toString() ?? '');
+      longitude = double.tryParse(tripData['to_lng']?.toString() ?? '');
+    }
+  }
+
+  if (latitude != null && longitude != null) {
+    await _openExternalMap(latitude, longitude);
+  } else if (mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('مختصات مبدأ یا مقصد این سفر پیدا نشد.'),
+      ),
+    );
+  }
+},
                                     icon: const Icon(Icons.navigation_outlined,
                                         color: Colors.white, size: 18),
                                     label: Text(
