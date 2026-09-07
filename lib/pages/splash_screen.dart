@@ -19,9 +19,7 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen> {
   bool _isLoading = true;
   bool _hasError = false;
-
-  // 🟢 حالت تست غیرفعال شد تا روند واقعی برنامه اجرا شود
-  static const bool isDebugMode = false;
+  Widget? _targetScreen;
 
   @override
   void initState() {
@@ -29,80 +27,102 @@ class _SplashScreenState extends State<SplashScreen> {
     _checkAuthAndNavigation();
   }
 
-  Future<void> _navigateTo(Widget screen) async {
-    if (!mounted) return;
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (context) => screen),
-      (route) => false,
-    );
-  }
-
   Future<void> _checkAuthAndNavigation() async {
-  if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+    });
 
-  setState(() {
-    _isLoading = true;
-    _hasError = false;
-  });
-
-  try {
-    final User? user = await FirebaseAuth.instance.authStateChanges().first;
-
-    if (user == null) {
-      await _navigateTo(const RegisterScreen());
-      return;
-    }
-
-    final authProvider =
-        Provider.of<AuthenticationProvider>(context, listen: false);
-
-    bool userExists = true;
     try {
-      userExists = await authProvider.checkUserExistById().timeout(
-        const Duration(seconds: 5),
-        onTimeout: () => true,
-      );
-    } catch (_) {
-      userExists = true;
-    }
+      // تاخیر جهت بارگذاری کامل Session فایربیس از حافظه دستگاه (مشابه اپ مسافر)
+      await Future.delayed(const Duration(milliseconds: 1500));
 
-    if (!userExists) {
-      await _navigateTo(const RegisterScreen());
-      return;
-    }
+      // ۱. بررسی مستقیم کاربر جاری
+      final User? user = FirebaseAuth.instance.currentUser;
 
-    bool isBlocked = false;
-    try {
-      isBlocked = await authProvider.checkIfDriverIsBlocked().timeout(
-        const Duration(seconds: 5),
-        onTimeout: () => false,
-      );
-    } catch (_) {
-      isBlocked = false;
-    }
+      if (!mounted) return;
 
-    if (isBlocked) {
-      await _navigateTo(const BlockedScreen());
-      return;
-    }
+      // اگر کاربر لاگین نبود -> صفحه ثبت‌نام
+      if (user == null) {
+        setState(() {
+          _isLoading = false;
+          _targetScreen = const RegisterScreen();
+        });
+        return;
+      }
 
-    await _navigateTo(const Dashboard());
-  } catch (e) {
-    if (!mounted) return;
+      // کاربر لاگین است؛ بررسی اطلاعات تکمیلی دیتابیس
+      final authProvider = Provider.of<AuthenticationProvider>(context, listen: false);
 
-    final User? currentUser = FirebaseAuth.instance.currentUser;
+      // بارگذاری اطلاعات راننده در پرووایدر
+      try {
+        await authProvider.retrieveCurrentDriverInfo();
+      } catch (e) {
+        debugPrint("Error loading driver info: $e");
+      }
 
-    if (currentUser != null) {
-      await _navigateTo(const Dashboard());
-    } else {
+      // ۲. بررسی وجود حساب راننده در فایربیس
+      bool userExists = true;
+      try {
+        userExists = await authProvider.checkUserExistById().timeout(
+          const Duration(seconds: 4),
+          onTimeout: () => true, // در صورت کندی شبکه لاگ‌اوت نکند
+        );
+      } catch (_) {
+        userExists = true;
+      }
+
+      if (!userExists) {
+        setState(() {
+          _isLoading = false;
+          _targetScreen = const RegisterScreen();
+        });
+        return;
+      }
+
+      // ۳. بررسی مسدود نبودن راننده
+      bool isBlocked = false;
+      try {
+        isBlocked = await authProvider.checkIfDriverIsBlocked().timeout(
+          const Duration(seconds: 4),
+          onTimeout: () => false,
+        );
+      } catch (_) {
+        isBlocked = false;
+      }
+
+      if (isBlocked) {
+        setState(() {
+          _isLoading = false;
+          _targetScreen = const BlockedScreen();
+        });
+        return;
+      }
+
+      // ورود به داشبورد اصلی
       setState(() {
         _isLoading = false;
-        _hasError = true;
+        _targetScreen = const Dashboard();
       });
+
+    } catch (e) {
+      if (!mounted) return;
+
+      // در صورت بروز هرگونه خطای غیرمنتظره، اگر راننده لاگین باشد او را خارج نمی‌کنیم
+      final User? currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null) {
+        setState(() {
+          _isLoading = false;
+          _targetScreen = const Dashboard();
+        });
+      } else {
+        setState(() {
+          _isLoading = false;
+          _hasError = true;
+        });
+      }
     }
   }
-}
 
   @override
   Widget build(BuildContext context) {
@@ -171,25 +191,29 @@ class _SplashScreenState extends State<SplashScreen> {
       );
     }
 
-    return Scaffold(
-      backgroundColor: AppColors.primaryBrand,
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Image.asset(
-              'assets/images/splash.png',
-              width: 140,
-              fit: BoxFit.contain,
-            ),
-            const SizedBox(height: 32),
-            const CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(AppColors.buttonText),
-              strokeWidth: 3,
-            ),
-          ],
+    if (_isLoading || _targetScreen == null) {
+      return Scaffold(
+        backgroundColor: AppColors.primaryBrand,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Image.asset(
+                'assets/images/splash.png',
+                width: 140,
+                fit: BoxFit.contain,
+              ),
+              const SizedBox(height: 32),
+              const CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(AppColors.buttonText),
+                strokeWidth: 3,
+              ),
+            ],
+          ),
         ),
-      ),
-    );
+      );
+    }
+
+    return _targetScreen!;
   }
 }
