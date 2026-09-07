@@ -47,24 +47,33 @@
 
     <!-- تنظیمات دسترسی به مسیریاب‌ها و مرورگرها -->
     <queries>
-        <!-- مرورگرها (مثل کروم) -->
+        <!-- پشتیبانی کامل از لینک‌های وب و مرورگرها (مثل Chrome) -->
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="https" />
         </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="http" />
+        </intent>
 
-        <!-- اپلیکیشن‌های مسیریاب (مثل Google Maps) -->
+        <!-- پشتیبانی از نقشه گوگل با دامین مستقیم -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" android:host="www.google.com" android:pathPrefix="/maps" />
+        </intent>
+
+        <!-- پشتیبانی از اپلیکیشن‌های مسیریاب (مثل Google Maps و مسیریاب‌های دیگر) -->
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="geo" />
         </intent>
-
-        <!-- نقشه گوگل با Intent اختصاصی -->
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="google.navigation" />
         </intent>
 
+        <!-- سایر خدمات -->
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
