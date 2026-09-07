@@ -29,21 +29,20 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _checkAuthAndNavigation() async {
+    if (!mounted) return;
+
     setState(() {
       _isLoading = true;
       _hasError = false;
+      _targetScreen = null;
     });
 
     try {
-      // تاخیر جهت بارگذاری کامل Session فایربیس از حافظه دستگاه (مشابه اپ مسافر)
-      await Future.delayed(const Duration(milliseconds: 1500));
-
-      // ۱. بررسی مستقیم کاربر جاری
-      final User? user = FirebaseAuth.instance.currentUser;
+      final User? user =
+          await FirebaseAuth.instance.authStateChanges().first;
 
       if (!mounted) return;
 
-      // اگر کاربر لاگین نبود -> صفحه ثبت‌نام
       if (user == null) {
         setState(() {
           _isLoading = false;
@@ -52,29 +51,35 @@ class _SplashScreenState extends State<SplashScreen> {
         return;
       }
 
-      // کاربر لاگین است؛ بررسی اطلاعات تکمیلی دیتابیس
-      final authProvider = Provider.of<AuthenticationProvider>(context, listen: false);
+      final AuthenticationProvider authProvider =
+          Provider.of<AuthenticationProvider>(
+        context,
+        listen: false,
+      );
 
-      // بارگذاری اطلاعات راننده در پرووایدر
+      final RegistrationProvider registrationProvider =
+          Provider.of<RegistrationProvider>(
+        context,
+        listen: false,
+      );
+
       try {
-        // ✅ درست
-      final regProvider = Provider.of<RegistrationProvider>(context, listen: false);
-      await regProvider.retrieveCurrentDriverInfo();
-
-      } catch (e) {
-        debugPrint("Error loading driver info: $e");
-      }
-
-      // ۲. بررسی وجود حساب راننده در فایربیس
-      bool userExists = true;
-      try {
-        userExists = await authProvider.checkUserExistById().timeout(
-          const Duration(seconds: 4),
-          onTimeout: () => true, // در صورت کندی شبکه لاگ‌اوت نکند
+        await registrationProvider.retrieveCurrentDriverInfo().timeout(
+          const Duration(seconds: 5),
         );
-      } catch (_) {
-        userExists = true;
+      } catch (e) {
+        debugPrint('Driver information loading skipped: $e');
       }
+
+      if (!mounted) return;
+
+      final bool userExists =
+          await authProvider.checkUserExistById().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => true,
+      );
+
+      if (!mounted) return;
 
       if (!userExists) {
         setState(() {
@@ -84,47 +89,33 @@ class _SplashScreenState extends State<SplashScreen> {
         return;
       }
 
-      // ۳. بررسی مسدود نبودن راننده
-      bool isBlocked = false;
-      try {
-        isBlocked = await authProvider.checkIfDriverIsBlocked().timeout(
-          const Duration(seconds: 4),
-          onTimeout: () => false,
-        );
-      } catch (_) {
-        isBlocked = false;
-      }
+      final bool isBlocked =
+          await authProvider.checkIfDriverIsBlocked().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => false,
+      );
 
-      if (isBlocked) {
-        setState(() {
-          _isLoading = false;
-          _targetScreen = const BlockedScreen();
-        });
-        return;
-      }
-
-      // ورود به داشبورد اصلی
-      setState(() {
-        _isLoading = false;
-        _targetScreen = const Dashboard();
-      });
-
-    } catch (e) {
       if (!mounted) return;
 
-      // در صورت بروز هرگونه خطای غیرمنتظره، اگر راننده لاگین باشد او را خارج نمی‌کنیم
-      final User? currentUser = FirebaseAuth.instance.currentUser;
-      if (currentUser != null) {
-        setState(() {
-          _isLoading = false;
-          _targetScreen = const Dashboard();
-        });
-      } else {
-        setState(() {
-          _isLoading = false;
-          _hasError = true;
-        });
-      }
+      setState(() {
+        _isLoading = false;
+        _targetScreen =
+            isBlocked ? const BlockedScreen() : const Dashboard();
+      });
+    } catch (e) {
+      debugPrint('Splash authentication error: $e');
+
+      if (!mounted) return;
+
+      final User? currentUser =
+          FirebaseAuth.instance.currentUser;
+
+      setState(() {
+        _isLoading = false;
+        _hasError = currentUser == null;
+        _targetScreen =
+            currentUser != null ? const Dashboard() : null;
+      });
     }
   }
 
@@ -147,7 +138,9 @@ class _SplashScreenState extends State<SplashScreen> {
                     ),
                     const SizedBox(height: 32),
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 40.0),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 40,
+                      ),
                       child: Text(
                         'network_error_msg'.tr(),
                         textAlign: TextAlign.center,
@@ -164,7 +157,7 @@ class _SplashScreenState extends State<SplashScreen> {
               Align(
                 alignment: Alignment.bottomCenter,
                 child: Padding(
-                  padding: const EdgeInsets.all(20.0),
+                  padding: const EdgeInsets.all(20),
                   child: SizedBox(
                     width: double.infinity,
                     height: 52,
@@ -209,7 +202,9 @@ class _SplashScreenState extends State<SplashScreen> {
               ),
               const SizedBox(height: 32),
               const CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(AppColors.buttonText),
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  AppColors.buttonText,
+                ),
                 strokeWidth: 3,
               ),
             ],
