@@ -45,13 +45,30 @@
             
     </application>
 
-    <!-- تنظیمات برای دسترسی به خدمات سیستم در اندروید ۱۱ به بالا -->
+    <!-- تنظیمات دسترسی به مسیریاب‌ها و مرورگرها -->
     <queries>
+        <!-- مرورگرها (مثل کروم) -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+
+        <!-- اپلیکیشن‌های مسیریاب (مثل Google Maps) -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="geo" />
+        </intent>
+
+        <!-- نقشه گوگل با Intent اختصاصی -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="google.navigation" />
+        </intent>
+
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
-        <!-- اضافه شده برای سرویس گوینده صوتی (TTS) -->
         <intent>
             <action android:name="android.intent.action.TTS_SERVICE" />
         </intent>
