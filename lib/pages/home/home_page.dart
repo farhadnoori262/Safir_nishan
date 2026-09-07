@@ -1,6 +1,4 @@
 import 'dart:async';
-import 'dart:developer';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -36,6 +34,9 @@ class _HomePageState extends State<HomePage> {
   String? activeTripId;
   String? activeTripStatus;
 
+  // 🔹 سیمبل/مارکر راننده روی نقشه
+  Symbol? driverSymbol;
+
   void _onMapCreated(MapLibreMapController controller) {
     mapController = controller;
   }
@@ -46,7 +47,36 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // 🔹 متد استخراج ایمن LatLng از فایربیس با هر ساختار داده‌ای
+  // 🔹 به‌روزرسانی موقعیت مارکر خودرو/فلش راننده روی نقشه
+  Future<void> _updateDriverMarkerOnMap(double lat, double lng) async {
+    if (mapController == null) return;
+
+    try {
+      if (driverSymbol == null) {
+        // ایجاد مارکر راننده برای اولین بار
+        driverSymbol = await mapController!.addSymbol(
+          SymbolOptions(
+            geometry: LatLng(lat, lng),
+            iconImage: "car-15", // آیکون پیش‌فرض خودرو در MapLibre (می‌توانید تصویر سفارشی هم اضافه کنید)
+            iconSize: 2.0,
+            iconAnchor: "center",
+          ),
+        );
+      } else {
+        // به‌روزرسانی موقعیت مارکر موجود جهت تعقیب مسیر
+        await mapController!.updateSymbol(
+          driverSymbol!,
+          SymbolOptions(
+            geometry: LatLng(lat, lng),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint("خطا در به‌روزرسانی مارکر راننده: $e");
+    }
+  }
+
+  // 🔹 استخراج ایمن LatLng از فایربیس
   LatLng? _extractLatLng(Map<String, dynamic> data, List<String> keys, {String? latKey, String? lngKey}) {
     for (String key in keys) {
       final value = data[key];
@@ -130,6 +160,7 @@ class _HomePageState extends State<HomePage> {
       if (mounted) {
         setState(() {});
         _animateMapToPosition(positionOfUser.latitude, positionOfUser.longitude);
+        _updateDriverMarkerOnMap(positionOfUser.latitude, positionOfUser.longitude);
       }
       return positionOfUser;
     } catch (e) {
@@ -204,6 +235,7 @@ class _HomePageState extends State<HomePage> {
       if (!mounted) return;
 
       _animateMapToPosition(position.latitude, position.longitude);
+      _updateDriverMarkerOnMap(position.latitude, position.longitude);
 
       final navController = context.read<NavigationController>();
       if (navController.isNavigating) {
@@ -281,9 +313,23 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _openExternalMap(double lat, double lng) async {
-    final Uri url = Uri.parse('https://www.google.com/maps/search/?api=1&query=$lat,$lng');
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url, mode: LaunchMode.externalApplication);
+    final Uri googleMapsUrl = Uri.parse("google.navigation:q=$lat,$lng&mode=d");
+    final Uri webUrl = Uri.parse("https://www.google.com/maps/search/?api=1&query=$lat,$lng");
+
+    try {
+      if (await canLaunchUrl(googleMapsUrl)) {
+        await launchUrl(googleMapsUrl);
+      } else if (await canLaunchUrl(webUrl)) {
+        await launchUrl(webUrl, mode: LaunchMode.externalApplication);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('مسیریابی روی دستگاه یافت نشد.')),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint("خطا در باز کردن مسیریاب: $e");
     }
   }
 
@@ -305,7 +351,6 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  // 🔹 رسم مسیر از موتر تا مبدأ مسافر
   Future<void> _startPickupRoute(String tripId, Map<String, dynamic> tripData) async {
     try {
       currentPositionOfDriver ??= await getCurrentLiveLocationOfDriver();
@@ -318,10 +363,7 @@ class _HomePageState extends State<HomePage> {
         lngKey: 'from_lng',
       );
 
-      if (pickupLatLng == null) {
-        debugPrint("❌ مختصات مبدأ پیدا نشد.");
-        return;
-      }
+      if (pickupLatLng == null) return;
 
       final LatLng driverPosition = LatLng(
         currentPositionOfDriver!.latitude,
@@ -338,7 +380,6 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  // 🔹 رسم مسیر از مبدأ تا مقصد مسافر
   Future<void> _startDestinationRoute(String tripId, Map<String, dynamic> tripData) async {
     try {
       currentPositionOfDriver ??= await getCurrentLiveLocationOfDriver();
@@ -351,10 +392,7 @@ class _HomePageState extends State<HomePage> {
         lngKey: 'to_lng',
       );
 
-      if (dropoffLatLng == null) {
-        debugPrint("❌ مختصات مقصد پیدا نشد.");
-        return;
-      }
+      if (dropoffLatLng == null) return;
 
       final LatLng driverPosition = LatLng(
         currentPositionOfDriver!.latitude,
@@ -388,6 +426,11 @@ class _HomePageState extends State<HomePage> {
   Future<void> _updateTripStatus(
       String tripId, String newStatus, Map<String, dynamic> tripData) async {
     try {
+      if (newStatus == 'completed') {
+        _showCompleteTripDialog(tripId, tripData);
+        return;
+      }
+
       await FirebaseFirestore.instance.collection('rides').doc(tripId).update({
         'status': newStatus,
         'updated_at': FieldValue.serverTimestamp(),
@@ -401,41 +444,174 @@ class _HomePageState extends State<HomePage> {
         });
       } else if (newStatus == 'ontrip' || newStatus == 'in_progress') {
         await _startDestinationRoute(tripId, tripData);
-      } else if (newStatus == 'completed') {
-        context.read<NavigationController>().stopNavigation();
-        if (mapController != null) {
-          await mapController!.clearLines();
-        }
-        setState(() {
-          activeTripId = null;
-          activeTripStatus = null;
-        });
       }
     } catch (e) {
       debugPrint("Error updating trip status: $e");
     }
   }
 
+  void _showCompleteTripDialog(String tripId, Map<String, dynamic> tripData) {
+    String price = '${tripData['fareAmount'] ?? tripData['price'] ?? '0'}';
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              const Icon(Icons.check_circle_rounded, color: Color(0xFF0F7D55), size: 28),
+              const SizedBox(width: 8),
+              const Text('اتمام سفر', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('آیا سفر به مقصد رسید و می‌خواهید آن را به پایان برسانید؟',
+                  style: TextStyle(fontSize: 14)),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F5E9),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('مبلغ کرایه دریافتی:',
+                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    Text('$price افغانی',
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: Color(0xFF2E7D32))),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text('btn_cancel'.tr(), style: TextStyle(color: Colors.grey.shade700)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0F7D55),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () async {
+                Navigator.pop(dialogContext);
+
+                await FirebaseFirestore.instance.collection('rides').doc(tripId).update({
+                  'status': 'completed',
+                  'completed_at': FieldValue.serverTimestamp(),
+                });
+
+                final user = FirebaseAuth.instance.currentUser;
+                if (user != null) {
+                  await FirebaseFirestore.instance.collection("drivers").doc(user.uid).update({
+                    "newTripStatus": "waiting",
+                  });
+                }
+
+                context.read<NavigationController>().stopNavigation();
+                if (mapController != null) {
+                  await mapController!.clearLines();
+                  if (driverSymbol != null) {
+                    await mapController!.removeSymbol(driverSymbol!);
+                    driverSymbol = null;
+                  }
+                }
+
+                setState(() {
+                  activeTripId = null;
+                  activeTripStatus = null;
+                });
+
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('سفر با موفقیت به پایان رسید.'),
+                      backgroundColor: Color(0xFF0F7D55),
+                    ),
+                  );
+                }
+              },
+              child: const Text('تأیید و دریافت کرایه', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _cancelTrip(String tripId) async {
-    try {
-      context.read<NavigationController>().stopNavigation();
-      if (mapController != null) {
-        await mapController!.clearLines();
-      }
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text('لغو سفر', style: TextStyle(fontWeight: FontWeight.bold)),
+          content: const Text('آیا از لغو این سفر اطمینان دارید؟ مسافر متوجه لغو سفر خواهد شد.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text('btn_cancel'.tr(), style: TextStyle(color: Colors.grey.shade700)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFE53935),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () async {
+                Navigator.pop(dialogContext);
 
-      await FirebaseFirestore.instance.collection('rides').doc(tripId).update({
-        'status': 'canceled',
-        'canceled_by': 'driver',
-        'canceled_at': FieldValue.serverTimestamp(),
-      });
+                context.read<NavigationController>().stopNavigation();
+                if (mapController != null) {
+                  await mapController!.clearLines();
+                  if (driverSymbol != null) {
+                    await mapController!.removeSymbol(driverSymbol!);
+                    driverSymbol = null;
+                  }
+                }
 
-      setState(() {
-        activeTripId = null;
-        activeTripStatus = null;
-      });
-    } catch (e) {
-      debugPrint("Error canceling trip: $e");
-    }
+                await FirebaseFirestore.instance.collection('rides').doc(tripId).update({
+                  'status': 'canceled',
+                  'canceled_by': 'driver',
+                  'canceled_at': FieldValue.serverTimestamp(),
+                });
+
+                final user = FirebaseAuth.instance.currentUser;
+                if (user != null) {
+                  await FirebaseFirestore.instance.collection("drivers").doc(user.uid).update({
+                    "newTripStatus": "waiting",
+                  });
+                }
+
+                setState(() {
+                  activeTripId = null;
+                  activeTripStatus = null;
+                });
+
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('سفر توسط شما لغو شد.'),
+                      backgroundColor: Color(0xFFE53935),
+                    ),
+                  );
+                }
+              },
+              child: const Text('بله، لغو شود', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -683,21 +859,26 @@ class _HomePageState extends State<HomePage> {
               StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance
                     .collection('rides')
-                    .where('driver_id', isEqualTo: currentUser.uid)
-                    .where('status', whereIn: [
-                  'accepted',
-                  'arrived',
-                  'ontrip',
-                  'in_progress'
-                ]).snapshots(),
+                    .where('status', whereIn: ['accepted', 'arrived', 'ontrip', 'in_progress'])
+                    .snapshots(),
                 builder: (context, snapshot) {
                   if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
-                    var activeTripDoc = snapshot.data!.docs.first;
+                    DocumentSnapshot? activeTripDoc;
+
+                    for (var doc in snapshot.data!.docs) {
+                      var data = doc.data() as Map<String, dynamic>;
+                      if (data['driverId'] == currentUser.uid || data['driver_id'] == currentUser.uid) {
+                        activeTripDoc = doc;
+                        break;
+                      }
+                    }
+
+                    if (activeTripDoc == null) return const SizedBox.shrink();
+
                     var tripData = activeTripDoc.data() as Map<String, dynamic>;
                     String tripId = activeTripDoc.id;
                     String status = tripData['status'] ?? 'accepted';
 
-                    // 🔹 فراخوانی خودکار ترسیم خط مسیر بر اساس وضعیت سفر
                     if (activeTripId != tripId || activeTripStatus != status) {
                       activeTripId = tripId;
                       activeTripStatus = status;
