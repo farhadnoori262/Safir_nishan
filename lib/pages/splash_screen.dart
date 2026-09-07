@@ -1,9 +1,12 @@
-import 'package:easy_localization/easy_localization.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import 'package:safir_drivers/pages/auth/register_screen.dart';
 import 'package:safir_drivers/pages/dashboard.dart';
+import 'package:safir_drivers/pages/driverRegistration/driver_registration.dart';
+import 'package:safir_drivers/providers/authentication_provider.dart';
+import 'package:safir_drivers/providers/registration_provider.dart';
 import 'package:safir_drivers/utils/app_colors.dart';
 
 class SplashScreen extends StatelessWidget {
@@ -11,12 +14,12 @@ class SplashScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const AuthGate();
+    return const DriverAuthGate();
   }
 }
 
-class AuthGate extends StatelessWidget {
-  const AuthGate({super.key});
+class DriverAuthGate extends StatelessWidget {
+  const DriverAuthGate({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -24,11 +27,11 @@ class AuthGate extends StatelessWidget {
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const _SplashLoadingScreen();
+          return const _LoadingScreen();
         }
 
         if (snapshot.hasError) {
-          return const _AuthErrorScreen();
+          return const _ErrorScreen();
         }
 
         final User? user = snapshot.data;
@@ -37,14 +40,83 @@ class AuthGate extends StatelessWidget {
           return const RegisterScreen();
         }
 
-        return const Dashboard();
+        return const _DriverProfileGate();
       },
     );
   }
 }
 
-class _SplashLoadingScreen extends StatelessWidget {
-  const _SplashLoadingScreen();
+class _DriverProfileGate extends StatefulWidget {
+  const _DriverProfileGate();
+
+  @override
+  State<_DriverProfileGate> createState() => _DriverProfileGateState();
+}
+
+class _DriverProfileGateState extends State<_DriverProfileGate> {
+  late Future<bool> _profileCheck;
+
+  @override
+  void initState() {
+    super.initState();
+    _profileCheck = _checkDriverProfile();
+  }
+
+  Future<bool> _checkDriverProfile() async {
+    final AuthenticationProvider authProvider =
+        Provider.of<AuthenticationProvider>(
+      context,
+      listen: false,
+    );
+
+    final RegistrationProvider registrationProvider =
+        Provider.of<RegistrationProvider>(
+      context,
+      listen: false,
+    );
+
+    try {
+      await registrationProvider.retrieveCurrentDriverInfo();
+
+      return await authProvider
+          .checkDriverFieldsFilled()
+          .timeout(const Duration(seconds: 8));
+    } catch (e) {
+      debugPrint('Driver profile check error: $e');
+
+      // خطای شبکه نباید کاربر Auth‌شده را logout کند.
+      // در این حالت ادامهٔ ثبت‌نام را باز می‌کنیم.
+      return false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<bool>(
+      future: _profileCheck,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const _LoadingScreen();
+        }
+
+        if (snapshot.hasError) {
+          return const DriverRegistration();
+        }
+
+        final bool isComplete = snapshot.data ?? false;
+
+        if (isComplete) {
+          return const Dashboard();
+        }
+
+        return const DriverRegistration();
+      },
+    );
+  }
+}
+
+class _LoadingScreen extends StatelessWidget {
+  const _LoadingScreen();
 
   @override
   Widget build(BuildContext context) {
@@ -73,37 +145,34 @@ class _SplashLoadingScreen extends StatelessWidget {
   }
 }
 
-class _AuthErrorScreen extends StatelessWidget {
-  const _AuthErrorScreen();
+class _ErrorScreen extends StatelessWidget {
+  const _ErrorScreen();
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.primaryBrand,
-      body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Image.asset(
-                  'assets/images/splash.png',
-                  width: 140,
-                  fit: BoxFit.contain,
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Image.asset(
+                'assets/images/splash.png',
+                width: 140,
+                fit: BoxFit.contain,
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'خطا در بررسی وضعیت حساب',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: AppColors.buttonText,
+                  fontSize: 16,
                 ),
-                const SizedBox(height: 24),
-                Text(
-                  'network_error_msg'.tr(),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: AppColors.buttonText,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
