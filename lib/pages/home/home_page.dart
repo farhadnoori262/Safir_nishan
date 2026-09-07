@@ -312,15 +312,16 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _openExternalMap(double lat, double lng) async {
-    final Uri googleMapsUrl = Uri.parse("google.navigation:q=$lat,$lng&mode=d");
-    final Uri webUrl = Uri.parse("https://www.google.com/maps/search/?api=1&query=$lat,$lng");
+    Future<void> _openExternalMap(double lat, double lng) async {
+    // لینک استاندارد وب که توسط تمام مرورگرها و Google Maps پشتیبانی می‌شود
+    final Uri mapUrl = Uri.parse("https://www.google.com/maps/search/?api=1&query=$lat,$lng");
 
     try {
-      if (await canLaunchUrl(googleMapsUrl)) {
-        await launchUrl(googleMapsUrl);
-      } else if (await canLaunchUrl(webUrl)) {
-        await launchUrl(webUrl, mode: LaunchMode.externalApplication);
+      if (await canLaunchUrl(mapUrl)) {
+        await launchUrl(
+          mapUrl,
+          mode: LaunchMode.externalApplication, // اجبار به باز کردن منوی انتخاب سیستم‌عامل
+        );
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -332,6 +333,7 @@ class _HomePageState extends State<HomePage> {
       debugPrint("خطا در باز کردن مسیریاب: $e");
     }
   }
+
 
   Future<void> _drawRoutePolyline(List<LatLng> points) async {
     if (mapController == null || points.isEmpty) return;
