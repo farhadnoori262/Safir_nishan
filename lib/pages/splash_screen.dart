@@ -57,7 +57,10 @@ class _SplashScreenState extends State<SplashScreen> {
 
       // بارگذاری اطلاعات راننده در پرووایدر
       try {
-        await authProvider.retrieveCurrentDriverInfo();
+        // ✅ درست
+      final regProvider = Provider.of<RegistrationProvider>(context, listen: false);
+      await regProvider.retrieveCurrentDriverInfo();
+
       } catch (e) {
         debugPrint("Error loading driver info: $e");
       }
