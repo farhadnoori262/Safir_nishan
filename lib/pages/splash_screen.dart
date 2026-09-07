@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import 'package:safir_drivers/pages/auth/register_screen.dart';
 import 'package:safir_drivers/pages/dashboard.dart';
+import 'package:safir_drivers/providers/registration_provider.dart';
 import 'package:safir_drivers/providers/authentication_provider.dart';
 import 'package:safir_drivers/utils/app_colors.dart';
 import 'package:safir_drivers/widgets/blocked_screen.dart';
