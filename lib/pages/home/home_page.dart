@@ -312,28 +312,25 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-    Future<void> _openExternalMap(double lat, double lng) async {
-    // لینک استاندارد وب که توسط تمام مرورگرها و Google Maps پشتیبانی می‌شود
+      Future<void> _openExternalMap(double lat, double lng) async {
     final Uri mapUrl = Uri.parse("https://www.google.com/maps/search/?api=1&query=$lat,$lng");
 
     try {
-      if (await canLaunchUrl(mapUrl)) {
-        await launchUrl(
-          mapUrl,
-          mode: LaunchMode.externalApplication, // اجبار به باز کردن منوی انتخاب سیستم‌عامل
+      // استفاده مستقیم از launchUrl بدون گیر دادن به canLaunchUrl
+      bool launched = await launchUrl(
+        mapUrl,
+        mode: LaunchMode.externalApplication,
+      );
+
+      if (!launched && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('امکان باز کردن مسیریاب وجود ندارد.')),
         );
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('مسیریابی روی دستگاه یافت نشد.')),
-          );
-        }
       }
     } catch (e) {
       debugPrint("خطا در باز کردن مسیریاب: $e");
     }
   }
-
 
   Future<void> _drawRoutePolyline(List<LatLng> points) async {
     if (mapController == null || points.isEmpty) return;
