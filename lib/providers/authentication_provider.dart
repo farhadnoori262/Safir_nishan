@@ -197,14 +197,27 @@ class AuthenticationProvider extends ChangeNotifier {
   }
 
   Future<bool> checkUserExistById() async {
-    if (FirebaseAuth.instance.currentUser == null) return false;
-    DatabaseReference usersRef = firebaseDatabase.ref().child("drivers");
-    DatabaseEvent snapshot = await usersRef
-        .orderByChild("id") 
-        .equalTo(FirebaseAuth.instance.currentUser!.uid)
-        .once();
+  final User? user = firebaseAuth.currentUser;
 
-    return snapshot.snapshot.exists;
+  if (user == null) {
+    return false;
+  }
+
+  try {
+    final DatabaseReference driverRef = firebaseDatabase
+        .ref()
+        .child('drivers')
+        .child(user.uid);
+
+    final DataSnapshot snapshot = await driverRef.get();
+
+    return snapshot.exists && snapshot.value != null;
+  } catch (e) {
+    debugPrint('Error checking driver profile: $e');
+
+    // خطای شبکه نباید کاربر را به ثبت‌نام بفرستد.
+    return true;
+  }
   }
 
   // دریافت اطلاعات کامل راننده همراه با جزییات پلاک افغانستان
