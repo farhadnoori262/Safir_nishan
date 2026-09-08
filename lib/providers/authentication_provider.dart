@@ -39,11 +39,10 @@ class AuthenticationProvider extends ChangeNotifier {
 
   Driver? _driverModel;
 
-  Driver? get driverModel => _driverModel;
+  Driver get driverModel => _driverModel!;
 
   String? get uid => _uid;
-  String get phoneNumber =>
-      _phoneNumber ?? firebaseAuth.currentUser?.phoneNumber ?? '';
+  String get phoneNumber => _phoneNumber!;
   bool get isSuccessful => _isSuccessful;
   bool get isLoading => _isLoading;
   bool get isGoogleSignedIn => _isGoogleSignedIn;
@@ -54,8 +53,9 @@ class AuthenticationProvider extends ChangeNotifier {
   final FirebaseStorage firebaseStorage = FirebaseStorage.instance;
   final FirebaseDatabase firebaseDatabase = FirebaseDatabase.instance; 
   final GoogleSignIn googleSignIn = GoogleSignIn(
-    serverClientId: '983174537944-n532tsodijqddnufq0lgtmevc2g0qr5a.apps.googleusercontent.com',
-  );
+  serverClientId: '983174537944-n532tsodijqddnufq0lgtmevc2g0qr5a.apps.googleusercontent.com',
+);
+ 
 
   void startLoading() {
     _isLoading = true;
@@ -77,18 +77,6 @@ class AuthenticationProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // سینک کردن UID و شماره تلفن کاربر فعلی فایربیس
-  void syncWithFirebaseUser() {
-    final currentUser = firebaseAuth.currentUser;
-    if (currentUser != null) {
-      _uid ??= currentUser.uid;
-      _phoneNumber ??= currentUser.phoneNumber;
-      _isGoogleSignedIn = currentUser.providerData
-          .any((info) => info.providerId == 'google.com');
-      notifyListeners();
-    }
-  }
-
   // ورود/ثبت‌نام با شماره تلفن
   void signInWithPhone({
     required BuildContext context,
@@ -108,6 +96,7 @@ class AuthenticationProvider extends ChangeNotifier {
           if (context.mounted) {
             commonMethods.displaySnackBar("${tr(context, 'err_phone_verify')}: ${e.message}", context);
           }
+          throw Exception(e.toString());
         },
         codeSent: (String verificationId, int? resendToken) {
           stopLoading(); 
@@ -208,26 +197,14 @@ class AuthenticationProvider extends ChangeNotifier {
   }
 
   Future<bool> checkUserExistById() async {
-    final User? user = firebaseAuth.currentUser;
+    if (FirebaseAuth.instance.currentUser == null) return false;
+    DatabaseReference usersRef = firebaseDatabase.ref().child("drivers");
+    DatabaseEvent snapshot = await usersRef
+        .orderByChild("id") 
+        .equalTo(FirebaseAuth.instance.currentUser!.uid)
+        .once();
 
-    if (user == null) {
-      return false;
-    }
-
-    try {
-      final DatabaseReference driverRef = firebaseDatabase
-          .ref()
-          .child('drivers')
-          .child(user.uid);
-
-      final DataSnapshot snapshot = await driverRef.get();
-
-      return snapshot.exists && snapshot.value != null;
-    } catch (e) {
-      debugPrint('Error checking driver profile: $e');
-      // خطای شبکه نباید کاربر را مستقیم به صفحه ثبت‌نام هدایت کند
-      return true;
-    }
+    return snapshot.snapshot.exists;
   }
 
   // دریافت اطلاعات کامل راننده همراه با جزییات پلاک افغانستان
@@ -263,8 +240,8 @@ class AuthenticationProvider extends ChangeNotifier {
           drivingLicenseBackImage: driverData["drivingLicenseBackImage"] ?? '',
           blockStatus: driverData["blockStatus"] ?? '',
           deviceToken: driverData["deviceToken"] ?? '',
-          driverRatings: driverData["driverRatings"] ?? driverData["driverRattings"] ?? '0',
-          earnings: driverData["earnings"] ?? '0',
+          driverRatings: driverData["driverRattings"] ?? '',
+          earnings: driverData["earnings"] ?? '',
           vehicleInfo: driverData["vehicleInfo"] != null
               ? VehicleInfo.fromMap(Map<String, dynamic>.from(driverData["vehicleInfo"]))
               : VehicleInfo.empty(),
@@ -358,49 +335,51 @@ class AuthenticationProvider extends ChangeNotifier {
   }
 
   Future<void> signInWithGoogle(
-      BuildContext context, VoidCallback onSuccess) async {
-    startGoogleLoading();
-    try {
-      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+    BuildContext context, VoidCallback onSuccess) async {
+  startGoogleLoading();
+  try {
+    final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
 
-      if (googleUser == null) {
-        stopGoogleLoading();
-        return; 
-      }
-
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
-
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-
-      final UserCredential userCredential =
-          await firebaseAuth.signInWithCredential(credential);
-      final User? user = userCredential.user;
-
-      if (user != null) {
-        _uid = user.uid;
-        _isGoogleSignedIn = true;
-        notifyListeners();
-      }
-      
+    if (googleUser == null) {
       stopGoogleLoading();
-      onSuccess();
+      return; 
+    }
 
-    } on FirebaseAuthException catch (e) {
-      stopGoogleLoading();
-      if (context.mounted) {
-        commonMethods.displaySnackBar("Firebase Auth Error: ${e.message}", context);
-      }
-    } catch (e) {
-      stopGoogleLoading();
-      if (context.mounted) {
-        commonMethods.displaySnackBar("Google Sign-In Error: $e", context);
-      }
+    final GoogleSignInAuthentication googleAuth =
+        await googleUser.authentication;
+
+    final credential = GoogleAuthProvider.credential(
+      accessToken: googleAuth.accessToken,
+      idToken: googleAuth.idToken,
+    );
+
+    final UserCredential userCredential =
+        await firebaseAuth.signInWithCredential(credential);
+    final User? user = userCredential.user;
+
+    if (user != null) {
+      _uid = user.uid;
+      _isGoogleSignedIn = true;
+      notifyListeners();
+    }
+    
+    stopGoogleLoading();
+    onSuccess();
+
+  } on FirebaseAuthException catch (e) {
+    stopGoogleLoading();
+    if (context.mounted) {
+      commonMethods.displaySnackBar("Firebase Auth Error: ${e.message}", context);
+    }
+  } catch (e) {
+    // 📌 نمایش خطای دقیق گوگل روی صفحه گوشی
+    stopGoogleLoading();
+    if (context.mounted) {
+      commonMethods.displaySnackBar("Google Sign-In Error: $e", context);
     }
   }
+}
+
 
   Future<bool> checkIfDriverIsBlocked() async {
     try {
@@ -422,7 +401,6 @@ class AuthenticationProvider extends ChangeNotifier {
 
           _uid = null;
           _isGoogleSignedIn = false;
-          _driverModel = null;
           notifyListeners();
           return true; 
         } else {
@@ -444,16 +422,15 @@ class AuthenticationProvider extends ChangeNotifier {
       await googleSignIn.signOut();
 
       _uid = null;
-      _phoneNumber = null;
       _isGoogleSignedIn = false;
-      _driverModel = null;
       notifyListeners();
 
       if (context.mounted) {
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(
-              builder: (context) => const RegisterScreen()), 
+              builder: (context) =>
+                  const RegisterScreen()), 
           (route) => false,
         );
       }
