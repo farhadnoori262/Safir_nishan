@@ -39,7 +39,7 @@ class AuthenticationProvider extends ChangeNotifier {
 
   Driver? _driverModel;
 
-  Driver get driverModel => _driverModel!;
+  Driver? get driverModel => _driverModel;
 
   String? get uid => _uid;
   String get phoneNumber =>
@@ -121,6 +121,14 @@ class AuthenticationProvider extends ChangeNotifier {
           stopLoading(); 
         },
       );
+      void syncWithFirebaseUser() {
+  final currentUser = firebaseAuth.currentUser;
+  if (currentUser != null) {
+    _uid ??= currentUser.uid;
+    _phoneNumber ??= currentUser.phoneNumber;
+    notifyListeners();
+  }
+      }
     } on FirebaseException catch (e) {
       stopLoading(); 
       if (context.mounted) {
