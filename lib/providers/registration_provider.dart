@@ -804,7 +804,7 @@ class RegistrationProvider extends ChangeNotifier {
           .child("drivers")
           .child(_auth.currentUser!.uid)
           .child("vehicleInfo");
-      await userRef.update(vehicleData);
+            await userRef.update(vehicleData);
       _isLoading = false;
       notifyListeners();
     } catch (e) {
@@ -812,4 +812,17 @@ class RegistrationProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  // 🔹 کد جدید را در این قسمت اضافه کنید:
+  bool get isDriverRegistered {
+    return _isDataFetched &&
+        firstNameController.text.isNotEmpty &&
+        lastNameController.text.isNotEmpty &&
+        phoneController.text.isNotEmpty &&
+        cnicController.text.isNotEmpty &&
+        drivingLicenseController.text.isNotEmpty &&
+        brandController.text.isNotEmpty &&
+        numberPlateController.text.isNotEmpty;
+  }
 }
+
