@@ -80,13 +80,13 @@ class _DriverProfileGateState extends State<_DriverProfileGate> {
 
       return await authProvider
           .checkDriverFieldsFilled()
-          .timeout(const Duration(seconds: 8));
+          .timeout(const Duration(seconds: 15));
     } catch (e) {
       debugPrint('Driver profile check error: $e');
 
       // خطای شبکه نباید کاربر Auth‌شده را logout کند.
       // در این حالت ادامهٔ ثبت‌نام را باز می‌کنیم.
-      return false;
+      return true;
     }
   }
 
