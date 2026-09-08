@@ -42,7 +42,8 @@ class AuthenticationProvider extends ChangeNotifier {
   Driver get driverModel => _driverModel!;
 
   String? get uid => _uid;
-  String get phoneNumber => _phoneNumber!;
+  String get phoneNumber =>
+    _phoneNumber ?? firebaseAuth.currentUser?.phoneNumber ?? '';
   bool get isSuccessful => _isSuccessful;
   bool get isLoading => _isLoading;
   bool get isGoogleSignedIn => _isGoogleSignedIn;
