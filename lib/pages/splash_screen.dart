@@ -1,12 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 
 import 'package:safir_drivers/pages/auth/register_screen.dart';
 import 'package:safir_drivers/pages/dashboard.dart';
-import 'package:safir_drivers/pages/driverRegistration/driver_registration.dart';
-import 'package:safir_drivers/providers/authentication_provider.dart';
-import 'package:safir_drivers/providers/registration_provider.dart';
 import 'package:safir_drivers/utils/app_colors.dart';
 
 class SplashScreen extends StatelessWidget {
@@ -40,76 +36,7 @@ class DriverAuthGate extends StatelessWidget {
           return const RegisterScreen();
         }
 
-        return const _DriverProfileGate();
-      },
-    );
-  }
-}
-
-class _DriverProfileGate extends StatefulWidget {
-  const _DriverProfileGate();
-
-  @override
-  State<_DriverProfileGate> createState() => _DriverProfileGateState();
-}
-
-class _DriverProfileGateState extends State<_DriverProfileGate> {
-  late Future<bool> _profileCheck;
-
-  @override
-  void initState() {
-    super.initState();
-    _profileCheck = _checkDriverProfile();
-  }
-
-  Future<bool> _checkDriverProfile() async {
-    final AuthenticationProvider authProvider =
-        Provider.of<AuthenticationProvider>(
-      context,
-      listen: false,
-    );
-
-    final RegistrationProvider registrationProvider =
-        Provider.of<RegistrationProvider>(
-      context,
-      listen: false,
-    );
-
-    try {
-      await registrationProvider.retrieveCurrentDriverInfo();
-
-      return await authProvider
-          .checkDriverFieldsFilled()
-          .timeout(const Duration(seconds: 15));
-    } catch (e) {
-      debugPrint('Driver profile check error: $e');
-
-      // خطای شبکه نباید کاربر Auth‌شده را logout کند.
-      // در این حالت ادامهٔ ثبت‌نام را باز می‌کنیم.
-      return true;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<bool>(
-      future: _profileCheck,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const _LoadingScreen();
-        }
-
-        if (snapshot.hasError) {
-          return const DriverRegistration();
-        }
-
-        final bool isComplete = snapshot.data ?? false;
-
-        if (isComplete) {
-          return const Dashboard();
-        }
-
-        return const DriverRegistration();
+        return const Dashboard();
       },
     );
   }
