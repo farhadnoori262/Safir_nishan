@@ -19,14 +19,13 @@ class Dashboard extends StatefulWidget {
 
 class _DashboardState extends State<Dashboard>
     with SingleTickerProviderStateMixin {
-  TabController? controller;
+  late TabController controller;
 
   @override
   void initState() {
     super.initState();
     controller = TabController(length: 4, vsync: this);
 
-    // 📌 فراخوانی و به‌روزرسانی اطلاعات راننده به محض ورود به داشبورد
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final regProvider = Provider.of<RegistrationProvider>(context, listen: false);
       regProvider.retrieveCurrentDriverInfo();
@@ -36,7 +35,7 @@ class _DashboardState extends State<Dashboard>
 
   @override
   void dispose() {
-    controller?.dispose();
+    controller.dispose();
     super.dispose();
   }
 
@@ -44,13 +43,14 @@ class _DashboardState extends State<Dashboard>
   Widget build(BuildContext context) {
     final dashboardProvider = Provider.of<DashboardProvider>(context);
 
-    // همگام‌سازی ایندکس کنترلر با پرووایدر در صورت تغییر از پرووایدر
-    if (controller != null && controller!.index != dashboardProvider.selectedIndex) {
-      controller!.index = dashboardProvider.selectedIndex;
+    // همگام‌سازی انیمیشنی کنترلر با پرووایدر
+    if (controller.index != dashboardProvider.selectedIndex) {
+      controller.animateTo(dashboardProvider.selectedIndex);
     }
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      extendBody: true, // اجازه می‌دهد محتوای صفحه پشت نوار شناور برود
       body: TabBarView(
         physics: const NeverScrollableScrollPhysics(),
         controller: controller,
@@ -61,64 +61,43 @@ class _DashboardState extends State<Dashboard>
           ProfilePage(),
         ],
       ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: AppColors.cardBackground,
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primaryBrand.withOpacity(0.08),
-              blurRadius: 16,
-              offset: const Offset(0, -4),
-            ),
-          ],
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+      bottomNavigationBar: SafeArea(
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          decoration: BoxDecoration(
+            color: AppColors.cardBackground,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.08),
+                blurRadius: 20,
+                spreadRadius: 2,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(24),
             child: BottomNavigationBar(
               items: [
                 BottomNavigationBarItem(
-                  icon: const Padding(
-                    padding: EdgeInsets.only(bottom: 4),
-                    child: Icon(Icons.map_outlined, size: 24),
-                  ),
-                  activeIcon: const Padding(
-                    padding: EdgeInsets.only(bottom: 4),
-                    child: Icon(Icons.map, size: 24),
-                  ),
+                  icon: const Icon(Icons.map_outlined, size: 22),
+                  activeIcon: const Icon(Icons.map_rounded, size: 24),
                   label: 'nav_home'.tr(),
                 ),
                 BottomNavigationBarItem(
-                  icon: const Padding(
-                    padding: EdgeInsets.only(bottom: 4),
-                    child: Icon(Icons.account_balance_wallet_outlined, size: 24),
-                  ),
-                  activeIcon: const Padding(
-                    padding: EdgeInsets.only(bottom: 4),
-                    child: Icon(Icons.account_balance_wallet, size: 24),
-                  ),
+                  icon: const Icon(Icons.account_balance_wallet_outlined, size: 22),
+                  activeIcon: const Icon(Icons.account_balance_wallet_rounded, size: 24),
                   label: 'nav_earnings'.tr(),
                 ),
                 BottomNavigationBarItem(
-                  icon: const Padding(
-                    padding: EdgeInsets.only(bottom: 4),
-                    child: Icon(Icons.route_outlined, size: 24),
-                  ),
-                  activeIcon: const Padding(
-                    padding: EdgeInsets.only(bottom: 4),
-                    child: Icon(Icons.route, size: 24),
-                  ),
+                  icon: const Icon(Icons.route_outlined, size: 22),
+                  activeIcon: const Icon(Icons.route_rounded, size: 24),
                   label: 'nav_trips'.tr(),
                 ),
                 BottomNavigationBarItem(
-                  icon: const Padding(
-                    padding: EdgeInsets.only(bottom: 4),
-                    child: Icon(Icons.person_outline_rounded, size: 24),
-                  ),
-                  activeIcon: const Padding(
-                    padding: EdgeInsets.only(bottom: 4),
-                    child: Icon(Icons.person_rounded, size: 24),
-                  ),
+                  icon: const Icon(Icons.person_outline_rounded, size: 22),
+                  activeIcon: const Icon(Icons.person_rounded, size: 24),
                   label: 'nav_profile'.tr(),
                 ),
               ],
@@ -128,19 +107,21 @@ class _DashboardState extends State<Dashboard>
               showSelectedLabels: true,
               showUnselectedLabels: true,
               selectedLabelStyle: const TextStyle(
-                fontSize: 12,
+                fontSize: 11,
                 fontWeight: FontWeight.bold,
+                fontFamily: 'IRANSans', // یا فونت پروژه شما
               ),
               unselectedLabelStyle: const TextStyle(
-                fontSize: 11,
+                fontSize: 10,
                 fontWeight: FontWeight.w500,
+                fontFamily: 'IRANSans',
               ),
               type: BottomNavigationBarType.fixed,
               backgroundColor: Colors.transparent,
               elevation: 0,
               onTap: (index) {
                 dashboardProvider.setIndex(index);
-                controller?.index = index;
+                controller.animateTo(index);
               },
             ),
           ),
