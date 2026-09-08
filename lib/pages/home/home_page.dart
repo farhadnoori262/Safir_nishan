@@ -422,7 +422,7 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _updateTripStatus(
+    Future<void> _updateTripStatus(
       String tripId, String newStatus, Map<String, dynamic> tripData) async {
     try {
       if (newStatus == 'completed') {
@@ -446,8 +446,16 @@ class _HomePageState extends State<HomePage> {
       }
     } catch (e) {
       debugPrint("Error updating trip status: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('بروزرسانی وضعیت سفر ناموفق بود: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
-  }
+    }
 
   void _showCompleteTripDialog(String tripId, Map<String, dynamic> tripData) {
     String price = '${tripData['fareAmount'] ?? tripData['price'] ?? '0'}';
