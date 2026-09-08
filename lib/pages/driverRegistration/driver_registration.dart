@@ -81,8 +81,13 @@ class _DriverRegistrationState extends State<DriverRegistration> {
     });
   }
 
-  @override
+    @override
   Widget build(BuildContext context) {
+    if (_isCheckingStatus) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
     return Consumer<RegistrationProvider>(
       builder: (context, registrationProvider, child) => Scaffold(
         backgroundColor: AppColors.background,
