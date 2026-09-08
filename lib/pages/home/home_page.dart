@@ -510,42 +510,54 @@ class _HomePageState extends State<HomePage> {
                 backgroundColor: const Color(0xFF0F7D55),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
-              onPressed: () async {
+                            onPressed: () async {
                 Navigator.pop(dialogContext);
 
-                await FirebaseFirestore.instance.collection('rides').doc(tripId).update({
-                  'status': 'completed',
-                  'completed_at': FieldValue.serverTimestamp(),
-                });
-
-                final user = FirebaseAuth.instance.currentUser;
-                if (user != null) {
-                  await FirebaseFirestore.instance.collection("drivers").doc(user.uid).update({
-                    "newTripStatus": "waiting",
+                try {
+                  await FirebaseFirestore.instance.collection('rides').doc(tripId).update({
+                    'status': 'completed',
+                    'completed_at': FieldValue.serverTimestamp(),
                   });
-                }
 
-                context.read<NavigationController>().stopNavigation();
-                if (mapController != null) {
-                  await mapController!.clearLines();
-                  if (driverSymbol != null) {
-                    await mapController!.removeSymbol(driverSymbol!);
-                    driverSymbol = null;
+                  final user = FirebaseAuth.instance.currentUser;
+                  if (user != null) {
+                    await FirebaseFirestore.instance.collection("drivers").doc(user.uid).update({
+                      "newTripStatus": "waiting",
+                    });
                   }
-                }
 
-                setState(() {
-                  activeTripId = null;
-                  activeTripStatus = null;
-                });
+                  context.read<NavigationController>().stopNavigation();
+                  if (mapController != null) {
+                    await mapController!.clearLines();
+                    if (driverSymbol != null) {
+                      await mapController!.removeSymbol(driverSymbol!);
+                      driverSymbol = null;
+                    }
+                  }
 
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('سفر با موفقیت به پایان رسید.'),
-                      backgroundColor: Color(0xFF0F7D55),
-                    ),
-                  );
+                  setState(() {
+                    activeTripId = null;
+                    activeTripStatus = null;
+                  });
+
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('سفر با موفقیت به پایان رسید.'),
+                        backgroundColor: Color(0xFF0F7D55),
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  debugPrint('❌ خطا در تکمیل سفر: $e');
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('تکمیل سفر ناموفق بود: $e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
                 }
               },
               child: const Text('تأیید و دریافت کرایه', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
