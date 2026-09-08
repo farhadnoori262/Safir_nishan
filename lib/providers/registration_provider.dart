@@ -51,20 +51,10 @@ class RegistrationProvider extends ChangeNotifier {
   String _plateCategory = 'ش';
   String _plateType = 'شخصی';
 
-  // گترها و سترهای پلاک
+  // گترها و سترهای پلاک (با به روزرسانی فرم)
   String get plateProvince => _plateProvince;
   String get plateCategory => _plateCategory;
   String get plateType => _plateType;
-  
-  // 🔹 گتر برای رفع خطای selectedProvince
-  String? get selectedProvince => _plateProvince;
-  set selectedProvince(String? val) {
-    if (val != null) {
-      _plateProvince = val;
-      checkVehicleBasicFormValidity();
-      notifyListeners();
-    }
-  }
 
   void setPlateProvince(String val) {
     _plateProvince = val;
@@ -98,9 +88,6 @@ class RegistrationProvider extends ChangeNotifier {
   final TextEditingController colorController = TextEditingController();
   final TextEditingController numberPlateController = TextEditingController();
   final TextEditingController productionYearController = TextEditingController();
-
-  // 🔹 گتر جهت تطبیق plateNumberController با numberPlateController
-  TextEditingController get plateNumberController => numberPlateController;
 
   // گترها و سترها
   XFile? get profilePhoto => _profilePhoto;
@@ -146,19 +133,6 @@ class RegistrationProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // 🔹 گترهای اصلاح املایی جهت رفع خطای missing getters
-  XFile? get cnicFrontImage => _cnicFrontImage;
-  XFile? get cnicBackImage => _cnicBackImage;
-
-  // 🔹 گترهای مسیر URL یا Path جهت مطابقت با driver_registration.dart
-  String? get profilePhotoUrl => _profilePhoto?.path;
-  String? get cnicFrontImageUrl => _cnicFrontImage?.path;
-  String? get cnicBackImageUrl => _cnicBackImage?.path;
-  String? get cnicWithSelfieImageUrl => _cnicWithSelfieImage?.path;
-  String? get drivingLicenseFrontImageUrl => _drivingLicenseFrontImage?.path;
-  String? get drivingLicenseBackImageUrl => _drivingLicenseBackImage?.path;
-  String? get vehicleImageUrl => _vehicleImage?.path;
-
   XFile? get drivingLicenseFrontImage => _drivingLicenseFrontImage;
   set drivingLicenseFrontImage(XFile? val) {
     _drivingLicenseFrontImage = val;
@@ -183,7 +157,7 @@ class RegistrationProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // 📌 گتر اختصاصی جهت صفحه پروفایل
+  // 📌 گتر اختصاصی جهت رفع خطای profile_page.dart
   Map<String, dynamic> get driverInformation {
     return {
       'name': "$driverName $driverSecondName".trim().isNotEmpty 
@@ -220,7 +194,6 @@ class RegistrationProvider extends ChangeNotifier {
   }
 
   void initFields(AuthenticationProvider authProvider) {
-    authProvider.syncWithFirebaseUser();
     if (!authProvider.isGoogleSignedIn) {
       phoneController.text = authProvider.phoneNumber;
     } else {
@@ -328,8 +301,7 @@ class RegistrationProvider extends ChangeNotifier {
   Future<void> pickAndCropCnincImage(BuildContext context, bool isFrontImage) async {
     final ImagePickerService imagePickerService = ImagePickerService();
 
-    final pickedFile = await imagePickerService.pickCropImage(
-      context: context,
+    final pickedFile = await imagePickerService.pickCropImage(context: context,
       cropAspectRatio: const CropAspectRatio(ratioX: 16, ratioY: 9),
       imageSource: ImageSource.camera,
     );
@@ -347,8 +319,7 @@ class RegistrationProvider extends ChangeNotifier {
   Future<void> pickAndCropVehicleRegistrationImages(BuildContext context, bool isFrontImage) async {
     final ImagePickerService imagePickerService = ImagePickerService();
 
-    final pickedFile = await imagePickerService.pickCropImage(
-      context: context,
+    final pickedFile = await imagePickerService.pickCropImage(context: context,
       cropAspectRatio: const CropAspectRatio(ratioX: 16, ratioY: 12),
       imageSource: ImageSource.camera,
     );
@@ -366,8 +337,7 @@ class RegistrationProvider extends ChangeNotifier {
   Future<void> pickAndCropDrivingLicenseImage(BuildContext context, bool isFrontImage) async {
     final ImagePickerService imagePickerService = ImagePickerService();
 
-    final pickedFile = await imagePickerService.pickCropImage(
-      context: context,
+    final pickedFile = await imagePickerService.pickCropImage(context: context,
       cropAspectRatio: const CropAspectRatio(ratioX: 16, ratioY: 9),
       imageSource: ImageSource.camera,
     );
@@ -385,8 +355,7 @@ class RegistrationProvider extends ChangeNotifier {
   Future<void> pickCnincImageWithSelfie(BuildContext context) async {
     final ImagePickerService imagePickerService = ImagePickerService();
 
-    final pickedFile = await imagePickerService.pickCropImage(
-      context: context,
+    final pickedFile = await imagePickerService.pickCropImage(context: context,
       cropAspectRatio: const CropAspectRatio(ratioX: 20, ratioY: 20),
       imageSource: ImageSource.camera,
     );
@@ -804,7 +773,7 @@ class RegistrationProvider extends ChangeNotifier {
           .child("drivers")
           .child(_auth.currentUser!.uid)
           .child("vehicleInfo");
-            await userRef.update(vehicleData);
+      await userRef.update(vehicleData);
       _isLoading = false;
       notifyListeners();
     } catch (e) {
@@ -812,17 +781,4 @@ class RegistrationProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
-
-  // 🔹 کد جدید را در این قسمت اضافه کنید:
-  bool get isDriverRegistered {
-    return _isDataFetched &&
-        firstNameController.text.isNotEmpty &&
-        lastNameController.text.isNotEmpty &&
-        phoneController.text.isNotEmpty &&
-        cnicController.text.isNotEmpty &&
-        drivingLicenseController.text.isNotEmpty &&
-        brandController.text.isNotEmpty &&
-        numberPlateController.text.isNotEmpty;
-  }
 }
-
