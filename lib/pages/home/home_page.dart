@@ -566,7 +566,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // 🔹 لغو سفر بدون وقفه و ارسال لحظه‌ای گزارش به مسافر
   Future<void> _cancelTrip(String tripId) async {
     showDialog(
       context: context,
@@ -589,13 +588,11 @@ class _HomePageState extends State<HomePage> {
               onPressed: () async {
                 Navigator.pop(dialogContext);
 
-                // ۱. پاکسازی آنی UI (بدون انتظار برای فرآیندهای سنگین شبکه)
                 setState(() {
                   activeTripId = null;
                   activeTripStatus = null;
                 });
 
-                // ۲. به‌روزرسانی سریع فایربیس جهت اطلاع آنی مسافر
                 final firestoreFuture = FirebaseFirestore.instance.collection('rides').doc(tripId).update({
                   'status': 'canceled',
                   'canceled_by': 'driver',
@@ -609,7 +606,6 @@ class _HomePageState extends State<HomePage> {
                   });
                 }
 
-                // ۳. متوقف ساختن ناوبری در پس‌زمینه
                 context.read<NavigationController>().stopNavigation();
                 if (mapController != null) {
                   mapController!.clearLines();
@@ -888,470 +884,469 @@ class _HomePageState extends State<HomePage> {
                     .where('status', whereIn: ['accepted', 'arrived', 'ontrip', 'in_progress'])
                     .snapshots(),
                 builder: (context, snapshot) {
-                  if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
-                    DocumentSnapshot? activeTripDoc;
+                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                    return const SizedBox.shrink();
+                  }
 
-                    for (var doc in snapshot.data!.docs) {
-                      var data = doc.data() as Map<String, dynamic>;
-                      if (data['driverId'] == currentUser.uid || data['driver_id'] == currentUser.uid) {
-                        activeTripDoc = doc;
-                        break;
-                      }
+                  DocumentSnapshot? activeTripDoc;
+
+                  for (var doc in snapshot.data!.docs) {
+                    var data = doc.data() as Map<String, dynamic>;
+                    String dId = data['driverId']?.toString() ?? data['driver_id']?.toString() ?? '';
+                    if (dId == currentUser.uid) {
+                      activeTripDoc = doc;
+                      break;
                     }
+                  }
 
-                    if (activeTripDoc == null) return const SizedBox.shrink();
+                  if (activeTripDoc == null) return const SizedBox.shrink();
 
-                    var tripData = activeTripDoc.data() as Map<String, dynamic>;
-                    String tripId = activeTripDoc.id;
-                    String status = tripData['status'] ?? 'accepted';
+                  var tripData = activeTripDoc.data() as Map<String, dynamic>;
+                  String tripId = activeTripDoc.id;
+                  String status = tripData['status'] ?? 'accepted';
 
-                    if (activeTripId != tripId || activeTripStatus != status) {
-                      activeTripId = tripId;
-                      activeTripStatus = status;
+                  if (activeTripId != tripId || activeTripStatus != status) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (!mounted) return;
+                      setState(() {
+                        activeTripId = tripId;
+                        activeTripStatus = status;
+                      });
 
                       if (status == 'accepted') {
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          _startPickupRoute(tripId, tripData);
-                        });
+                        _startPickupRoute(tripId, tripData);
                       } else if (status == 'ontrip' || status == 'in_progress') {
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          _startDestinationRoute(tripId, tripData);
-                        });
+                        _startDestinationRoute(tripId, tripData);
                       }
-                    }
+                    });
+                  }
 
-                    String passengerName = tripData['userName'] ??
-                        tripData['full_name'] ??
-                        'passenger'.tr();
-                    String passengerPhone =
-                        tripData['userPhone'] ?? tripData['phone'] ?? '';
-                    String passengerRating =
-                        '${tripData['userRating'] ?? tripData['rating'] ?? '4.8'}';
-                    String originAddress = tripData['originAddress'] ??
-                        tripData['pickup_address'] ??
-                        '';
-                    String destinationAddress = tripData['destinationAddress'] ??
-                        tripData['dropoff_address'] ??
-                        '';
-                    String duration = '${tripData['duration'] ?? '15'}';
-                    String distance = '${tripData['distance'] ?? '5.2'}';
-                    String price =
-                        '${tripData['fareAmount'] ?? tripData['price'] ?? '120'}';
+                  String passengerName = tripData['userName'] ??
+                      tripData['full_name'] ??
+                      'passenger'.tr();
+                  String passengerPhone =
+                      tripData['userPhone'] ?? tripData['phone'] ?? '';
+                  String passengerRating =
+                      '${tripData['userRating'] ?? tripData['rating'] ?? '4.8'}';
+                  String originAddress = tripData['originAddress'] ??
+                      tripData['pickup_address'] ??
+                      '';
+                  String destinationAddress = tripData['destinationAddress'] ??
+                      tripData['dropoff_address'] ??
+                      '';
+                  String duration = '${tripData['duration'] ?? '15'}';
+                  String distance = '${tripData['distance'] ?? '5.2'}';
+                  String price =
+                      '${tripData['fareAmount'] ?? tripData['price'] ?? '120'}';
 
-                    return DraggableScrollableSheet(
-                      initialChildSize: 0.65,
-                      minChildSize: 0.22,
-                      maxChildSize: 0.92,
-                      snap: true,
-                      snapSizes: const [0.22, 0.65, 0.92],
-                      builder: (context, scrollController) {
-                        return Container(
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF8FAFC),
-                            borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(32),
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.08),
-                                blurRadius: 24,
-                                offset: const Offset(0, -8),
-                              ),
-                            ],
+                  return DraggableScrollableSheet(
+                    initialChildSize: 0.65,
+                    minChildSize: 0.22,
+                    maxChildSize: 0.92,
+                    snap: true,
+                    snapSizes: const [0.22, 0.65, 0.92],
+                    builder: (context, scrollController) {
+                      return Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(32),
                           ),
-                          child: SingleChildScrollView(
-                            controller: scrollController,
-                            // ✅ کد جایگزین‌شده (خط ۵۳۲):
-                            padding: const EdgeInsets.only(left: 20, right: 20, top: 12, bottom: 95),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.08),
+                              blurRadius: 24,
+                              offset: const Offset(0, -8),
+                            ),
+                          ],
+                        ),
+                        child: SingleChildScrollView(
+                          controller: scrollController,
+                          padding: const EdgeInsets.only(left: 20, right: 20, top: 12, bottom: 24),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Center(
+                                child: Container(
+                                  width: 40,
+                                  height: 5,
+                                  margin: const EdgeInsets.only(bottom: 16),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade300,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                              ),
 
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Center(
-                                  child: Container(
-                                    width: 40,
-                                    height: 5,
-                                    margin: const EdgeInsets.only(bottom: 16),
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey.shade300,
-                                      borderRadius: BorderRadius.circular(10),
+                              // کارت پروفایل مسافر
+                              Container(
+                                padding: const EdgeInsets.all(14),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(20),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.02),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 2),
+                                    )
+                                  ],
+                                  border: Border.all(color: Colors.grey.shade200),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 48,
+                                      height: 48,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF0F7D55).withOpacity(0.1),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.person_rounded,
+                                        color: Color(0xFF0F7D55),
+                                        size: 26,
+                                      ),
                                     ),
-                                  ),
-                                ),
-
-                                // کارت پروفایل مسافر
-                                Container(
-                                  padding: const EdgeInsets.all(14),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(20),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withOpacity(0.02),
-                                        blurRadius: 10,
-                                        offset: const Offset(0, 2),
-                                      )
-                                    ],
-                                    border: Border.all(color: Colors.grey.shade200),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Container(
-                                        width: 48,
-                                        height: 48,
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFF0F7D55).withOpacity(0.1),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Icon(
-                                          Icons.person_rounded,
-                                          color: Color(0xFF0F7D55),
-                                          size: 26,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              passengerName,
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 16,
-                                                color: Colors.black87,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Row(
-                                              children: [
-                                                const Icon(Icons.star_rounded, color: Colors.amber, size: 16),
-                                                const SizedBox(width: 4),
-                                                Text(
-                                                  passengerRating,
-                                                  style: const TextStyle(
-                                                    fontSize: 13,
-                                                    fontWeight: FontWeight.w600,
-                                                    color: Colors.black87,
-                                                  ),
-                                                ),
-                                                const SizedBox(width: 10),
-                                                Text(
-                                                  passengerPhone,
-                                                  style: TextStyle(
-                                                    fontSize: 12,
-                                                    color: Colors.grey.shade600,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      Material(
-                                        color: const Color(0xFFE8F5E9),
-                                        shape: const CircleBorder(),
-                                        child: IconButton(
-                                          onPressed: () => _makePhoneCall(passengerPhone),
-                                          icon: const Icon(Icons.phone_in_talk_rounded, color: Color(0xFF2E7D32), size: 22),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-
-                                const SizedBox(height: 12),
-
-                                // کارت مبدأ و مقصد
-                                Container(
-                                  padding: const EdgeInsets.all(16),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(20),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withOpacity(0.02),
-                                        blurRadius: 10,
-                                        offset: const Offset(0, 2),
-                                      )
-                                    ],
-                                    border: Border.all(color: Colors.grey.shade200),
-                                  ),
-                                  child: Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Column(
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          const Icon(Icons.circle, color: Color(0xFF0F7D55), size: 12),
-                                          Container(
-                                            height: 32,
-                                            width: 2,
-                                            color: Colors.grey.shade300,
+                                          Text(
+                                            passengerName,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16,
+                                              color: Colors.black87,
+                                            ),
                                           ),
-                                          const Icon(Icons.location_on_rounded, color: Color(0xFFEF4444), size: 16),
+                                          const SizedBox(height: 4),
+                                          Row(
+                                            children: [
+                                              const Icon(Icons.star_rounded, color: Colors.amber, size: 16),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                passengerRating,
+                                                style: const TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: Colors.black87,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 10),
+                                              Text(
+                                                passengerPhone,
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.grey.shade600,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
                                         ],
                                       ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              '${'origin_label'.tr()}: $originAddress',
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.w600,
-                                                color: Colors.black87,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 20),
-                                            Text(
-                                              '${'destination_label'.tr()}: $destinationAddress',
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.w600,
-                                                color: Colors.black87,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
+                                    ),
+                                    Material(
+                                      color: const Color(0xFFE8F5E9),
+                                      shape: const CircleBorder(),
+                                      child: IconButton(
+                                        onPressed: () => _makePhoneCall(passengerPhone),
+                                        icon: const Icon(Icons.phone_in_talk_rounded, color: Color(0xFF2E7D32), size: 22),
                                       ),
-                                    ],
-                                  ),
-                                ),
-
-                                const SizedBox(height: 12),
-
-                                // مشخصات سفر
-                                Row(
-                                  children: [
-                                    Expanded(child: _buildInfoCard('estimated_time_label'.tr(), '$duration min', Icons.access_time_rounded, Colors.orange)),
-                                    const SizedBox(width: 8),
-                                    Expanded(child: _buildInfoCard('estimated_distance_label'.tr(), '$distance km', Icons.alt_route_rounded, Colors.blue)),
-                                    const SizedBox(width: 8),
-                                    Expanded(child: _buildInfoCard('estimated_fare_label'.tr(), '$price AFN', Icons.account_balance_wallet_rounded, Colors.green)),
+                                    ),
                                   ],
                                 ),
+                              ),
 
-                                const SizedBox(height: 12),
+                              const SizedBox(height: 12),
 
-                                // پیام هدایت مسیریابی
-                                Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFFFF8E1),
-                                    borderRadius: BorderRadius.circular(14),
-                                    border: Border.all(color: Colors.amber.shade200),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      const Icon(Icons.notifications_active_outlined, color: Colors.amber, size: 18),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          'msg_follow_navigation'.tr(),
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w600,
-                                            color: Color(0xFF795548),
+                              // کارت مبدأ و مقصد
+                              Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(20),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.02),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 2),
+                                    )
+                                  ],
+                                  border: Border.all(color: Colors.grey.shade200),
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Column(
+                                      children: [
+                                        const Icon(Icons.circle, color: Color(0xFF0F7D55), size: 12),
+                                        Container(
+                                          height: 32,
+                                          width: 2,
+                                          color: Colors.grey.shade300,
+                                        ),
+                                        const Icon(Icons.location_on_rounded, color: Color(0xFFEF4444), size: 16),
+                                      ],
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            '${'origin_label'.tr()}: $originAddress',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.black87,
+                                            ),
                                           ),
+                                          const SizedBox(height: 20),
+                                          Text(
+                                            '${'destination_label'.tr()}: $destinationAddress',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.black87,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                              const SizedBox(height: 12),
+
+                              // مشخصات سفر
+                              Row(
+                                children: [
+                                  Expanded(child: _buildInfoCard('estimated_time_label'.tr(), '$duration min', Icons.access_time_rounded, Colors.orange)),
+                                  const SizedBox(width: 8),
+                                  Expanded(child: _buildInfoCard('estimated_distance_label'.tr(), '$distance km', Icons.alt_route_rounded, Colors.blue)),
+                                  const SizedBox(width: 8),
+                                  Expanded(child: _buildInfoCard('estimated_fare_label'.tr(), '$price AFN', Icons.account_balance_wallet_rounded, Colors.green)),
+                                ],
+                              ),
+
+                              const SizedBox(height: 12),
+
+                              // پیام هدایت مسیریابی
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFFF8E1),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(color: Colors.amber.shade200),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.notifications_active_outlined, color: Colors.amber, size: 18),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        'msg_follow_navigation'.tr(),
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: Color(0xFF795548),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                              const SizedBox(height: 16),
+
+                              // 🔹 دکمه اکشن اصلی سفر
+                              SizedBox(
+                                width: double.infinity,
+                                height: 52,
+                                child: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF0F7D55),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(28),
+                                    ),
+                                    elevation: 2,
+                                    shadowColor: const Color(0xFF0F7D55).withOpacity(0.3),
+                                  ),
+                                  onPressed: () {
+                                    if (status == 'accepted') {
+                                      _updateTripStatus(tripId, 'arrived', tripData);
+                                    } else if (status == 'arrived') {
+                                      _updateTripStatus(tripId, 'ontrip', tripData);
+                                    } else if (status == 'ontrip' || status == 'in_progress') {
+                                      _updateTripStatus(tripId, 'completed', tripData);
+                                    }
+                                  },
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(_getActionButtonIcon(status), color: Colors.white, size: 20),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        _getActionButtonTitle(status),
+                                        style: const TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
+                              ),
 
-                                const SizedBox(height: 16),
+                              const SizedBox(height: 12),
 
-                                // 🔹 دکمه اکشن اصلی سفر
-                                SizedBox(
-                                  width: double.infinity,
-                                  height: 52,
-                                  child: ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF0F7D55),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(28),
-                                      ),
-                                      elevation: 2,
-                                      shadowColor: const Color(0xFF0F7D55).withOpacity(0.3),
-                                    ),
-                                    onPressed: () {
-                                      if (status == 'accepted') {
-                                        _updateTripStatus(tripId, 'arrived', tripData);
-                                      } else if (status == 'arrived') {
-                                        _updateTripStatus(tripId, 'ontrip', tripData);
-                                      } else if (status == 'ontrip' || status == 'in_progress') {
-                                        _updateTripStatus(tripId, 'completed', tripData);
-                                      }
-                                    },
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Icon(_getActionButtonIcon(status), color: Colors.white, size: 20),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          _getActionButtonTitle(status),
-                                          style: const TextStyle(
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.white,
+                              // 🔹 دکمه‌های چت پیامکی و لغو سفر
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: SizedBox(
+                                      height: 48,
+                                      child: ElevatedButton.icon(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: const Color(0xFF2563EB),
+                                          elevation: 0,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(24),
                                           ),
                                         ),
-                                      ],
+                                        onPressed: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) => ChatPage(
+                                                tripId: tripId,
+                                                passengerName: passengerName,
+                                                passengerPhone: passengerPhone,
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                        icon: const Icon(
+                                          Icons.edit_square,
+                                          color: Colors.white,
+                                          size: 18,
+                                        ),
+                                        label: Text(
+                                          'btn_sms_chat'.tr(),
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
                                     ),
                                   ),
-                                ),
 
-                                const SizedBox(height: 12),
-
-                                // 🔹 دکمه‌های چت پیامکی و لغو سفر با استایل Pillow بازطراحی‌شده
-                                Row(
-                                  children: [
-                                    // دکمه چت پیامکی مطابق تصویر مدرن درخواستی
+                                  if (status != 'ontrip' && status != 'in_progress') ...[
+                                    const SizedBox(width: 10),
                                     Expanded(
                                       child: SizedBox(
                                         height: 48,
-                                        child: ElevatedButton.icon(
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: const Color(0xFF2563EB), // آبی مدرن
-                                            elevation: 0,
+                                        child: OutlinedButton.icon(
+                                          style: OutlinedButton.styleFrom(
+                                            backgroundColor: const Color(0xFFFEF2F2),
+                                            side: const BorderSide(color: Color(0xFFFCA5A5), width: 1.2),
                                             shape: RoundedRectangleBorder(
                                               borderRadius: BorderRadius.circular(24),
                                             ),
                                           ),
-                                          onPressed: () {
-                                            Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                builder: (context) => ChatPage(
-                                                  tripId: tripId,
-                                                  passengerName: passengerName,
-                                                  passengerPhone: passengerPhone,
-                                                ),
-                                              ),
-                                            );
-                                          },
+                                          onPressed: () => _cancelTrip(tripId),
                                           icon: const Icon(
-                                            Icons.edit_square,
-                                            color: Colors.white,
+                                            Icons.cancel_outlined,
+                                            color: Color(0xFFEF4444),
                                             size: 18,
                                           ),
                                           label: Text(
-                                            'btn_sms_chat'.tr(),
+                                            'btn_cancel_trip'.tr(),
                                             style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 14,
+                                              color: Color(0xFFEF4444),
+                                              fontSize: 13,
                                               fontWeight: FontWeight.bold,
                                             ),
                                           ),
                                         ),
                                       ),
                                     ),
-
-                                    if (status != 'ontrip' && status != 'in_progress') ...[
-                                      const SizedBox(width: 10),
-                                      // دکمه لغو سفر شیک و مدرن
-                                      Expanded(
-                                        child: SizedBox(
-                                          height: 48,
-                                          child: OutlinedButton.icon(
-                                            style: OutlinedButton.styleFrom(
-                                              backgroundColor: const Color(0xFFFEF2F2),
-                                              side: const BorderSide(color: Color(0xFFFCA5A5), width: 1.2),
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius: BorderRadius.circular(24),
-                                              ),
-                                            ),
-                                            onPressed: () => _cancelTrip(tripId),
-                                            icon: const Icon(
-                                              Icons.cancel_outlined,
-                                              color: Color(0xFFEF4444),
-                                              size: 18,
-                                            ),
-                                            label: Text(
-                                              'btn_cancel_trip'.tr(),
-                                              style: const TextStyle(
-                                                color: Color(0xFFEF4444),
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
                                   ],
-                                ),
+                                ],
+                              ),
 
-                                const SizedBox(height: 12),
+                              const SizedBox(height: 12),
 
-                                // 🔹 دکمه مسیریابی بیرونی مدرن
-                                SizedBox(
-                                  width: double.infinity,
-                                  height: 50,
-                                  child: ElevatedButton.icon(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF1D4ED8),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(25),
-                                      ),
-                                      elevation: 1,
+                              // 🔹 دکمه مسیریابی بیرونی
+                              SizedBox(
+                                width: double.infinity,
+                                height: 50,
+                                child: ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF1D4ED8),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(25),
                                     ),
-                                    onPressed: () async {
-                                      LatLng? targetPos;
-                                      if (status == 'accepted' || status == 'arrived') {
-                                        targetPos = _extractLatLng(
-                                          tripData, 
-                                          ['originLatLng', 'pickup_location', 'pickupLatLng', 'origin'],
-                                          latKey: 'from_lat',
-                                          lngKey: 'from_lng',
-                                        );
-                                      } else {
-                                        targetPos = _extractLatLng(
-                                          tripData, 
-                                          ['destinationLatLng', 'dropoff_location', 'dropoffLatLng', 'destination'],
-                                          latKey: 'to_lat',
-                                          lngKey: 'to_lng',
-                                        );
-                                      }
+                                    elevation: 1,
+                                  ),
+                                  onPressed: () async {
+                                    LatLng? targetPos;
+                                    if (status == 'accepted' || status == 'arrived') {
+                                      targetPos = _extractLatLng(
+                                        tripData, 
+                                        ['originLatLng', 'pickup_location', 'pickupLatLng', 'origin'],
+                                        latKey: 'from_lat',
+                                        lngKey: 'from_lng',
+                                      );
+                                    } else {
+                                      targetPos = _extractLatLng(
+                                        tripData, 
+                                        ['destinationLatLng', 'dropoff_location', 'dropoffLatLng', 'destination'],
+                                        latKey: 'to_lat',
+                                        lngKey: 'to_lng',
+                                      );
+                                    }
 
-                                      if (targetPos != null) {
-                                        await _openExternalMap(targetPos.latitude, targetPos.longitude);
-                                      } else if (mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(
-                                            content: Text('مختصات مبدأ یا مقصد این سفر پیدا نشد.'),
-                                          ),
-                                        );
-                                      }
-                                    },
-                                    icon: const Icon(Icons.navigation_rounded, color: Colors.white, size: 20),
-                                    label: Text(
-                                      (status == 'accepted' || status == 'arrived')
-                                          ? 'btn_external_navigation_origin'.tr()
-                                          : 'btn_external_navigation_destination'.tr(),
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white,
-                                      ),
+                                    if (targetPos != null) {
+                                      await _openExternalMap(targetPos.latitude, targetPos.longitude);
+                                    } else if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('مختصات مبدأ یا مقصد این سفر پیدا نشد.'),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                  icon: const Icon(Icons.navigation_rounded, color: Colors.white, size: 20),
+                                  label: Text(
+                                    (status == 'accepted' || status == 'arrived')
+                                        ? 'btn_external_navigation_origin'.tr()
+                                        : 'btn_external_navigation_destination'.tr(),
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
                                     ),
                                   ),
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
-                        );
-                      },
-                    );
-                  }
-                  return const SizedBox.shrink();
+                        ),
+                      );
+                    },
+                  );
                 },
               ),
           ],
