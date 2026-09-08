@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:developer';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -34,9 +36,6 @@ class _HomePageState extends State<HomePage> {
   String? activeTripId;
   String? activeTripStatus;
 
-  // 🔹 سیمبل/مارکر راننده روی نقشه
-  Symbol? driverSymbol;
-
   void _onMapCreated(MapLibreMapController controller) {
     mapController = controller;
   }
@@ -47,34 +46,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // 🔹 به‌روزرسانی موقعیت مارکر خودرو روی نقشه
-  Future<void> _updateDriverMarkerOnMap(double lat, double lng) async {
-    if (mapController == null) return;
-
-    try {
-      if (driverSymbol == null) {
-        driverSymbol = await mapController!.addSymbol(
-          SymbolOptions(
-            geometry: LatLng(lat, lng),
-            iconImage: "car-15",
-            iconSize: 2.0,
-            iconAnchor: "center",
-          ),
-        );
-      } else {
-        await mapController!.updateSymbol(
-          driverSymbol!,
-          SymbolOptions(
-            geometry: LatLng(lat, lng),
-          ),
-        );
-      }
-    } catch (e) {
-      debugPrint("خطا در به‌روزرسانی مارکر راننده: $e");
-    }
-  }
-
-  // 🔹 استخراج ایمن LatLng از فایربیس
+  // 🔹 متد استخراج ایمن LatLng از فایربیس با هر ساختار داده‌ای
   LatLng? _extractLatLng(Map<String, dynamic> data, List<String> keys, {String? latKey, String? lngKey}) {
     for (String key in keys) {
       final value = data[key];
@@ -158,7 +130,6 @@ class _HomePageState extends State<HomePage> {
       if (mounted) {
         setState(() {});
         _animateMapToPosition(positionOfUser.latitude, positionOfUser.longitude);
-        _updateDriverMarkerOnMap(positionOfUser.latitude, positionOfUser.longitude);
       }
       return positionOfUser;
     } catch (e) {
@@ -233,7 +204,6 @@ class _HomePageState extends State<HomePage> {
       if (!mounted) return;
 
       _animateMapToPosition(position.latitude, position.longitude);
-      _updateDriverMarkerOnMap(position.latitude, position.longitude);
 
       final navController = context.read<NavigationController>();
       if (navController.isNavigating) {
@@ -311,21 +281,9 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _openExternalMap(double lat, double lng) async {
-    final Uri mapUrl = Uri.parse("https://www.google.com/maps/search/?api=1&query=$lat,$lng");
-
-    try {
-      bool launched = await launchUrl(
-        mapUrl,
-        mode: LaunchMode.externalApplication,
-      );
-
-      if (!launched && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('امکان باز کردن مسیریاب وجود ندارد.')),
-        );
-      }
-    } catch (e) {
-      debugPrint("خطا در باز کردن مسیریاب: $e");
+    final Uri url = Uri.parse('https://www.google.com/maps/search/?api=1&query=$lat,$lng');
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
     }
   }
 
@@ -347,6 +305,7 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  // 🔹 رسم مسیر از موتر تا مبدأ مسافر
   Future<void> _startPickupRoute(String tripId, Map<String, dynamic> tripData) async {
     try {
       currentPositionOfDriver ??= await getCurrentLiveLocationOfDriver();
@@ -359,7 +318,10 @@ class _HomePageState extends State<HomePage> {
         lngKey: 'from_lng',
       );
 
-      if (pickupLatLng == null) return;
+      if (pickupLatLng == null) {
+        debugPrint("❌ مختصات مبدأ پیدا نشد.");
+        return;
+      }
 
       final LatLng driverPosition = LatLng(
         currentPositionOfDriver!.latitude,
@@ -376,6 +338,7 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  // 🔹 رسم مسیر از مبدأ تا مقصد مسافر
   Future<void> _startDestinationRoute(String tripId, Map<String, dynamic> tripData) async {
     try {
       currentPositionOfDriver ??= await getCurrentLiveLocationOfDriver();
@@ -388,7 +351,10 @@ class _HomePageState extends State<HomePage> {
         lngKey: 'to_lng',
       );
 
-      if (dropoffLatLng == null) return;
+      if (dropoffLatLng == null) {
+        debugPrint("❌ مختصات مقصد پیدا نشد.");
+        return;
+      }
 
       final LatLng driverPosition = LatLng(
         currentPositionOfDriver!.latitude,
@@ -422,11 +388,6 @@ class _HomePageState extends State<HomePage> {
   Future<void> _updateTripStatus(
       String tripId, String newStatus, Map<String, dynamic> tripData) async {
     try {
-      if (newStatus == 'completed') {
-        _showCompleteTripDialog(tripId, tripData);
-        return;
-      }
-
       await FirebaseFirestore.instance.collection('rides').doc(tripId).update({
         'status': newStatus,
         'updated_at': FieldValue.serverTimestamp(),
@@ -440,198 +401,41 @@ class _HomePageState extends State<HomePage> {
         });
       } else if (newStatus == 'ontrip' || newStatus == 'in_progress') {
         await _startDestinationRoute(tripId, tripData);
+      } else if (newStatus == 'completed') {
+        context.read<NavigationController>().stopNavigation();
+        if (mapController != null) {
+          await mapController!.clearLines();
+        }
+        setState(() {
+          activeTripId = null;
+          activeTripStatus = null;
+        });
       }
     } catch (e) {
       debugPrint("Error updating trip status: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('بروزرسانی وضعیت سفر ناموفق بود: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
     }
   }
 
-  void _showCompleteTripDialog(String tripId, Map<String, dynamic> tripData) {
-    String price = '${tripData['fareAmount'] ?? tripData['price'] ?? '0'}';
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          title: Row(
-            children: [
-              const Icon(Icons.check_circle_rounded, color: Color(0xFF0F7D55), size: 28),
-              const SizedBox(width: 8),
-              const Text('اتمام سفر', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('آیا سفر به مقصد رسید و می‌خواهید آن را به پایان برسانید؟',
-                  style: TextStyle(fontSize: 14)),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE8F5E9),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('مبلغ کرایه دریافتی:',
-                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                    Text('$price افغانی',
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                            color: Color(0xFF2E7D32))),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: Text('btn_cancel'.tr(), style: TextStyle(color: Colors.grey.shade700)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0F7D55),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              ),
-              onPressed: () async {
-                Navigator.pop(dialogContext);
-
-                try {
-                  await FirebaseFirestore.instance.collection('rides').doc(tripId).update({
-                    'status': 'completed',
-                    'completed_at': FieldValue.serverTimestamp(),
-                  });
-
-                  final user = FirebaseAuth.instance.currentUser;
-                  if (user != null) {
-                    await FirebaseFirestore.instance.collection("drivers").doc(user.uid).update({
-                      "newTripStatus": "waiting",
-                    });
-                  }
-
-                  context.read<NavigationController>().stopNavigation();
-                  if (mapController != null) {
-                    await mapController!.clearLines();
-                    if (driverSymbol != null) {
-                      await mapController!.removeSymbol(driverSymbol!);
-                      driverSymbol = null;
-                    }
-                  }
-
-                  setState(() {
-                    activeTripId = null;
-                    activeTripStatus = null;
-                  });
-
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('سفر با موفقیت به پایان رسید.'),
-                        backgroundColor: Color(0xFF0F7D55),
-                      ),
-                    );
-                  }
-                } catch (e) {
-                  debugPrint('❌ خطا در تکمیل سفر: $e');
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('تکمیل سفر ناموفق بود: $e'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                  }
-                }
-              },
-              child: const Text('تأیید و دریافت کرایه', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   Future<void> _cancelTrip(String tripId) async {
-    showDialog(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          title: const Text('لغو سفر', style: TextStyle(fontWeight: FontWeight.bold)),
-          content: const Text('آیا از لغو این سفر اطمینان دارید؟ مسافر متوجه لغو سفر خواهد شد.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: Text('btn_cancel'.tr(), style: TextStyle(color: Colors.grey.shade700)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFEF4444),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              ),
-              onPressed: () async {
-                Navigator.pop(dialogContext);
+    try {
+      context.read<NavigationController>().stopNavigation();
+      if (mapController != null) {
+        await mapController!.clearLines();
+      }
 
-                setState(() {
-                  activeTripId = null;
-                  activeTripStatus = null;
-                });
+      await FirebaseFirestore.instance.collection('rides').doc(tripId).update({
+        'status': 'canceled',
+        'canceled_by': 'driver',
+        'canceled_at': FieldValue.serverTimestamp(),
+      });
 
-                final firestoreFuture = FirebaseFirestore.instance.collection('rides').doc(tripId).update({
-                  'status': 'canceled',
-                  'canceled_by': 'driver',
-                  'canceled_at': FieldValue.serverTimestamp(),
-                });
-
-                final user = FirebaseAuth.instance.currentUser;
-                if (user != null) {
-                  FirebaseFirestore.instance.collection("drivers").doc(user.uid).update({
-                    "newTripStatus": "waiting",
-                  });
-                }
-
-                context.read<NavigationController>().stopNavigation();
-                if (mapController != null) {
-                  mapController!.clearLines();
-                  if (driverSymbol != null) {
-                    mapController!.removeSymbol(driverSymbol!);
-                    driverSymbol = null;
-                  }
-                }
-
-                await firestoreFuture;
-
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('سفر توسط شما لغو شد.'),
-                      backgroundColor: Color(0xFFEF4444),
-                    ),
-                  );
-                }
-              },
-              child: const Text('بله، لغو شود', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-            ),
-          ],
-        );
-      },
-    );
+      setState(() {
+        activeTripId = null;
+        activeTripStatus = null;
+      });
+    } catch (e) {
+      debugPrint("Error canceling trip: $e");
+    }
   }
 
   @override
@@ -734,11 +538,11 @@ class _HomePageState extends State<HomePage> {
                                 },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: isDriverAvailable
-                                ? const Color(0xFFEF4444)
+                                ? const Color(0xFFE53935)
                                 : const Color(0xFF0F7D55),
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
+                              borderRadius: BorderRadius.circular(12),
                             ),
                             elevation: 0,
                           ),
@@ -760,7 +564,7 @@ class _HomePageState extends State<HomePage> {
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             side: BorderSide(color: Colors.grey.shade300),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
+                              borderRadius: BorderRadius.circular(12),
                             ),
                           ),
                           child: Text(
@@ -807,7 +611,6 @@ class _HomePageState extends State<HomePage> {
               onMapCreated: _onMapCreated,
             ),
 
-            // دکمه بازگشت به موقعیت فعلی روی نقشه
             Positioned(
               top: 20,
               right: 16,
@@ -816,8 +619,8 @@ class _HomePageState extends State<HomePage> {
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 12,
+                      color: Colors.black.withOpacity(0.12),
+                      blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
                   ],
@@ -832,13 +635,12 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
 
-            // دکمه تغییر وضعیت آنلاین / آفلاین
             Positioned(
               top: 20,
               left: 16,
               child: Material(
                 elevation: 4,
-                shadowColor: Colors.black12,
+                shadowColor: Colors.black26,
                 borderRadius: BorderRadius.circular(30),
                 child: InkWell(
                   onTap: _showStatusChangeModal,
@@ -847,7 +649,7 @@ class _HomePageState extends State<HomePage> {
                     duration: const Duration(milliseconds: 300),
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                     decoration: BoxDecoration(
-                      color: isDriverAvailable ? const Color(0xFFEF4444) : const Color(0xFF0F7D55),
+                      color: isDriverAvailable ? const Color(0xFFE53935) : const Color(0xFF0F7D55),
                       borderRadius: BorderRadius.circular(30),
                     ),
                     child: Row(
@@ -881,400 +683,328 @@ class _HomePageState extends State<HomePage> {
               StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance
                     .collection('rides')
-                    .where('status', whereIn: ['accepted', 'arrived', 'ontrip', 'in_progress'])
-                    .snapshots(),
+                    .where('driver_id', isEqualTo: currentUser.uid)
+                    .where('status', whereIn: [
+                  'accepted',
+                  'arrived',
+                  'ontrip',
+                  'in_progress'
+                ]).snapshots(),
                 builder: (context, snapshot) {
-                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                    return const SizedBox.shrink();
-                  }
+                  if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
+                    var activeTripDoc = snapshot.data!.docs.first;
+                    var tripData = activeTripDoc.data() as Map<String, dynamic>;
+                    String tripId = activeTripDoc.id;
+                    String status = tripData['status'] ?? 'accepted';
 
-                  DocumentSnapshot? activeTripDoc;
-
-                  for (var doc in snapshot.data!.docs) {
-                    var data = doc.data() as Map<String, dynamic>;
-                    String dId = data['driverId']?.toString() ?? data['driver_id']?.toString() ?? '';
-                    if (dId == currentUser.uid) {
-                      activeTripDoc = doc;
-                      break;
-                    }
-                  }
-
-                  if (activeTripDoc == null) return const SizedBox.shrink();
-
-                  var tripData = activeTripDoc.data() as Map<String, dynamic>;
-                  String tripId = activeTripDoc.id;
-                  String status = tripData['status'] ?? 'accepted';
-
-                  if (activeTripId != tripId || activeTripStatus != status) {
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      if (!mounted) return;
-                      setState(() {
-                        activeTripId = tripId;
-                        activeTripStatus = status;
-                      });
+                    // 🔹 فراخوانی خودکار ترسیم خط مسیر بر اساس وضعیت سفر
+                    if (activeTripId != tripId || activeTripStatus != status) {
+                      activeTripId = tripId;
+                      activeTripStatus = status;
 
                       if (status == 'accepted') {
-                        _startPickupRoute(tripId, tripData);
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          _startPickupRoute(tripId, tripData);
+                        });
                       } else if (status == 'ontrip' || status == 'in_progress') {
-                        _startDestinationRoute(tripId, tripData);
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          _startDestinationRoute(tripId, tripData);
+                        });
                       }
-                    });
-                  }
+                    }
 
-                  String passengerName = tripData['userName'] ??
-                      tripData['full_name'] ??
-                      'passenger'.tr();
-                  String passengerPhone =
-                      tripData['userPhone'] ?? tripData['phone'] ?? '';
-                  String passengerRating =
-                      '${tripData['userRating'] ?? tripData['rating'] ?? '4.8'}';
-                  String originAddress = tripData['originAddress'] ??
-                      tripData['pickup_address'] ??
-                      '';
-                  String destinationAddress = tripData['destinationAddress'] ??
-                      tripData['dropoff_address'] ??
-                      '';
-                  String duration = '${tripData['duration'] ?? '15'}';
-                  String distance = '${tripData['distance'] ?? '5.2'}';
-                  String price =
-                      '${tripData['fareAmount'] ?? tripData['price'] ?? '120'}';
+                    String passengerName = tripData['userName'] ??
+                        tripData['full_name'] ??
+                        'passenger'.tr();
+                    String passengerPhone =
+                        tripData['userPhone'] ?? tripData['phone'] ?? '';
+                    String passengerRating =
+                        '${tripData['userRating'] ?? tripData['rating'] ?? '4.8'}';
+                    String originAddress = tripData['originAddress'] ??
+                        tripData['pickup_address'] ??
+                        '';
+                    String destinationAddress = tripData['destinationAddress'] ??
+                        tripData['dropoff_address'] ??
+                        '';
+                    String duration = '${tripData['duration'] ?? '15'}';
+                    String distance = '${tripData['distance'] ?? '5.2'}';
+                    String price =
+                        '${tripData['fareAmount'] ?? tripData['price'] ?? '120'}';
 
-                  return DraggableScrollableSheet(
-                    initialChildSize: 0.65,
-                    minChildSize: 0.22,
-                    maxChildSize: 0.92,
-                    snap: true,
-                    snapSizes: const [0.22, 0.65, 0.92],
-                    builder: (context, scrollController) {
-                      return Container(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF8FAFC),
-                          borderRadius: const BorderRadius.vertical(
-                            top: Radius.circular(32),
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.08),
-                              blurRadius: 24,
-                              offset: const Offset(0, -8),
+                    return DraggableScrollableSheet(
+                      initialChildSize: 0.62,
+                      minChildSize: 0.22,
+                      maxChildSize: 0.90,
+                      snap: true,
+                      snapSizes: const [0.22, 0.62, 0.90],
+                      builder: (context, scrollController) {
+                        return Container(
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(28),
                             ),
-                          ],
-                        ),
-                        child: SingleChildScrollView(
-                          controller: scrollController,
-                          padding: const EdgeInsets.only(left: 20, right: 20, top: 12, bottom: 24),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Center(
-                                child: Container(
-                                  width: 40,
-                                  height: 5,
-                                  margin: const EdgeInsets.only(bottom: 16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.08),
+                                blurRadius: 20,
+                                offset: const Offset(0, -6),
+                              ),
+                            ],
+                          ),
+                          child: SingleChildScrollView(
+                            controller: scrollController,
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Center(
+                                  child: Container(
+                                    width: 44,
+                                    height: 5,
+                                    margin: const EdgeInsets.only(bottom: 16),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.shade300,
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                ),
+
+                                Container(
+                                  padding: const EdgeInsets.all(14),
                                   decoration: BoxDecoration(
-                                    color: Colors.grey.shade300,
-                                    borderRadius: BorderRadius.circular(10),
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(color: Colors.grey.shade200),
                                   ),
-                                ),
-                              ),
-
-                              // کارت پروفایل مسافر
-                              Container(
-                                padding: const EdgeInsets.all(14),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(20),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.02),
-                                      blurRadius: 10,
-                                      offset: const Offset(0, 2),
-                                    )
-                                  ],
-                                  border: Border.all(color: Colors.grey.shade200),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 48,
-                                      height: 48,
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF0F7D55).withOpacity(0.1),
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(
-                                        Icons.person_rounded,
-                                        color: Color(0xFF0F7D55),
-                                        size: 26,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            passengerName,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 16,
-                                              color: Colors.black87,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Row(
-                                            children: [
-                                              const Icon(Icons.star_rounded, color: Colors.amber, size: 16),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                passengerRating,
-                                                style: const TextStyle(
-                                                  fontSize: 13,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: Colors.black87,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 10),
-                                              Text(
-                                                passengerPhone,
-                                                style: TextStyle(
-                                                  fontSize: 12,
-                                                  color: Colors.grey.shade600,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    Material(
-                                      color: const Color(0xFFE8F5E9),
-                                      shape: const CircleBorder(),
-                                      child: IconButton(
-                                        onPressed: () => _makePhoneCall(passengerPhone),
-                                        icon: const Icon(Icons.phone_in_talk_rounded, color: Color(0xFF2E7D32), size: 22),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-
-                              const SizedBox(height: 12),
-
-                              // کارت مبدأ و مقصد
-                              Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(20),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.02),
-                                      blurRadius: 10,
-                                      offset: const Offset(0, 2),
-                                    )
-                                  ],
-                                  border: Border.all(color: Colors.grey.shade200),
-                                ),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Column(
-                                      children: [
-                                        const Icon(Icons.circle, color: Color(0xFF0F7D55), size: 12),
-                                        Container(
-                                          height: 32,
-                                          width: 2,
-                                          color: Colors.grey.shade300,
-                                        ),
-                                        const Icon(Icons.location_on_rounded, color: Color(0xFFEF4444), size: 16),
-                                      ],
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            '${'origin_label'.tr()}: $originAddress',
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w600,
-                                              color: Colors.black87,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 20),
-                                          Text(
-                                            '${'destination_label'.tr()}: $destinationAddress',
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w600,
-                                              color: Colors.black87,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-
-                              const SizedBox(height: 12),
-
-                              // مشخصات سفر
-                              Row(
-                                children: [
-                                  Expanded(child: _buildInfoCard('estimated_time_label'.tr(), '$duration min', Icons.access_time_rounded, Colors.orange)),
-                                  const SizedBox(width: 8),
-                                  Expanded(child: _buildInfoCard('estimated_distance_label'.tr(), '$distance km', Icons.alt_route_rounded, Colors.blue)),
-                                  const SizedBox(width: 8),
-                                  Expanded(child: _buildInfoCard('estimated_fare_label'.tr(), '$price AFN', Icons.account_balance_wallet_rounded, Colors.green)),
-                                ],
-                              ),
-
-                              const SizedBox(height: 12),
-
-                              // پیام هدایت مسیریابی
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFFFF8E1),
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(color: Colors.amber.shade200),
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.notifications_active_outlined, color: Colors.amber, size: 18),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        'msg_follow_navigation'.tr(),
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                          color: Color(0xFF795548),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-
-                              const SizedBox(height: 16),
-
-                              // 🔹 دکمه اکشن اصلی سفر
-                              SizedBox(
-                                width: double.infinity,
-                                height: 52,
-                                child: ElevatedButton(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF0F7D55),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(28),
-                                    ),
-                                    elevation: 2,
-                                    shadowColor: const Color(0xFF0F7D55).withOpacity(0.3),
-                                  ),
-                                  onPressed: () {
-                                    if (status == 'accepted') {
-                                      _updateTripStatus(tripId, 'arrived', tripData);
-                                    } else if (status == 'arrived') {
-                                      _updateTripStatus(tripId, 'ontrip', tripData);
-                                    } else if (status == 'ontrip' || status == 'in_progress') {
-                                      _updateTripStatus(tripId, 'completed', tripData);
-                                    }
-                                  },
                                   child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      Icon(_getActionButtonIcon(status), color: Colors.white, size: 20),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        _getActionButtonTitle(status),
-                                        style: const TextStyle(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white,
+                                      Container(
+                                        width: 48,
+                                        height: 48,
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF0F7D55).withOpacity(0.12),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                          Icons.person_rounded,
+                                          color: Color(0xFF0F7D55),
+                                          size: 28,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              passengerName,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 16,
+                                                color: Colors.black87,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Row(
+                                              children: [
+                                                const Icon(Icons.star_rounded, color: Colors.amber, size: 16),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  passengerRating,
+                                                  style: const TextStyle(
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: Colors.black87,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 10),
+                                                Text(
+                                                  passengerPhone,
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: Colors.grey.shade600,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Material(
+                                        color: const Color(0xFFE8F5E9),
+                                        shape: const CircleBorder(),
+                                        child: IconButton(
+                                          onPressed: () => _makePhoneCall(passengerPhone),
+                                          icon: const Icon(Icons.phone_in_talk_rounded, color: Color(0xFF2E7D32), size: 22),
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
-                              ),
 
-                              const SizedBox(height: 12),
+                                const SizedBox(height: 12),
 
-                              // 🔹 دکمه‌های چت پیامکی و لغو سفر
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: SizedBox(
-                                      height: 48,
-                                      child: ElevatedButton.icon(
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: const Color(0xFF2563EB),
-                                          elevation: 0,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(24),
+                                Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(color: Colors.grey.shade200),
+                                  ),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Column(
+                                        children: [
+                                          const Icon(Icons.circle, color: Color(0xFF0F7D55), size: 12),
+                                          Container(
+                                            height: 32,
+                                            width: 2,
+                                            color: Colors.grey.shade300,
                                           ),
-                                        ),
-                                        onPressed: () {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) => ChatPage(
-                                                tripId: tripId,
-                                                passengerName: passengerName,
-                                                passengerPhone: passengerPhone,
+                                          const Icon(Icons.location_on_rounded, color: Color(0xFFE53935), size: 16),
+                                        ],
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              '${'origin_label'.tr()}: $originAddress',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.black87,
                                               ),
                                             ),
-                                          );
-                                        },
-                                        icon: const Icon(
-                                          Icons.edit_square,
-                                          color: Colors.white,
-                                          size: 18,
+                                            const SizedBox(height: 20),
+                                            Text(
+                                              '${'destination_label'.tr()}: $destinationAddress',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.black87,
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                        label: Text(
-                                          'btn_sms_chat'.tr(),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
+                                const SizedBox(height: 12),
+
+                                Row(
+                                  children: [
+                                    Expanded(child: _buildInfoCard('estimated_time_label'.tr(), '$duration min', Icons.access_time_rounded, Colors.orange)),
+                                    const SizedBox(width: 8),
+                                    Expanded(child: _buildInfoCard('estimated_distance_label'.tr(), '$distance km', Icons.alt_route_rounded, Colors.blue)),
+                                    const SizedBox(width: 8),
+                                    Expanded(child: _buildInfoCard('estimated_fare_label'.tr(), '$price AFN', Icons.account_balance_wallet_rounded, Colors.green)),
+                                  ],
+                                ),
+
+                                const SizedBox(height: 12),
+
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFFF8E1),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: Colors.amber.shade200),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.notifications_active_outlined, color: Colors.amber, size: 18),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          'msg_follow_navigation'.tr(),
                                           style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.bold,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF795548),
                                           ),
                                         ),
                                       ),
+                                    ],
+                                  ),
+                                ),
+
+                                const SizedBox(height: 16),
+
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 50,
+                                  child: ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF0F7D55),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                      elevation: 2,
+                                    ),
+                                    onPressed: () {
+                                      if (status == 'accepted') {
+                                        _updateTripStatus(tripId, 'arrived', tripData);
+                                      } else if (status == 'arrived') {
+                                        _updateTripStatus(tripId, 'ontrip', tripData);
+                                      } else if (status == 'ontrip' || status == 'in_progress') {
+                                        _updateTripStatus(tripId, 'completed', tripData);
+                                      }
+                                    },
+                                    child: Text(
+                                      _getActionButtonTitle(status),
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
                                     ),
                                   ),
+                                ),
 
-                                  if (status != 'ontrip' && status != 'in_progress') ...[
-                                    const SizedBox(width: 10),
+                                const SizedBox(height: 10),
+
+                                Row(
+                                  children: [
                                     Expanded(
                                       child: SizedBox(
-                                        height: 48,
-                                        child: OutlinedButton.icon(
-                                          style: OutlinedButton.styleFrom(
-                                            backgroundColor: const Color(0xFFFEF2F2),
-                                            side: const BorderSide(color: Color(0xFFFCA5A5), width: 1.2),
+                                        height: 44,
+                                        child: ElevatedButton.icon(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: const Color(0xFFE3F2FD),
+                                            elevation: 0,
                                             shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(24),
+                                              borderRadius: BorderRadius.circular(12),
                                             ),
                                           ),
-                                          onPressed: () => _cancelTrip(tripId),
-                                          icon: const Icon(
-                                            Icons.cancel_outlined,
-                                            color: Color(0xFFEF4444),
-                                            size: 18,
-                                          ),
+                                          onPressed: () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) => ChatPage(
+                                                  tripId: tripId,
+                                                  passengerName: passengerName,
+                                                  passengerPhone: passengerPhone,
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                          icon: const Icon(Icons.chat_bubble_outline_rounded,
+                                              color: Color(0xFF1E88E5), size: 18),
                                           label: Text(
-                                            'btn_cancel_trip'.tr(),
+                                            'btn_sms_chat'.tr(),
                                             style: const TextStyle(
-                                              color: Color(0xFFEF4444),
+                                              color: Color(0xFF1E88E5),
                                               fontSize: 13,
                                               fontWeight: FontWeight.bold,
                                             ),
@@ -1282,71 +1012,98 @@ class _HomePageState extends State<HomePage> {
                                         ),
                                       ),
                                     ),
-                                  ],
-                                ],
-                              ),
-
-                              const SizedBox(height: 12),
-
-                              // 🔹 دکمه مسیریابی بیرونی
-                              SizedBox(
-                                width: double.infinity,
-                                height: 50,
-                                child: ElevatedButton.icon(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF1D4ED8),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(25),
-                                    ),
-                                    elevation: 1,
-                                  ),
-                                  onPressed: () async {
-                                    LatLng? targetPos;
-                                    if (status == 'accepted' || status == 'arrived') {
-                                      targetPos = _extractLatLng(
-                                        tripData, 
-                                        ['originLatLng', 'pickup_location', 'pickupLatLng', 'origin'],
-                                        latKey: 'from_lat',
-                                        lngKey: 'from_lng',
-                                      );
-                                    } else {
-                                      targetPos = _extractLatLng(
-                                        tripData, 
-                                        ['destinationLatLng', 'dropoff_location', 'dropoffLatLng', 'destination'],
-                                        latKey: 'to_lat',
-                                        lngKey: 'to_lng',
-                                      );
-                                    }
-
-                                    if (targetPos != null) {
-                                      await _openExternalMap(targetPos.latitude, targetPos.longitude);
-                                    } else if (mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('مختصات مبدأ یا مقصد این سفر پیدا نشد.'),
+                                    if (status != 'ontrip' && status != 'in_progress') ...[
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: SizedBox(
+                                          height: 44,
+                                          child: ElevatedButton(
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: const Color(0xFFFFEBEE),
+                                              elevation: 0,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(12),
+                                              ),
+                                            ),
+                                            onPressed: () => _cancelTrip(tripId),
+                                            child: Text(
+                                              'btn_cancel_trip'.tr(),
+                                              style: const TextStyle(
+                                                color: Color(0xFFE53935),
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
                                         ),
-                                      );
-                                    }
-                                  },
-                                  icon: const Icon(Icons.navigation_rounded, color: Colors.white, size: 20),
-                                  label: Text(
-                                    (status == 'accepted' || status == 'arrived')
-                                        ? 'btn_external_navigation_origin'.tr()
-                                        : 'btn_external_navigation_destination'.tr(),
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
+                                      ),
+                                    ],
+                                  ],
+                                ),
+
+                                const SizedBox(height: 10),
+
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 50,
+                                  child: ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF1565C0),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                      elevation: 1,
+                                    ),
+                                    onPressed: () async {
+                                      LatLng? targetPos;
+                                      if (status == 'accepted' || status == 'arrived') {
+                                        targetPos = _extractLatLng(
+                                          tripData, 
+                                          ['originLatLng', 'pickup_location', 'pickupLatLng', 'origin'],
+                                          latKey: 'from_lat',
+                                          lngKey: 'from_lng',
+                                        );
+                                      } else {
+                                        targetPos = _extractLatLng(
+                                          tripData, 
+                                          ['destinationLatLng', 'dropoff_location', 'dropoffLatLng', 'destination'],
+                                          latKey: 'to_lat',
+                                          lngKey: 'to_lng',
+                                        );
+                                      }
+
+                                      if (targetPos != null) {
+                                        await _openExternalMap(targetPos.latitude, targetPos.longitude);
+                                      } else if (mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('مختصات مبدأ یا مقصد این سفر پیدا نشد.'),
+                                          ),
+                                        );
+                                      }
+                                    },
+                                    icon: const Icon(Icons.near_me_rounded,
+                                        color: Colors.white, size: 20),
+                                    label: Text(
+                                      (status == 'accepted' || status == 'arrived')
+                                          ? 'btn_external_navigation_origin'.tr()
+                                          : 'btn_external_navigation_destination'.tr(),
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                      );
-                    },
-                  );
+                        );
+                      },
+                    );
+                  }
+                  return const SizedBox.shrink();
                 },
               ),
           ],
@@ -1369,33 +1126,12 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  IconData _getActionButtonIcon(String status) {
-    switch (status) {
-      case 'accepted':
-        return Icons.where_to_vote_rounded;
-      case 'arrived':
-        return Icons.play_arrow_rounded;
-      case 'ontrip':
-      case 'in_progress':
-        return Icons.check_circle_rounded;
-      default:
-        return Icons.navigation_rounded;
-    }
-  }
-
   Widget _buildInfoCard(String label, String value, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.015),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          )
-        ],
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: Colors.grey.shade200),
       ),
       child: Column(
