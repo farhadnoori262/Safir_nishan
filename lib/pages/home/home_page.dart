@@ -566,43 +566,55 @@ class _HomePageState extends State<HomePage> {
                 backgroundColor: const Color(0xFFE53935),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
-              onPressed: () async {
+                            onPressed: () async {
                 Navigator.pop(dialogContext);
 
-                context.read<NavigationController>().stopNavigation();
-                if (mapController != null) {
-                  await mapController!.clearLines();
-                  if (driverSymbol != null) {
-                    await mapController!.removeSymbol(driverSymbol!);
-                    driverSymbol = null;
+                try {
+                  context.read<NavigationController>().stopNavigation();
+                  if (mapController != null) {
+                    await mapController!.clearLines();
+                    if (driverSymbol != null) {
+                      await mapController!.removeSymbol(driverSymbol!);
+                      driverSymbol = null;
+                    }
                   }
-                }
 
-                await FirebaseFirestore.instance.collection('rides').doc(tripId).update({
-                  'status': 'canceled',
-                  'canceled_by': 'driver',
-                  'canceled_at': FieldValue.serverTimestamp(),
-                });
-
-                final user = FirebaseAuth.instance.currentUser;
-                if (user != null) {
-                  await FirebaseFirestore.instance.collection("drivers").doc(user.uid).update({
-                    "newTripStatus": "waiting",
+                  await FirebaseFirestore.instance.collection('rides').doc(tripId).update({
+                    'status': 'canceled',
+                    'canceled_by': 'driver',
+                    'canceled_at': FieldValue.serverTimestamp(),
                   });
-                }
 
-                setState(() {
-                  activeTripId = null;
-                  activeTripStatus = null;
-                });
+                  final user = FirebaseAuth.instance.currentUser;
+                  if (user != null) {
+                    await FirebaseFirestore.instance.collection("drivers").doc(user.uid).update({
+                      "newTripStatus": "waiting",
+                    });
+                  }
 
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('سفر توسط شما لغو شد.'),
-                      backgroundColor: Color(0xFFE53935),
-                    ),
-                  );
+                  setState(() {
+                    activeTripId = null;
+                    activeTripStatus = null;
+                  });
+
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('سفر توسط شما لغو شد.'),
+                        backgroundColor: Color(0xFFE53935),
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  debugPrint('❌ خطا در لغو سفر: $e');
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('لغو سفر ناموفق بود: $e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
                 }
               },
               child: const Text('بله، لغو شود', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
