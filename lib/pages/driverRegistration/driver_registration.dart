@@ -36,41 +36,62 @@ class _DriverRegistrationState extends State<DriverRegistration> {
     });
   }
 
+  // 🔄 دریافت آخرین اطلاعات و محاسبه دقیق تکمیل بودن هر مرحله
   Future<void> _loadCurrentStatus() async {
     final registrationProvider =
         Provider.of<RegistrationProvider>(context, listen: false);
 
     await registrationProvider.fetchUserData();
 
+    if (!mounted) return;
+
     setState(() {
-      isBasicInfoComplete = registrationProvider.firstNameController.text.isNotEmpty &&
-          registrationProvider.lastNameController.text.isNotEmpty &&
-          registrationProvider.emailController.text.isNotEmpty &&
-          registrationProvider.addressController.text.isNotEmpty &&
-          registrationProvider.profilePhoto != null;
+      // ۱. اطلاعات اولیه (نام، تخلص، ایمیل، آدرس و عکس پروفایل)
+      isBasicInfoComplete =
+          registrationProvider.firstNameController.text.trim().isNotEmpty &&
+          registrationProvider.lastNameController.text.trim().isNotEmpty &&
+          registrationProvider.emailController.text.trim().isNotEmpty &&
+          registrationProvider.addressController.text.trim().isNotEmpty &&
+          (registrationProvider.profilePhotoUrl != null &&
+              registrationProvider.profilePhotoUrl!.isNotEmpty);
 
-      isCnicComplete = registrationProvider.cnincFrontImage != null &&
-          registrationProvider.cnincBackImage != null &&
-          registrationProvider.cnicController.text.isNotEmpty;
+      // ۲. تذکره / کارت ملی
+      isCnicComplete =
+          registrationProvider.cnicController.text.trim().isNotEmpty &&
+          (registrationProvider.cnicFrontImageUrl != null &&
+              registrationProvider.cnicFrontImageUrl!.isNotEmpty) &&
+          (registrationProvider.cnicBackImageUrl != null &&
+              registrationProvider.cnicBackImageUrl!.isNotEmpty);
 
-      isSelfieComplete = registrationProvider.cnicWithSelfieImage != null;
+      // ۳. سلفی با تذکره
+      isSelfieComplete =
+          registrationProvider.cnicWithSelfieImageUrl != null &&
+          registrationProvider.cnicWithSelfieImageUrl!.isNotEmpty;
 
+      // ۴. جواز رانندگی
       isDrivingLicenseInfoComplete =
-          registrationProvider.drivingLicenseFrontImage != null &&
-          registrationProvider.drivingLicenseBackImage != null &&
-          registrationProvider.drivingLicenseController.text.isNotEmpty;
+          registrationProvider.drivingLicenseController.text.trim().isNotEmpty &&
+          (registrationProvider.drivingLicenseFrontImageUrl != null &&
+              registrationProvider.drivingLicenseFrontImageUrl!.isNotEmpty) &&
+          (registrationProvider.drivingLicenseBackImageUrl != null &&
+              registrationProvider.drivingLicenseBackImageUrl!.isNotEmpty);
 
-      isVehicleInfoComplete = registrationProvider.selectedVehicle != null &&
+      // ۵. مشخصات خودرو و پلاک افغانستان
+      isVehicleInfoComplete =
+          registrationProvider.selectedVehicle != null &&
           registrationProvider.selectedVehicle!.isNotEmpty &&
-          registrationProvider.brandController.text.isNotEmpty &&
-          registrationProvider.vehicleImage != null;
+          registrationProvider.brandController.text.trim().isNotEmpty &&
+          registrationProvider.plateNumberController.text.trim().isNotEmpty &&
+          registrationProvider.selectedProvince != null &&
+          (registrationProvider.vehicleImageUrl != null &&
+              registrationProvider.vehicleImageUrl!.isNotEmpty);
 
       _isCheckingStatus = false;
       _recalculateAllComplete();
     });
   }
 
-  // تابع بازخوانی وضعیت تکمیل تمامی مدارک
+  // تابع محاسبه مجدد تکمیل کامل تمامی مدارک
   void _recalculateAllComplete() {
     setState(() {
       isAllComplete = isBasicInfoComplete &&
@@ -81,13 +102,14 @@ class _DriverRegistrationState extends State<DriverRegistration> {
     });
   }
 
-    @override
+  @override
   Widget build(BuildContext context) {
     if (_isCheckingStatus) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       );
     }
+
     return Consumer<RegistrationProvider>(
       builder: (context, registrationProvider, child) => Scaffold(
         backgroundColor: AppColors.background,
@@ -140,18 +162,13 @@ class _DriverRegistrationState extends State<DriverRegistration> {
                           subtitle: 'step_basic_info_sub'.tr(),
                           isCompleted: isBasicInfoComplete,
                           onTap: () async {
-                            bool? result = await Navigator.push(
+                            await Navigator.push(
                               context,
                               MaterialPageRoute(
                                 builder: (context) => const BasicInfoScreen(),
                               ),
                             );
-                            if (result != null && result) {
-                              setState(() {
-                                isBasicInfoComplete = true;
-                                _recalculateAllComplete();
-                              });
-                            }
+                            _loadCurrentStatus();
                           },
                         );
                       } else if (index == 1) {
@@ -160,18 +177,13 @@ class _DriverRegistrationState extends State<DriverRegistration> {
                           subtitle: 'step_cnic_sub'.tr(),
                           isCompleted: isCnicComplete,
                           onTap: () async {
-                            bool? result = await Navigator.push(
+                            await Navigator.push(
                               context,
                               MaterialPageRoute(
                                 builder: (context) => const CNICScreen(),
                               ),
                             );
-                            if (result != null && result) {
-                              setState(() {
-                                isCnicComplete = true;
-                                _recalculateAllComplete();
-                              });
-                            }
+                            _loadCurrentStatus();
                           },
                         );
                       } else if (index == 2) {
@@ -180,18 +192,13 @@ class _DriverRegistrationState extends State<DriverRegistration> {
                           subtitle: 'step_selfie_sub'.tr(),
                           isCompleted: isSelfieComplete,
                           onTap: () async {
-                            bool? result = await Navigator.push(
+                            await Navigator.push(
                               context,
                               MaterialPageRoute(
                                 builder: (context) => const SelfieScreen(),
                               ),
                             );
-                            if (result != null && result) {
-                              setState(() {
-                                isSelfieComplete = true;
-                                _recalculateAllComplete();
-                              });
-                            }
+                            _loadCurrentStatus();
                           },
                         );
                       } else if (index == 3) {
@@ -200,18 +207,13 @@ class _DriverRegistrationState extends State<DriverRegistration> {
                           subtitle: 'step_license_sub'.tr(),
                           isCompleted: isDrivingLicenseInfoComplete,
                           onTap: () async {
-                            bool? result = await Navigator.push(
+                            await Navigator.push(
                               context,
                               MaterialPageRoute(
                                 builder: (context) => const DrivingLicenseScreen(),
                               ),
                             );
-                            if (result != null && result) {
-                              setState(() {
-                                isDrivingLicenseInfoComplete = true;
-                                _recalculateAllComplete();
-                              });
-                            }
+                            _loadCurrentStatus();
                           },
                         );
                       } else {
@@ -220,18 +222,13 @@ class _DriverRegistrationState extends State<DriverRegistration> {
                           subtitle: 'step_vehicle_sub'.tr(),
                           isCompleted: isVehicleInfoComplete,
                           onTap: () async {
-                            bool? result = await Navigator.push(
+                            await Navigator.push(
                               context,
                               MaterialPageRoute(
                                 builder: (context) => VehicleInfoScreen(),
                               ),
                             );
-                            if (result != null && result) {
-                              setState(() {
-                                isVehicleInfoComplete = true;
-                                _recalculateAllComplete();
-                              });
-                            }
+                            _loadCurrentStatus();
                           },
                         );
                       }
@@ -247,7 +244,6 @@ class _DriverRegistrationState extends State<DriverRegistration> {
                   child: ElevatedButton(
                     onPressed: isAllComplete && !registrationProvider.isLoading
                         ? () async {
-                            registrationProvider.startLoading();
                             try {
                               await registrationProvider.saveUserData(context);
                               if (context.mounted) {
@@ -259,13 +255,10 @@ class _DriverRegistrationState extends State<DriverRegistration> {
                                 );
                                 CommonMethods commonMethods = CommonMethods();
                                 commonMethods.displaySnackBar(
-                                    'reg_success_msg'.tr(),
-                                    context);
+                                    'reg_success_msg'.tr(), context);
                               }
                             } catch (e) {
                               debugPrint("Error while saving data: $e");
-                            } finally {
-                              registrationProvider.stopLoading();
                             }
                           }
                         : null,
@@ -284,7 +277,7 @@ class _DriverRegistrationState extends State<DriverRegistration> {
                         : Text(
                             'submit_all_docs'.tr(),
                             style: const TextStyle(
-                              fontSize: 16, 
+                              fontSize: 16,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -292,11 +285,13 @@ class _DriverRegistrationState extends State<DriverRegistration> {
                 ),
                 const SizedBox(height: 10),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 20.0, vertical: 8.0),
                   child: Text(
                     'reg_terms_note'.tr(),
                     textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                    style: const TextStyle(
+                        fontSize: 11, color: AppColors.textSecondary),
                   ),
                 ),
               ],
@@ -317,14 +312,18 @@ class _DriverRegistrationState extends State<DriverRegistration> {
     return ListTile(
       title: Text(
         title,
-        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+        style: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary),
       ),
       subtitle: Text(
         subtitle,
         style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
       ),
       trailing: isCompleted
-          ? const Icon(Icons.check_circle, color: AppColors.primaryBrand, size: 26)
+          ? const Icon(Icons.check_circle,
+              color: AppColors.primaryBrand, size: 26)
           : const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
       onTap: onTap,
     );
