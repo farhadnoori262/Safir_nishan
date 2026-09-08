@@ -1,8 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
@@ -19,7 +19,10 @@ import 'package:http/http.dart' as http;
 class RegistrationProvider extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseDatabase _database = FirebaseDatabase.instance;
-  final FirebaseStorage _storage = FirebaseStorage.instance;
+
+  // 🔹 تنظیمات Cloudinary
+  final String _cloudinaryCloudName = 'mhjpeymi';
+  final String _cloudinaryUploadPreset = 'safir_preset';
 
   bool _isLoading = false;
   bool _isFetchLoading = false;
@@ -43,6 +46,9 @@ class RegistrationProvider extends ChangeNotifier {
   bool _isDataFetched = false;
   bool get isDataFetched => _isDataFetched;
   
+  bool _isDriverRegistered = false;
+  bool get isDriverRegistered => _isDriverRegistered;
+
   double _driverEarnings = 0.0;
   double get driverEarnings => _driverEarnings;
 
@@ -51,7 +57,7 @@ class RegistrationProvider extends ChangeNotifier {
   String _plateCategory = 'ش';
   String _plateType = 'شخصی';
 
-  // گترها و سترهای پلاک (با به روزرسانی فرم)
+  // گترها و سترهای پلاک
   String get plateProvince => _plateProvince;
   String get plateCategory => _plateCategory;
   String get plateType => _plateType;
@@ -157,7 +163,6 @@ class RegistrationProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // 📌 گتر اختصاصی جهت رفع خطای profile_page.dart
   Map<String, dynamic> get driverInformation {
     return {
       'name': "$driverName $driverSecondName".trim().isNotEmpty 
@@ -194,14 +199,14 @@ class RegistrationProvider extends ChangeNotifier {
   }
 
   void initFields(AuthenticationProvider authProvider) {
-  authProvider.syncWithFirebaseUser();
-  if (!authProvider.isGoogleSignedIn) {
-    phoneController.text = authProvider.phoneNumber;
-  } else {
-    emailController.text = authProvider.firebaseAuth.currentUser?.email ?? '';
-    phoneController.text = '';
-  }
-  checkBasicFormValidity();
+    authProvider.syncWithFirebaseUser();
+    if (!authProvider.isGoogleSignedIn) {
+      phoneController.text = authProvider.phoneNumber;
+    } else {
+      emailController.text = authProvider.firebaseAuth.currentUser?.email ?? '';
+      phoneController.text = '';
+    }
+    checkBasicFormValidity();
   }
 
   void checkBasicFormValidity() {
@@ -367,22 +372,31 @@ class RegistrationProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // 🔹 آپلود رایگان و مستقیم تصویر روی Cloudinary
   Future<String> uploadImageToFirebaseStorage(XFile? photo, String path, BuildContext context) async {
     if (photo == null) {
       throw Exception(tr(context, 'err_no_image_selected'));
     }
-    if (_auth.currentUser == null) throw Exception("User not authenticated");
-    String imageIDName = DateTime.now().millisecondsSinceEpoch.toString();
-    final file = File(photo.path);
-    final reference = _storage
-        .ref()
-        .child(_auth.currentUser!.uid)
-        .child(path)
-        .child(imageIDName);
-    final uploadTask = reference.putFile(file);
-    final snapshot = await uploadTask.whenComplete(() => {});
-    final downloadUrl = await snapshot.ref.getDownloadURL();
-    return downloadUrl;
+
+    try {
+      final url = Uri.parse('https://api.cloudinary.com/v1_1/$_cloudinaryCloudName/image/upload');
+      final request = http.MultipartRequest('POST', url)
+        ..fields['upload_preset'] = _cloudinaryUploadPreset
+        ..files.add(await http.MultipartFile.fromPath('file', photo.path));
+
+      final response = await request.send();
+      final responseData = await response.stream.bytesToString();
+
+      if (response.statusCode == 200) {
+        final jsonMap = jsonDecode(responseData);
+        return jsonMap['secure_url'] ?? '';
+      } else {
+        throw Exception("Cloudinary Upload Error: $responseData");
+      }
+    } catch (e) {
+      debugPrint("Error uploading image to Cloudinary: $e");
+      rethrow;
+    }
   }
 
   Future<void> saveUserData(BuildContext context) async {
@@ -570,7 +584,11 @@ class RegistrationProvider extends ChangeNotifier {
 
   Future<void> retrieveCurrentDriverInfo() async {
     try {
-      if (_auth.currentUser == null) return;
+      if (_auth.currentUser == null) {
+        _isDriverRegistered = false;
+        notifyListeners();
+        return;
+      }
       final driverId = _auth.currentUser!.uid;
       DatabaseReference driverRef =
           _database.ref().child("drivers").child(driverId);
@@ -600,10 +618,16 @@ class RegistrationProvider extends ChangeNotifier {
           carNumber = rawNumber;
         }
 
+        _isDriverRegistered = driverName.trim().isNotEmpty;
+        notifyListeners();
+      } else {
+        _isDriverRegistered = false;
         notifyListeners();
       }
     } catch (e) {
       debugPrint("Error retrieving current driver profile: $e");
+      _isDriverRegistered = false;
+      notifyListeners();
     }
   }
 
