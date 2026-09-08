@@ -1,8 +1,8 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
@@ -19,10 +19,7 @@ import 'package:http/http.dart' as http;
 class RegistrationProvider extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseDatabase _database = FirebaseDatabase.instance;
-
-  // 🔹 تنظیمات Cloudinary
-  final String _cloudinaryCloudName = 'mhjpeymi';
-  final String _cloudinaryUploadPreset = 'safir_preset';
+  final FirebaseStorage _storage = FirebaseStorage.instance;
 
   bool _isLoading = false;
   bool _isFetchLoading = false;
@@ -46,9 +43,6 @@ class RegistrationProvider extends ChangeNotifier {
   bool _isDataFetched = false;
   bool get isDataFetched => _isDataFetched;
   
-  bool _isDriverRegistered = false;
-  bool get isDriverRegistered => _isDriverRegistered;
-
   double _driverEarnings = 0.0;
   double get driverEarnings => _driverEarnings;
 
@@ -61,6 +55,16 @@ class RegistrationProvider extends ChangeNotifier {
   String get plateProvince => _plateProvince;
   String get plateCategory => _plateCategory;
   String get plateType => _plateType;
+  
+  // 🔹 گتر برای رفع خطای selectedProvince
+  String? get selectedProvince => _plateProvince;
+  set selectedProvince(String? val) {
+    if (val != null) {
+      _plateProvince = val;
+      checkVehicleBasicFormValidity();
+      notifyListeners();
+    }
+  }
 
   void setPlateProvince(String val) {
     _plateProvince = val;
@@ -94,6 +98,9 @@ class RegistrationProvider extends ChangeNotifier {
   final TextEditingController colorController = TextEditingController();
   final TextEditingController numberPlateController = TextEditingController();
   final TextEditingController productionYearController = TextEditingController();
+
+  // 🔹 گتر جهت تطبیق plateNumberController با numberPlateController
+  TextEditingController get plateNumberController => numberPlateController;
 
   // گترها و سترها
   XFile? get profilePhoto => _profilePhoto;
@@ -139,6 +146,19 @@ class RegistrationProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // 🔹 گترهای اصلاح املایی جهت رفع خطای missing getters
+  XFile? get cnicFrontImage => _cnicFrontImage;
+  XFile? get cnicBackImage => _cnicBackImage;
+
+  // 🔹 گترهای مسیر URL یا Path جهت مطابقت با driver_registration.dart
+  String? get profilePhotoUrl => _profilePhoto?.path;
+  String? get cnicFrontImageUrl => _cnicFrontImage?.path;
+  String? get cnicBackImageUrl => _cnicBackImage?.path;
+  String? get cnicWithSelfieImageUrl => _cnicWithSelfieImage?.path;
+  String? get drivingLicenseFrontImageUrl => _drivingLicenseFrontImage?.path;
+  String? get drivingLicenseBackImageUrl => _drivingLicenseBackImage?.path;
+  String? get vehicleImageUrl => _vehicleImage?.path;
+
   XFile? get drivingLicenseFrontImage => _drivingLicenseFrontImage;
   set drivingLicenseFrontImage(XFile? val) {
     _drivingLicenseFrontImage = val;
@@ -163,6 +183,7 @@ class RegistrationProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // 📌 گتر اختصاصی جهت صفحه پروفایل
   Map<String, dynamic> get driverInformation {
     return {
       'name': "$driverName $driverSecondName".trim().isNotEmpty 
@@ -307,7 +328,8 @@ class RegistrationProvider extends ChangeNotifier {
   Future<void> pickAndCropCnincImage(BuildContext context, bool isFrontImage) async {
     final ImagePickerService imagePickerService = ImagePickerService();
 
-    final pickedFile = await imagePickerService.pickCropImage(context: context,
+    final pickedFile = await imagePickerService.pickCropImage(
+      context: context,
       cropAspectRatio: const CropAspectRatio(ratioX: 16, ratioY: 9),
       imageSource: ImageSource.camera,
     );
@@ -325,7 +347,8 @@ class RegistrationProvider extends ChangeNotifier {
   Future<void> pickAndCropVehicleRegistrationImages(BuildContext context, bool isFrontImage) async {
     final ImagePickerService imagePickerService = ImagePickerService();
 
-    final pickedFile = await imagePickerService.pickCropImage(context: context,
+    final pickedFile = await imagePickerService.pickCropImage(
+      context: context,
       cropAspectRatio: const CropAspectRatio(ratioX: 16, ratioY: 12),
       imageSource: ImageSource.camera,
     );
@@ -343,7 +366,8 @@ class RegistrationProvider extends ChangeNotifier {
   Future<void> pickAndCropDrivingLicenseImage(BuildContext context, bool isFrontImage) async {
     final ImagePickerService imagePickerService = ImagePickerService();
 
-    final pickedFile = await imagePickerService.pickCropImage(context: context,
+    final pickedFile = await imagePickerService.pickCropImage(
+      context: context,
       cropAspectRatio: const CropAspectRatio(ratioX: 16, ratioY: 9),
       imageSource: ImageSource.camera,
     );
@@ -361,7 +385,8 @@ class RegistrationProvider extends ChangeNotifier {
   Future<void> pickCnincImageWithSelfie(BuildContext context) async {
     final ImagePickerService imagePickerService = ImagePickerService();
 
-    final pickedFile = await imagePickerService.pickCropImage(context: context,
+    final pickedFile = await imagePickerService.pickCropImage(
+      context: context,
       cropAspectRatio: const CropAspectRatio(ratioX: 20, ratioY: 20),
       imageSource: ImageSource.camera,
     );
@@ -372,31 +397,22 @@ class RegistrationProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // 🔹 آپلود رایگان و مستقیم تصویر روی Cloudinary
   Future<String> uploadImageToFirebaseStorage(XFile? photo, String path, BuildContext context) async {
     if (photo == null) {
       throw Exception(tr(context, 'err_no_image_selected'));
     }
-
-    try {
-      final url = Uri.parse('https://api.cloudinary.com/v1_1/$_cloudinaryCloudName/image/upload');
-      final request = http.MultipartRequest('POST', url)
-        ..fields['upload_preset'] = _cloudinaryUploadPreset
-        ..files.add(await http.MultipartFile.fromPath('file', photo.path));
-
-      final response = await request.send();
-      final responseData = await response.stream.bytesToString();
-
-      if (response.statusCode == 200) {
-        final jsonMap = jsonDecode(responseData);
-        return jsonMap['secure_url'] ?? '';
-      } else {
-        throw Exception("Cloudinary Upload Error: $responseData");
-      }
-    } catch (e) {
-      debugPrint("Error uploading image to Cloudinary: $e");
-      rethrow;
-    }
+    if (_auth.currentUser == null) throw Exception("User not authenticated");
+    String imageIDName = DateTime.now().millisecondsSinceEpoch.toString();
+    final file = File(photo.path);
+    final reference = _storage
+        .ref()
+        .child(_auth.currentUser!.uid)
+        .child(path)
+        .child(imageIDName);
+    final uploadTask = reference.putFile(file);
+    final snapshot = await uploadTask.whenComplete(() => {});
+    final downloadUrl = await snapshot.ref.getDownloadURL();
+    return downloadUrl;
   }
 
   Future<void> saveUserData(BuildContext context) async {
@@ -584,11 +600,7 @@ class RegistrationProvider extends ChangeNotifier {
 
   Future<void> retrieveCurrentDriverInfo() async {
     try {
-      if (_auth.currentUser == null) {
-        _isDriverRegistered = false;
-        notifyListeners();
-        return;
-      }
+      if (_auth.currentUser == null) return;
       final driverId = _auth.currentUser!.uid;
       DatabaseReference driverRef =
           _database.ref().child("drivers").child(driverId);
@@ -618,16 +630,10 @@ class RegistrationProvider extends ChangeNotifier {
           carNumber = rawNumber;
         }
 
-        _isDriverRegistered = driverName.trim().isNotEmpty;
-        notifyListeners();
-      } else {
-        _isDriverRegistered = false;
         notifyListeners();
       }
     } catch (e) {
       debugPrint("Error retrieving current driver profile: $e");
-      _isDriverRegistered = false;
-      notifyListeners();
     }
   }
 
