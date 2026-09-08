@@ -26,6 +26,49 @@ class _DriverRegistrationState extends State<DriverRegistration> {
   bool isVehicleInfoComplete = false;
   bool isDrivingLicenseInfoComplete = false;
   bool isAllComplete = false;
+  bool _isCheckingStatus = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadCurrentStatus();
+    });
+  }
+
+  Future<void> _loadCurrentStatus() async {
+    final registrationProvider =
+        Provider.of<RegistrationProvider>(context, listen: false);
+
+    await registrationProvider.fetchUserData();
+
+    setState(() {
+      isBasicInfoComplete = registrationProvider.firstNameController.text.isNotEmpty &&
+          registrationProvider.lastNameController.text.isNotEmpty &&
+          registrationProvider.emailController.text.isNotEmpty &&
+          registrationProvider.addressController.text.isNotEmpty &&
+          registrationProvider.profilePhoto != null;
+
+      isCnicComplete = registrationProvider.cnincFrontImage != null &&
+          registrationProvider.cnincBackImage != null &&
+          registrationProvider.cnicController.text.isNotEmpty;
+
+      isSelfieComplete = registrationProvider.cnicWithSelfieImage != null;
+
+      isDrivingLicenseInfoComplete =
+          registrationProvider.drivingLicenseFrontImage != null &&
+          registrationProvider.drivingLicenseBackImage != null &&
+          registrationProvider.drivingLicenseController.text.isNotEmpty;
+
+      isVehicleInfoComplete = registrationProvider.selectedVehicle != null &&
+          registrationProvider.selectedVehicle!.isNotEmpty &&
+          registrationProvider.brandController.text.isNotEmpty &&
+          registrationProvider.vehicleImage != null;
+
+      _isCheckingStatus = false;
+      _recalculateAllComplete();
+    });
+  }
 
   // تابع بازخوانی وضعیت تکمیل تمامی مدارک
   void _recalculateAllComplete() {
