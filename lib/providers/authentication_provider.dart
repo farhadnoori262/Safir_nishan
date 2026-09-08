@@ -73,9 +73,19 @@ class AuthenticationProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void stopGoogleLoading() {
+    void stopGoogleLoading() {
     _isGoogleSignInLoading = false;
     notifyListeners();
+  }
+
+  // 👇 اینجا، به‌عنوان متد مستقل کلاس
+  void syncWithFirebaseUser() {
+    final currentUser = firebaseAuth.currentUser;
+    if (currentUser != null) {
+      _uid ??= currentUser.uid;
+      _phoneNumber ??= currentUser.phoneNumber;
+      notifyListeners();
+    }
   }
 
   // ورود/ثبت‌نام با شماره تلفن
@@ -121,14 +131,6 @@ class AuthenticationProvider extends ChangeNotifier {
           stopLoading(); 
         },
       );
-      void syncWithFirebaseUser() {
-  final currentUser = firebaseAuth.currentUser;
-  if (currentUser != null) {
-    _uid ??= currentUser.uid;
-    _phoneNumber ??= currentUser.phoneNumber;
-    notifyListeners();
-  }
-      }
     } on FirebaseException catch (e) {
       stopLoading(); 
       if (context.mounted) {
