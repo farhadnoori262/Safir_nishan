@@ -961,7 +961,9 @@ class _HomePageState extends State<HomePage> {
                           ),
                           child: SingleChildScrollView(
                             controller: scrollController,
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            // ✅ کد جایگزین‌شده (خط ۵۳۲):
+                            padding: const EdgeInsets.only(left: 20, right: 20, top: 12, bottom: 95),
+
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
