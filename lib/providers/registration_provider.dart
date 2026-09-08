@@ -194,13 +194,14 @@ class RegistrationProvider extends ChangeNotifier {
   }
 
   void initFields(AuthenticationProvider authProvider) {
-    if (!authProvider.isGoogleSignedIn) {
-      phoneController.text = authProvider.phoneNumber;
-    } else {
-      emailController.text = authProvider.firebaseAuth.currentUser?.email ?? '';
-      phoneController.text = '';
-    }
-    checkBasicFormValidity();
+  authProvider.syncWithFirebaseUser();
+  if (!authProvider.isGoogleSignedIn) {
+    phoneController.text = authProvider.phoneNumber;
+  } else {
+    emailController.text = authProvider.firebaseAuth.currentUser?.email ?? '';
+    phoneController.text = '';
+  }
+  checkBasicFormValidity();
   }
 
   void checkBasicFormValidity() {
