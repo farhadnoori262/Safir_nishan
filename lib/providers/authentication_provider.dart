@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -51,11 +50,10 @@ class AuthenticationProvider extends ChangeNotifier {
   final FirebaseAuth firebaseAuth = FirebaseAuth.instance;
   final FirebaseFirestore firebaseFirestore = FirebaseFirestore.instance;
   final FirebaseStorage firebaseStorage = FirebaseStorage.instance;
-  final FirebaseDatabase firebaseDatabase = FirebaseDatabase.instance; 
+  
   final GoogleSignIn googleSignIn = GoogleSignIn(
-  serverClientId: '983174537944-n532tsodijqddnufq0lgtmevc2g0qr5a.apps.googleusercontent.com',
-);
- 
+    serverClientId: '983174537944-n532tsodijqddnufq0lgtmevc2g0qr5a.apps.googleusercontent.com',
+  );
 
   void startLoading() {
     _isLoading = true;
@@ -165,7 +163,7 @@ class AuthenticationProvider extends ChangeNotifier {
     }
   }
 
-  // ذخیره اطلاعات کامل راننده در فایربیس دیتابیس
+  // ذخیره اطلاعات کامل راننده در Cloud Firestore
   void saveUserDataToFirebase({
     required BuildContext context,
     required Driver driverModel,
@@ -174,12 +172,13 @@ class AuthenticationProvider extends ChangeNotifier {
     startLoading();
 
     try {
-      DatabaseReference usersRef =
-          firebaseDatabase.ref().child("drivers").child(driverModel.id);
-      await usersRef.set(driverModel.toMap()).then((value) {
-        stopLoading();
-        onSuccess();
-      });
+      await firebaseFirestore
+          .collection("drivers")
+          .doc(driverModel.id)
+          .set(driverModel.toMap(), SetOptions(merge: true));
+          
+      stopLoading();
+      onSuccess();
     } on FirebaseException catch (e) {
       stopLoading();
       if (context.mounted) {
@@ -189,37 +188,37 @@ class AuthenticationProvider extends ChangeNotifier {
   }
 
   Future<bool> checkUserExistByEmail(String email) async {
-    DatabaseReference usersRef = firebaseDatabase.ref().child("drivers");
-    DatabaseEvent snapshot =
-        await usersRef.orderByChild("email").equalTo(email).once();
+    QuerySnapshot snapshot = await firebaseFirestore
+        .collection("drivers")
+        .where("email", isEqualTo: email)
+        .limit(1)
+        .get();
 
-    return snapshot.snapshot.exists;
+    return snapshot.docs.isNotEmpty;
   }
 
   Future<bool> checkUserExistById() async {
-    if (FirebaseAuth.instance.currentUser == null) return false;
-    DatabaseReference usersRef = firebaseDatabase.ref().child("drivers");
-    DatabaseEvent snapshot = await usersRef
-        .orderByChild("id") 
-        .equalTo(FirebaseAuth.instance.currentUser!.uid)
-        .once();
+    if (firebaseAuth.currentUser == null) return false;
+    DocumentSnapshot doc = await firebaseFirestore
+        .collection("drivers")
+        .doc(firebaseAuth.currentUser!.uid)
+        .get();
 
-    return snapshot.snapshot.exists;
+    return doc.exists;
   }
 
-  // دریافت اطلاعات کامل راننده همراه با جزییات پلاک افغانستان
+  // دریافت اطلاعات کامل راننده از Cloud Firestore
   Future<void> getUserDataFromFirebaseDatabase() async {
     try {
       if (firebaseAuth.currentUser == null) return;
-      DatabaseReference driverRef = firebaseDatabase
-          .ref()
-          .child("drivers")
-          .child(firebaseAuth.currentUser!.uid);
 
-      DataSnapshot snapshot = await driverRef.get();
+      DocumentSnapshot doc = await firebaseFirestore
+          .collection("drivers")
+          .doc(firebaseAuth.currentUser!.uid)
+          .get();
 
-      if (snapshot.exists && snapshot.value != null) {
-        Map<String, dynamic> driverData = Map<String, dynamic>.from(snapshot.value as Map);
+      if (doc.exists && doc.data() != null) {
+        Map<String, dynamic> driverData = doc.data() as Map<String, dynamic>;
 
         _driverModel = Driver(
           id: driverData["id"] ?? '',
@@ -240,7 +239,7 @@ class AuthenticationProvider extends ChangeNotifier {
           drivingLicenseBackImage: driverData["drivingLicenseBackImage"] ?? '',
           blockStatus: driverData["blockStatus"] ?? '',
           deviceToken: driverData["deviceToken"] ?? '',
-          driverRatings: driverData["driverRattings"] ?? '',
+          driverRatings: driverData["driverRatings"] ?? driverData["driverRattings"] ?? '',
           earnings: driverData["earnings"] ?? '',
           vehicleInfo: driverData["vehicleInfo"] != null
               ? VehicleInfo.fromMap(Map<String, dynamic>.from(driverData["vehicleInfo"]))
@@ -255,19 +254,18 @@ class AuthenticationProvider extends ChangeNotifier {
     }
   }
 
-  // بررسی کامل پر بودن تمام فیلدها جهت احراز هویت
+  // بررسی پر بودن فیلدها از روی Cloud Firestore
   Future<bool> checkDriverFieldsFilled() async {
     try {
       if (firebaseAuth.currentUser == null) return false;
-      DatabaseReference driverRef = firebaseDatabase
-          .ref()
-          .child("drivers")
-          .child(firebaseAuth.currentUser!.uid);
 
-      DataSnapshot snapshot = await driverRef.get();
+      DocumentSnapshot doc = await firebaseFirestore
+          .collection("drivers")
+          .doc(firebaseAuth.currentUser!.uid)
+          .get();
 
-      if (snapshot.exists && snapshot.value != null) {
-        Map driverData = snapshot.value as Map;
+      if (doc.exists && doc.data() != null) {
+        Map<String, dynamic> driverData = doc.data() as Map<String, dynamic>;
 
         String profilePicture = driverData["profilePicture"] ?? '';
         String firstName = driverData["firstName"] ?? '';
@@ -336,63 +334,60 @@ class AuthenticationProvider extends ChangeNotifier {
 
   Future<void> signInWithGoogle(
     BuildContext context, VoidCallback onSuccess) async {
-  startGoogleLoading();
-  try {
-    final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+    startGoogleLoading();
+    try {
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
 
-    if (googleUser == null) {
+      if (googleUser == null) {
+        stopGoogleLoading();
+        return; 
+      }
+
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      final UserCredential userCredential =
+          await firebaseAuth.signInWithCredential(credential);
+      final User? user = userCredential.user;
+
+      if (user != null) {
+        _uid = user.uid;
+        _isGoogleSignedIn = true;
+        notifyListeners();
+      }
+      
       stopGoogleLoading();
-      return; 
-    }
+      onSuccess();
 
-    final GoogleSignInAuthentication googleAuth =
-        await googleUser.authentication;
-
-    final credential = GoogleAuthProvider.credential(
-      accessToken: googleAuth.accessToken,
-      idToken: googleAuth.idToken,
-    );
-
-    final UserCredential userCredential =
-        await firebaseAuth.signInWithCredential(credential);
-    final User? user = userCredential.user;
-
-    if (user != null) {
-      _uid = user.uid;
-      _isGoogleSignedIn = true;
-      notifyListeners();
-    }
-    
-    stopGoogleLoading();
-    onSuccess();
-
-  } on FirebaseAuthException catch (e) {
-    stopGoogleLoading();
-    if (context.mounted) {
-      commonMethods.displaySnackBar("Firebase Auth Error: ${e.message}", context);
-    }
-  } catch (e) {
-    // 📌 نمایش خطای دقیق گوگل روی صفحه گوشی
-    stopGoogleLoading();
-    if (context.mounted) {
-      commonMethods.displaySnackBar("Google Sign-In Error: $e", context);
+    } on FirebaseAuthException catch (e) {
+      stopGoogleLoading();
+      if (context.mounted) {
+        commonMethods.displaySnackBar("Firebase Auth Error: ${e.message}", context);
+      }
+    } catch (e) {
+      stopGoogleLoading();
+      if (context.mounted) {
+        commonMethods.displaySnackBar("Google Sign-In Error: $e", context);
+      }
     }
   }
-}
-
 
   Future<bool> checkIfDriverIsBlocked() async {
     try {
       if (firebaseAuth.currentUser == null) return false;
-      DatabaseReference driverRef = firebaseDatabase
-          .ref()
-          .child("drivers")
-          .child(firebaseAuth.currentUser!.uid);
 
-      DataSnapshot snapshot = await driverRef.get();
+      DocumentSnapshot doc = await firebaseFirestore
+          .collection("drivers")
+          .doc(firebaseAuth.currentUser!.uid)
+          .get();
 
-      if (snapshot.exists && snapshot.value != null) {
-        Map driverData = snapshot.value as Map;
+      if (doc.exists && doc.data() != null) {
+        Map<String, dynamic> driverData = doc.data() as Map<String, dynamic>;
         String blockStatus = driverData["blockStatus"] ?? 'no';
 
         if (blockStatus == 'yes') {
