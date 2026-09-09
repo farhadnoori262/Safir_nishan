@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -14,7 +16,6 @@ import 'package:safir_drivers/models/driver.dart';
 import 'package:safir_drivers/models/vehicle_info.dart'; 
 import 'package:safir_drivers/providers/authentication_provider.dart'; 
 import 'package:safir_drivers/utils/lang_helper.dart';
-import 'package:http/http.dart' as http;
 
 class RegistrationProvider extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -370,29 +371,43 @@ class RegistrationProvider extends ChangeNotifier {
   }
 
   // متد آپلود تصویر روی Storage با قابلیت تشخیص تصاویر موجود
-  Future<String> uploadImageToFirebaseStorage(XFile? photo, String path, BuildContext context) async {
+    Future<String> uploadImageToFirebaseStorage(XFile? photo, String path, BuildContext context) async {
     if (photo == null) {
       throw Exception(tr(context, 'err_no_image_selected'));
     }
-    if (_auth.currentUser == null) throw Exception("User not authenticated");
 
-    // اگر مسیر فایل آنلاین است نیاز به آپلود مجدد نیست
+    // اگر عکس قبلاً آپلود شده بود همان آدرس را برگردان
     if (photo.path.startsWith('http')) {
       return photo.path;
     }
 
-    String imageIDName = DateTime.now().millisecondsSinceEpoch.toString();
-    final file = File(photo.path);
-    final reference = _storage
-        .ref()
-        .child(_auth.currentUser!.uid)
-        .child(path)
-        .child(imageIDName);
-    final uploadTask = reference.putFile(file);
-    final snapshot = await uploadTask.whenComplete(() => {});
-    final downloadUrl = await snapshot.ref.getDownloadURL();
-    return downloadUrl;
+    const String cloudName = "mhjpeymi";
+    const String uploadPreset = "safir_preset";
+
+    final Uri url = Uri.parse("https://api.cloudinary.com/v1_1/$cloudName/image/upload");
+
+    try {
+      var request = http.MultipartRequest("POST", url);
+      request.fields['upload_preset'] = uploadPreset;
+
+      var multipartFile = await http.MultipartFile.fromPath('file', photo.path);
+      request.files.add(multipartFile);
+
+      var streamedResponse = await request.send();
+      var response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final Map<String, dynamic> responseData = jsonDecode(response.body);
+        return responseData['secure_url'];
+      } else {
+        throw Exception("Upload failed: ${response.statusCode}");
+      }
+    } catch (e) {
+      debugPrint("Cloudinary Upload Error: $e");
+      rethrow;
+    }
   }
+
 
   // ذخیره اطلاعات کامل راننده در Cloud Firestore
   Future<void> saveUserData(BuildContext context) async {
