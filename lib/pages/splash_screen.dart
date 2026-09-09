@@ -34,15 +34,18 @@ class _SplashScreenState extends State<SplashScreen> {
     });
 
     try {
-      // تاخیر جهت بارگذاری کامل Session فایربیس از حافظه دستگاه (مشابه اپ مسافر)
-      await Future.delayed(const Duration(milliseconds: 1500));
-
-      // ۱. بررسی مستقیم کاربر جاری
-      final User? user = FirebaseAuth.instance.currentUser;
+      // ۱. انتظار برای بازیابی وضعیت لاگین از حافظه داخلی توسط فایربیس
+      final User? user = await FirebaseAuth.instance
+          .authStateChanges()
+          .first
+          .timeout(
+            const Duration(seconds: 5),
+            onTimeout: () => FirebaseAuth.instance.currentUser,
+          );
 
       if (!mounted) return;
 
-      // اگر کاربر لاگین نبود -> صفحه ثبت‌نام
+      // اگر هیچ کاربری لاگین نبود -> صفحه ثبت‌نام/ورود
       if (user == null) {
         setState(() {
           _isLoading = false;
@@ -51,36 +54,16 @@ class _SplashScreenState extends State<SplashScreen> {
         return;
       }
 
-      // کاربر لاگین است؛ بررسی اطلاعات تکمیلی دیتابیس
+      // کاربر لاگین است؛ بارگذاری اطلاعات تکمیلی از دیتابیس
       final authProvider = Provider.of<AuthenticationProvider>(context, listen: false);
 
-      // بارگذاری اطلاعات راننده در پرووایدر
       try {
         await authProvider.retrieveCurrentDriverInfo();
       } catch (e) {
         debugPrint("Error loading driver info: $e");
       }
 
-      // ۲. بررسی وجود حساب راننده در فایربیس
-      bool userExists = true;
-      try {
-        userExists = await authProvider.checkUserExistById().timeout(
-          const Duration(seconds: 4),
-          onTimeout: () => true, // در صورت کندی شبکه لاگ‌اوت نکند
-        );
-      } catch (_) {
-        userExists = true;
-      }
-
-      if (!userExists) {
-        setState(() {
-          _isLoading = false;
-          _targetScreen = const RegisterScreen();
-        });
-        return;
-      }
-
-      // ۳. بررسی مسدود نبودن راننده
+      // ۲. بررسی مسدود نبودن راننده
       bool isBlocked = false;
       try {
         isBlocked = await authProvider.checkIfDriverIsBlocked().timeout(
@@ -99,16 +82,35 @@ class _SplashScreenState extends State<SplashScreen> {
         return;
       }
 
-      // ورود به داشبورد اصلی
-      setState(() {
-        _isLoading = false;
-        _targetScreen = const Dashboard();
-      });
+      // ۳. بررسی تکمیل بودن مشخصات فرم راننده (اصلاح اصلی)
+      bool isProfileComplete = false;
+      try {
+        isProfileComplete = await authProvider.checkDriverFieldsFilled().timeout(
+          const Duration(seconds: 4),
+          onTimeout: () => true, // در صورت کندی اینترنت راننده لاگین‌شده را بیرون نیندازد
+        );
+      } catch (_) {
+        isProfileComplete = true;
+      }
+
+      if (isProfileComplete) {
+        // پروفایل کامل است -> هدایت به داشبورد اصلی
+        setState(() {
+          _isLoading = false;
+          _targetScreen = const Dashboard();
+        });
+      } else {
+        // فرم راننده تکمیل نشده است -> تکمیل مشخصات
+        setState(() {
+          _isLoading = false;
+          _targetScreen = const RegisterScreen();
+        });
+      }
 
     } catch (e) {
       if (!mounted) return;
 
-      // در صورت بروز هرگونه خطای غیرمنتظره، اگر راننده لاگین باشد او را خارج نمی‌کنیم
+      // در صورت بروز خطای غیرمنتظره، اگر کاربر لاگین است او را به داشبورد می‌فرستیم
       final User? currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser != null) {
         setState(() {
