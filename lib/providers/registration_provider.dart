@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:image_cropper/image_cropper.dart';
@@ -18,7 +18,7 @@ import 'package:http/http.dart' as http;
 
 class RegistrationProvider extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseDatabase _database = FirebaseDatabase.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
 
   bool _isLoading = false;
@@ -51,7 +51,7 @@ class RegistrationProvider extends ChangeNotifier {
   String _plateCategory = 'ش';
   String _plateType = 'شخصی';
 
-  // گترها و سترهای پلاک (با به روزرسانی فرم)
+  // گترها و سترهای پلاک
   String get plateProvince => _plateProvince;
   String get plateCategory => _plateCategory;
   String get plateType => _plateType;
@@ -157,7 +157,6 @@ class RegistrationProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // 📌 گتر اختصاصی جهت رفع خطای profile_page.dart
   Map<String, dynamic> get driverInformation {
     return {
       'name': "$driverName $driverSecondName".trim().isNotEmpty 
@@ -301,7 +300,8 @@ class RegistrationProvider extends ChangeNotifier {
   Future<void> pickAndCropCnincImage(BuildContext context, bool isFrontImage) async {
     final ImagePickerService imagePickerService = ImagePickerService();
 
-    final pickedFile = await imagePickerService.pickCropImage(context: context,
+    final pickedFile = await imagePickerService.pickCropImage(
+      context: context,
       cropAspectRatio: const CropAspectRatio(ratioX: 16, ratioY: 9),
       imageSource: ImageSource.camera,
     );
@@ -319,7 +319,8 @@ class RegistrationProvider extends ChangeNotifier {
   Future<void> pickAndCropVehicleRegistrationImages(BuildContext context, bool isFrontImage) async {
     final ImagePickerService imagePickerService = ImagePickerService();
 
-    final pickedFile = await imagePickerService.pickCropImage(context: context,
+    final pickedFile = await imagePickerService.pickCropImage(
+      context: context,
       cropAspectRatio: const CropAspectRatio(ratioX: 16, ratioY: 12),
       imageSource: ImageSource.camera,
     );
@@ -337,7 +338,8 @@ class RegistrationProvider extends ChangeNotifier {
   Future<void> pickAndCropDrivingLicenseImage(BuildContext context, bool isFrontImage) async {
     final ImagePickerService imagePickerService = ImagePickerService();
 
-    final pickedFile = await imagePickerService.pickCropImage(context: context,
+    final pickedFile = await imagePickerService.pickCropImage(
+      context: context,
       cropAspectRatio: const CropAspectRatio(ratioX: 16, ratioY: 9),
       imageSource: ImageSource.camera,
     );
@@ -355,7 +357,8 @@ class RegistrationProvider extends ChangeNotifier {
   Future<void> pickCnincImageWithSelfie(BuildContext context) async {
     final ImagePickerService imagePickerService = ImagePickerService();
 
-    final pickedFile = await imagePickerService.pickCropImage(context: context,
+    final pickedFile = await imagePickerService.pickCropImage(
+      context: context,
       cropAspectRatio: const CropAspectRatio(ratioX: 20, ratioY: 20),
       imageSource: ImageSource.camera,
     );
@@ -366,11 +369,18 @@ class RegistrationProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // متد آپلود تصویر روی Storage با قابلیت تشخیص تصاویر موجود
   Future<String> uploadImageToFirebaseStorage(XFile? photo, String path, BuildContext context) async {
     if (photo == null) {
       throw Exception(tr(context, 'err_no_image_selected'));
     }
     if (_auth.currentUser == null) throw Exception("User not authenticated");
+
+    // اگر مسیر فایل آنلاین است نیاز به آپلود مجدد نیست
+    if (photo.path.startsWith('http')) {
+      return photo.path;
+    }
+
     String imageIDName = DateTime.now().millisecondsSinceEpoch.toString();
     final file = File(photo.path);
     final reference = _storage
@@ -384,6 +394,7 @@ class RegistrationProvider extends ChangeNotifier {
     return downloadUrl;
   }
 
+  // ذخیره اطلاعات کامل راننده در Cloud Firestore
   Future<void> saveUserData(BuildContext context) async {
     if (!isFormValidBasic ||
         !isFormValidCninc ||
@@ -451,9 +462,10 @@ class RegistrationProvider extends ChangeNotifier {
         ), 
       );
 
-      final userRef =
-          _database.ref().child("drivers").child(_auth.currentUser!.uid);
-      await userRef.set(driver.toMap());
+      await _firestore
+          .collection("drivers")
+          .doc(_auth.currentUser!.uid)
+          .set(driver.toMap(), SetOptions(merge: true));
       
       await retrieveCurrentDriverInfo();
       stopLoading();
@@ -463,19 +475,21 @@ class RegistrationProvider extends ChangeNotifier {
     }
   }
 
+  // فراخوانی اطلاعات راننده از Cloud Firestore
   Future<void> fetchUserData() async {
     if (_isDataFetched || _auth.currentUser == null) {
       return; 
     }
     try {
       startFetchLoading();
-      final userRef =
-          _database.ref().child("drivers").child(_auth.currentUser!.uid);
+      
+      DocumentSnapshot doc = await _firestore
+          .collection("drivers")
+          .doc(_auth.currentUser!.uid)
+          .get();
 
-      final snapshot = await userRef.get();
-
-      if (snapshot.exists) {
-        final data = snapshot.value as Map<dynamic, dynamic>;
+      if (doc.exists && doc.data() != null) {
+        final data = doc.data() as Map<String, dynamic>;
 
         firstNameController.text = data['firstName'] ?? '';
         lastNameController.text = data['secondName'] ?? '';
@@ -546,16 +560,19 @@ class RegistrationProvider extends ChangeNotifier {
     }
   }
 
+  // دریافت کارکرد/درآمد راننده از Cloud Firestore
   Future<void> fetchDriverEarnings() async {
     try {
       if (_auth.currentUser == null) return;
-      final userId = _auth.currentUser!.uid;
-      DatabaseReference driverRef =
-          _database.ref().child("drivers").child(userId);
+      
+      DocumentSnapshot doc = await _firestore
+          .collection("drivers")
+          .doc(_auth.currentUser!.uid)
+          .get();
 
-      final snapshot = await driverRef.child("earnings").get();
-      if (snapshot.exists) {
-        double earnings = double.tryParse(snapshot.value.toString()) ?? 0.0;
+      if (doc.exists && doc.data() != null) {
+        final data = doc.data() as Map<String, dynamic>;
+        double earnings = double.tryParse(data["earnings"]?.toString() ?? '0') ?? 0.0;
         _driverEarnings = double.parse(earnings.toStringAsFixed(2));
         notifyListeners(); 
       } else {
@@ -567,23 +584,25 @@ class RegistrationProvider extends ChangeNotifier {
     }
   }
 
+  // دریافت سریع پروفایل راننده جاری
   Future<void> retrieveCurrentDriverInfo() async {
     try {
       if (_auth.currentUser == null) return;
-      final driverId = _auth.currentUser!.uid;
-      DatabaseReference driverRef =
-          _database.ref().child("drivers").child(driverId);
-      final snapshot = await driverRef.get();
+      
+      DocumentSnapshot doc = await _firestore
+          .collection("drivers")
+          .doc(_auth.currentUser!.uid)
+          .get();
 
-      if (snapshot.exists) {
-        final data = snapshot.value as Map<dynamic, dynamic>;
+      if (doc.exists && doc.data() != null) {
+        final data = doc.data() as Map<String, dynamic>;
 
         driverName = data['firstName'] ?? '';
         driverSecondName = data['secondName'] ?? '';
         driverPhone = data['phoneNumber'] ?? '';
         driverEmail = data['email'] ?? '';
         address = data['address'] ?? '';
-        rating = data['driverRatings'] ?? '';
+        rating = data['driverRatings'] ?? data['driverRattings'] ?? '';
         driverPhoto = data['profilePicture'] ?? '';
         carModel = data['vehicleInfo']?['brand'] ?? '';
         carColor = data['vehicleInfo']?['color'] ?? '';
@@ -621,9 +640,12 @@ class RegistrationProvider extends ChangeNotifier {
         'dob': dobController.text,
         'profilePicture': newProfilePicture,
       };
-      final userRef =
-          _database.ref().child("drivers").child(_auth.currentUser!.uid);
-      await userRef.update(driverData);
+      
+      await _firestore
+          .collection("drivers")
+          .doc(_auth.currentUser!.uid)
+          .set(driverData, SetOptions(merge: true));
+
       await retrieveCurrentDriverInfo();
       _isLoading = false;
       notifyListeners();
@@ -646,9 +668,12 @@ class RegistrationProvider extends ChangeNotifier {
         'cnicBackImage': backCnincImageUrl,
         'cnicNumber': cnicController.text,
       };
-      final userRef =
-          _database.ref().child("drivers").child(_auth.currentUser!.uid);
-      await userRef.update(driverData);
+
+      await _firestore
+          .collection("drivers")
+          .doc(_auth.currentUser!.uid)
+          .set(driverData, SetOptions(merge: true));
+
       _isLoading = false;
       notifyListeners();
     } catch (e) {
@@ -666,9 +691,12 @@ class RegistrationProvider extends ChangeNotifier {
       final driverData = {
         'driverFaceWithCnic': faceWithCnincImageUrl,
       };
-      final userRef =
-          _database.ref().child("drivers").child(_auth.currentUser!.uid);
-      await userRef.update(driverData);
+
+      await _firestore
+          .collection("drivers")
+          .doc(_auth.currentUser!.uid)
+          .set(driverData, SetOptions(merge: true));
+
       _isLoading = false;
       notifyListeners();
     } catch (e) {
@@ -690,9 +718,12 @@ class RegistrationProvider extends ChangeNotifier {
         'drivingLicenseBackImage': drivingLicenseBackImageUrl,
         'drivingLicenseNumber': drivingLicenseController.text,
       };
-      final userRef =
-          _database.ref().child("drivers").child(_auth.currentUser!.uid);
-      await userRef.update(driverData);
+
+      await _firestore
+          .collection("drivers")
+          .doc(_auth.currentUser!.uid)
+          .set(driverData, SetOptions(merge: true));
+
       _isLoading = false;
       notifyListeners();
     } catch (e) {
@@ -715,12 +746,11 @@ class RegistrationProvider extends ChangeNotifier {
         'plateCategory': _plateCategory,
         'plateType': _plateType,
       };
-      final userRef = _database
-          .ref()
-          .child("drivers")
-          .child(_auth.currentUser!.uid)
-          .child("vehicleInfo");
-      await userRef.update(vehicleData);
+
+      await _firestore
+          .collection("drivers")
+          .doc(_auth.currentUser!.uid)
+          .set({'vehicleInfo': vehicleData}, SetOptions(merge: true));
       
       await retrieveCurrentDriverInfo();
       _isLoading = false;
@@ -740,12 +770,12 @@ class RegistrationProvider extends ChangeNotifier {
       final vehicleData = {
         'vehiclePicture': vehicleImageUrl,
       };
-      final userRef = _database
-          .ref()
-          .child("drivers")
-          .child(_auth.currentUser!.uid)
-          .child("vehicleInfo");
-      await userRef.update(vehicleData);
+
+      await _firestore
+          .collection("drivers")
+          .doc(_auth.currentUser!.uid)
+          .set({'vehicleInfo': vehicleData}, SetOptions(merge: true));
+
       _isLoading = false;
       notifyListeners();
     } catch (e) {
@@ -768,12 +798,12 @@ class RegistrationProvider extends ChangeNotifier {
         'registrationCertificateFrontImage': vehicleRegistrationFrontImageUrl,
         'registrationCertificateBackImage': vehicleRegistrationBackImageUrl,
       };
-      final userRef = _database
-          .ref()
-          .child("drivers")
-          .child(_auth.currentUser!.uid)
-          .child("vehicleInfo");
-      await userRef.update(vehicleData);
+
+      await _firestore
+          .collection("drivers")
+          .doc(_auth.currentUser!.uid)
+          .set({'vehicleInfo': vehicleData}, SetOptions(merge: true));
+
       _isLoading = false;
       notifyListeners();
     } catch (e) {
