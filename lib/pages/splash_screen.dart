@@ -58,7 +58,7 @@ class _SplashScreenState extends State<SplashScreen> {
       final authProvider = Provider.of<AuthenticationProvider>(context, listen: false);
 
       try {
-        await authProvider.retrieveCurrentDriverInfo();
+        await authProvider.getUserDataFromFirebaseDatabase();
       } catch (e) {
         debugPrint("Error loading driver info: $e");
       }
