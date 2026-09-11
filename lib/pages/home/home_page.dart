@@ -67,50 +67,42 @@ class _HomePageState extends State<HomePage> {
   }
 
   void listenForTripRequests() {
-    tripRequestStream?.cancel();
-    driverOnlineTimestamp ??= DateTime.now();
+  tripRequestStream?.cancel();
 
-    tripRequestStream = FirebaseFirestore.instance
-        .collection('rides')
-        .where('status', whereIn: ['requested', 'pending'])
-        .snapshots()
-        .listen(
-      (snapshot) {
-        for (final change in snapshot.docChanges) {
-          if (change.type == DocumentChangeType.added) {
-            final String tripID = change.doc.id;
-            final data = change.doc.data() as Map<String, dynamic>?;
-            if (data == null) continue;
+  tripRequestStream = FirebaseFirestore.instance
+      .collection('rides')
+      .where('status', isEqualTo: TripStatus.searching) // 👈 شنود فقط روی درخواست‌های فعال
+      .snapshots()
+      .listen(
+    (snapshot) {
+      for (final change in snapshot.docChanges) {
+        if (change.type == DocumentChangeType.added) {
+          final String tripID = change.doc.id;
+          final data = change.doc.data() as Map<String, dynamic>?;
+          if (data == null) continue;
 
-            final dynamic createdAtValue =
-                data['created_at'] ?? data['createdAt'] ?? data['timestamp'];
-
-            if (createdAtValue is Timestamp) {
-              final DateTime tripTime = createdAtValue.toDate();
-              if (driverOnlineTimestamp != null &&
-                  tripTime.isBefore(driverOnlineTimestamp!)) {
-                continue;
-              }
-            } else if (createdAtValue is int) {
-              final DateTime tripTime =
-                  DateTime.fromMillisecondsSinceEpoch(createdAtValue);
-              if (driverOnlineTimestamp != null &&
-                  tripTime.isBefore(driverOnlineTimestamp!)) {
-                continue;
-              }
-            }
-
-            if (mounted && isDriverAvailable) {
-              PushNotificationSystem().retrieveTripRequestInfo(tripID, context);
+          // بررسی درخواست‌های ۳ دقیقه اخیر سرور
+          final dynamic createdAtValue = data['createdAt'];
+          if (createdAtValue is Timestamp) {
+            final DateTime tripTime = createdAtValue.toDate();
+            final DateTime now = DateTime.now();
+            if (now.difference(tripTime).inMinutes > 3) {
+              continue; // درخواست‌های قدیمی‌تر از ۳ دقیقه پردازش نمی‌شوند
             }
           }
+
+          if (mounted && isDriverAvailable) {
+            PushNotificationSystem().retrieveTripRequestInfo(tripID, context);
+          }
         }
-      },
-      onError: (error) {
-        debugPrint("Error listening for trip requests: $error");
-      },
-    );
-  }
+      }
+    },
+    onError: (error) {
+      debugPrint("Error listening for trip requests: $error");
+    },
+  );
+}
+
 
   Future<Position?> getCurrentLiveLocationOfDriver() async {
     try {
