@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:easy_localization/easy_localization.dart'; // 📌 ایمپورت پکیج اصلی ترجمه
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-
+import 'package:safir_drivers/constants/trip_status.dart';
 import '../global/global.dart';
 import '../methods/common_method.dart';
 import '../models/trip_details.dart';
@@ -112,11 +112,12 @@ class _NotificationDialogState extends State<NotificationDialog> {
         String currentStatus = data?["status"]?.toString() ?? "";
 
         if (currentStatus == "requested" || currentStatus == "waiting") {
-          await tripRef.update({
-            "status": "accepted",
-            "driver_id": currentUser.uid,
-            "accepted_at": FieldValue.serverTimestamp(),
-          });
+          // جایگزین کد داخل تابع acceptTrip:
+await FirebaseFirestore.instance.collection('rides').doc(tripId).update({
+  'status': TripStatus.accepted, // 👈 استفاده از enum استاندارد
+  'driver_id': FirebaseAuth.instance.currentUser?.uid,
+  'accepted_at': FieldValue.serverTimestamp(),
+});
 
           await FirebaseFirestore.instance
               .collection("drivers")
