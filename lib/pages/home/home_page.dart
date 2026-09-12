@@ -409,7 +409,7 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _cancelTrip(String tripId) async {
+    Future<void> _cancelTrip(String tripId) async {
     try {
       context.read<NavigationController>().stopNavigation();
       if (mapController != null) {
@@ -417,7 +417,7 @@ class _HomePageState extends State<HomePage> {
       }
 
       await FirebaseFirestore.instance.collection('rides').doc(tripId).update({
-        'status': 'canceled',
+        'status': TripStatus.cancelledByDriver,
         'canceled_by': 'driver',
         'canceled_at': FieldValue.serverTimestamp(),
       });
@@ -430,6 +430,7 @@ class _HomePageState extends State<HomePage> {
       debugPrint("Error canceling trip: $e");
     }
   }
+
 
   @override
   void initState() {
@@ -674,15 +675,15 @@ class _HomePageState extends State<HomePage> {
 
             if (currentUser != null && isDriverAvailable)
               StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection('rides')
-                    .where('driver_id', isEqualTo: currentUser.uid)
-                    .where('status', whereIn: [
-                  'accepted',
-                  'arrived',
-                  'ontrip',
-                  'in_progress'
-                ]).snapshots(),
+  stream: FirebaseFirestore.instance
+      .collection('rides')
+      .where('driver_id', isEqualTo: currentUser.uid)
+      .where('status', whereIn: [
+    TripStatus.accepted,
+    TripStatus.arrived,
+    TripStatus.onTrip,
+  ]).snapshots(),
+
                 builder: (context, snapshot) {
                   if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
                     var activeTripDoc = snapshot.data!.docs.first;
@@ -946,14 +947,15 @@ class _HomePageState extends State<HomePage> {
                                       elevation: 2,
                                     ),
                                     onPressed: () {
-                                      if (status == 'accepted') {
-                                        _updateTripStatus(tripId, 'arrived', tripData);
-                                      } else if (status == 'arrived') {
-                                        _updateTripStatus(tripId, 'ontrip', tripData);
-                                      } else if (status == 'ontrip' || status == 'in_progress') {
-                                        _updateTripStatus(tripId, 'completed', tripData);
-                                      }
-                                    },
+  if (status == TripStatus.accepted) {
+    _updateTripStatus(tripId, TripStatus.arrived, tripData);
+  } else if (status == TripStatus.arrived) {
+    _updateTripStatus(tripId, TripStatus.onTrip, tripData);
+  } else if (status == TripStatus.onTrip) {
+    _updateTripStatus(tripId, TripStatus.completed, tripData);
+  }
+},
+
                                     child: Text(
                                       _getActionButtonTitle(status),
                                       style: const TextStyle(
