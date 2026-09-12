@@ -11,8 +11,8 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'package:safir_drivers/controllers/navigation_controller.dart';
 import 'package:safir_drivers/constants/trip_status.dart';
+import 'package:safir_drivers/controllers/navigation_controller.dart';
 import 'package:safir_drivers/pages/chat_page.dart';
 import 'package:safir_drivers/providers/registration_provider.dart';
 import 'package:safir_drivers/utils/app_colors.dart';
@@ -68,42 +68,40 @@ class _HomePageState extends State<HomePage> {
   }
 
   void listenForTripRequests() {
-  tripRequestStream?.cancel();
+    tripRequestStream?.cancel();
 
-  tripRequestStream = FirebaseFirestore.instance
-      .collection('rides')
-      .where('status', isEqualTo: TripStatus.searching) // 👈 شنود فقط روی درخواست‌های فعال
-      .snapshots()
-      .listen(
-    (snapshot) {
-      for (final change in snapshot.docChanges) {
-        if (change.type == DocumentChangeType.added) {
-          final String tripID = change.doc.id;
-          final data = change.doc.data() as Map<String, dynamic>?;
-          if (data == null) continue;
+    tripRequestStream = FirebaseFirestore.instance
+        .collection('rides')
+        .where('status', isEqualTo: TripStatus.searching)
+        .snapshots()
+        .listen(
+      (snapshot) {
+        for (final change in snapshot.docChanges) {
+          if (change.type == DocumentChangeType.added) {
+            final String tripID = change.doc.id;
+            final data = change.doc.data() as Map<String, dynamic>?;
+            if (data == null) continue;
 
-          // بررسی درخواست‌های ۳ دقیقه اخیر سرور
-          final dynamic createdAtValue = data['createdAt'];
-          if (createdAtValue is Timestamp) {
-            final DateTime tripTime = createdAtValue.toDate();
-            final DateTime now = DateTime.now();
-            if (now.difference(tripTime).inMinutes > 3) {
-              continue; // درخواست‌های قدیمی‌تر از ۳ دقیقه پردازش نمی‌شوند
+            final dynamic createdAtValue = data['createdAt'];
+            if (createdAtValue is Timestamp) {
+              final DateTime tripTime = createdAtValue.toDate();
+              final DateTime now = DateTime.now();
+              if (now.difference(tripTime).inMinutes > 3) {
+                continue;
+              }
+            }
+
+            if (mounted && isDriverAvailable) {
+              PushNotificationSystem().retrieveTripRequestInfo(tripID, context);
             }
           }
-
-          if (mounted && isDriverAvailable) {
-            PushNotificationSystem().retrieveTripRequestInfo(tripID, context);
-          }
         }
-      }
-    },
-    onError: (error) {
-      debugPrint("Error listening for trip requests: $error");
-    },
-  );
-}
-
+      },
+      onError: (error) {
+        debugPrint("Error listening for trip requests: $error");
+      },
+    );
+  }
 
   Future<Position?> getCurrentLiveLocationOfDriver() async {
     try {
@@ -322,7 +320,7 @@ class _HomePageState extends State<HomePage> {
       );
 
       activeTripId = tripId;
-      activeTripStatus = 'accepted';
+      activeTripStatus = TripStatus.accepted;
 
       await startTripNavigation(driverPosition, pickupLatLng);
       if (mounted) setState(() {});
@@ -355,7 +353,7 @@ class _HomePageState extends State<HomePage> {
       );
 
       activeTripId = tripId;
-      activeTripStatus = 'ontrip';
+      activeTripStatus = TripStatus.onTrip;
 
       await startTripNavigation(driverPosition, dropoffLatLng);
       if (mounted) setState(() {});
@@ -378,7 +376,7 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-    Future<void> _updateTripStatus(
+  Future<void> _updateTripStatus(
       String tripId, String newStatus, Map<String, dynamic> tripData) async {
     try {
       await FirebaseFirestore.instance.collection('rides').doc(tripId).update({
@@ -409,7 +407,7 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-    Future<void> _cancelTrip(String tripId) async {
+  Future<void> _cancelTrip(String tripId) async {
     try {
       context.read<NavigationController>().stopNavigation();
       if (mapController != null) {
@@ -430,7 +428,6 @@ class _HomePageState extends State<HomePage> {
       debugPrint("Error canceling trip: $e");
     }
   }
-
 
   @override
   void initState() {
@@ -675,32 +672,31 @@ class _HomePageState extends State<HomePage> {
 
             if (currentUser != null && isDriverAvailable)
               StreamBuilder<QuerySnapshot>(
-  stream: FirebaseFirestore.instance
-      .collection('rides')
-      .where('driver_id', isEqualTo: currentUser.uid)
-      .where('status', whereIn: [
-    TripStatus.accepted,
-    TripStatus.arrived,
-    TripStatus.onTrip,
-  ]).snapshots(),
-
+                stream: FirebaseFirestore.instance
+                    .collection('rides')
+                    .where('driver_id', isEqualTo: currentUser.uid)
+                    .where('status', whereIn: [
+                  TripStatus.accepted,
+                  TripStatus.arrived,
+                  TripStatus.onTrip,
+                ]).snapshots(),
                 builder: (context, snapshot) {
                   if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
                     var activeTripDoc = snapshot.data!.docs.first;
                     var tripData = activeTripDoc.data() as Map<String, dynamic>;
                     String tripId = activeTripDoc.id;
-                    String status = tripData['status'] ?? 'accepted';
+                    String status = tripData['status'] ?? TripStatus.accepted;
 
                     // 🔹 فراخوانی خودکار ترسیم خط مسیر بر اساس وضعیت سفر
                     if (activeTripId != tripId || activeTripStatus != status) {
                       activeTripId = tripId;
                       activeTripStatus = status;
 
-                      if (status == 'accepted') {
+                      if (status == TripStatus.accepted) {
                         WidgetsBinding.instance.addPostFrameCallback((_) {
                           _startPickupRoute(tripId, tripData);
                         });
-                      } else if (status == 'ontrip' || status == 'in_progress') {
+                      } else if (status == TripStatus.onTrip) {
                         WidgetsBinding.instance.addPostFrameCallback((_) {
                           _startDestinationRoute(tripId, tripData);
                         });
@@ -947,15 +943,14 @@ class _HomePageState extends State<HomePage> {
                                       elevation: 2,
                                     ),
                                     onPressed: () {
-  if (status == TripStatus.accepted) {
-    _updateTripStatus(tripId, TripStatus.arrived, tripData);
-  } else if (status == TripStatus.arrived) {
-    _updateTripStatus(tripId, TripStatus.onTrip, tripData);
-  } else if (status == TripStatus.onTrip) {
-    _updateTripStatus(tripId, TripStatus.completed, tripData);
-  }
-},
-
+                                      if (status == TripStatus.accepted) {
+                                        _updateTripStatus(tripId, TripStatus.arrived, tripData);
+                                      } else if (status == TripStatus.arrived) {
+                                        _updateTripStatus(tripId, TripStatus.onTrip, tripData);
+                                      } else if (status == TripStatus.onTrip) {
+                                        _updateTripStatus(tripId, TripStatus.completed, tripData);
+                                      }
+                                    },
                                     child: Text(
                                       _getActionButtonTitle(status),
                                       style: const TextStyle(
@@ -1007,7 +1002,7 @@ class _HomePageState extends State<HomePage> {
                                         ),
                                       ),
                                     ),
-                                    if (status != 'ontrip' && status != 'in_progress') ...[
+                                    if (status != TripStatus.onTrip) ...[
                                       const SizedBox(width: 10),
                                       Expanded(
                                         child: SizedBox(
@@ -1051,7 +1046,7 @@ class _HomePageState extends State<HomePage> {
                                     ),
                                     onPressed: () async {
                                       LatLng? targetPos;
-                                      if (status == 'accepted' || status == 'arrived') {
+                                      if (status == TripStatus.accepted || status == TripStatus.arrived) {
                                         targetPos = _extractLatLng(
                                           tripData, 
                                           ['originLatLng', 'pickup_location', 'pickupLatLng', 'origin'],
@@ -1080,7 +1075,7 @@ class _HomePageState extends State<HomePage> {
                                     icon: const Icon(Icons.near_me_rounded,
                                         color: Colors.white, size: 20),
                                     label: Text(
-                                      (status == 'accepted' || status == 'arrived')
+                                      (status == TripStatus.accepted || status == TripStatus.arrived)
                                           ? 'btn_external_navigation_origin'.tr()
                                           : 'btn_external_navigation_destination'.tr(),
                                       style: const TextStyle(
@@ -1108,17 +1103,14 @@ class _HomePageState extends State<HomePage> {
   }
 
   String _getActionButtonTitle(String status) {
-    switch (status) {
-      case 'accepted':
-        return 'btn_arrived_pickup'.tr();
-      case 'arrived':
-        return 'btn_start_trip'.tr();
-      case 'ontrip':
-      case 'in_progress':
-        return 'btn_end_trip'.tr();
-      default:
-        return 'btn_arrived_pickup'.tr();
+    if (status == TripStatus.accepted) {
+      return 'btn_arrived_pickup'.tr();
+    } else if (status == TripStatus.arrived) {
+      return 'btn_start_trip'.tr();
+    } else if (status == TripStatus.onTrip) {
+      return 'btn_end_trip'.tr();
     }
+    return 'btn_arrived_pickup'.tr();
   }
 
   Widget _buildInfoCard(String label, String value, IconData icon, Color color) {
