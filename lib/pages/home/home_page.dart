@@ -12,6 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:safir_drivers/controllers/navigation_controller.dart';
+import 'package:safir_drivers/constants/trip_status.dart';
 import 'package:safir_drivers/pages/chat_page.dart';
 import 'package:safir_drivers/providers/registration_provider.dart';
 import 'package:safir_drivers/utils/app_colors.dart';
@@ -377,7 +378,7 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _updateTripStatus(
+    Future<void> _updateTripStatus(
       String tripId, String newStatus, Map<String, dynamic> tripData) async {
     try {
       await FirebaseFirestore.instance.collection('rides').doc(tripId).update({
@@ -385,15 +386,15 @@ class _HomePageState extends State<HomePage> {
         'updated_at': FieldValue.serverTimestamp(),
       });
 
-      if (newStatus == 'accepted') {
+      if (newStatus == TripStatus.accepted) {
         await _startPickupRoute(tripId, tripData);
-      } else if (newStatus == 'arrived') {
+      } else if (newStatus == TripStatus.arrived) {
         setState(() {
-          activeTripStatus = 'arrived';
+          activeTripStatus = TripStatus.arrived;
         });
-      } else if (newStatus == 'ontrip' || newStatus == 'in_progress') {
+      } else if (newStatus == TripStatus.onTrip) {
         await _startDestinationRoute(tripId, tripData);
-      } else if (newStatus == 'completed') {
+      } else if (newStatus == TripStatus.completed) {
         context.read<NavigationController>().stopNavigation();
         if (mapController != null) {
           await mapController!.clearLines();
