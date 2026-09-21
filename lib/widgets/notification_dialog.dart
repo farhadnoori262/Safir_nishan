@@ -136,7 +136,7 @@ class _NotificationDialogState extends State<NotificationDialog> {
               context,
               MaterialPageRoute(
                 builder: (c) => NewTripPage(
-                  tripDetailsInfo: widget.tripDetailsInfo,
+                  newTripDetailsInfo: widget.tripDetailsInfo,
                 ),
               ),
             );
