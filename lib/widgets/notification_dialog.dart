@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:easy_localization/easy_localization.dart'; // 📌 ایمپورت پکیج اصلی ترجمه
+import 'package:easy_localization/easy_localization.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:safir_drivers/constants/trip_status.dart';
@@ -102,7 +102,7 @@ class _NotificationDialogState extends State<NotificationDialog> {
       DocumentSnapshot tripSnapshot = await tripRef.get();
 
       if (mounted) {
-        Navigator.pop(context);
+        Navigator.pop(context); // بستن دایالوگ لودینگ
       }
 
       if (tripSnapshot.exists) {
@@ -112,12 +112,12 @@ class _NotificationDialogState extends State<NotificationDialog> {
         String currentStatus = data?["status"]?.toString() ?? "";
 
         if (currentStatus == "requested" || currentStatus == "waiting") {
-          // جایگزین کد داخل تابع acceptTrip:
-await FirebaseFirestore.instance.collection('rides').doc(tripId).update({
-  'status': TripStatus.accepted, // 👈 استفاده از enum استاندارد
-  'driver_id': FirebaseAuth.instance.currentUser?.uid,
-  'accepted_at': FieldValue.serverTimestamp(),
-});
+          // ✅ ۱. اصلاح متغیر tripID (رفع خطای اصلی کامپایل)
+          await tripRef.update({
+            'status': TripStatus.accepted,
+            'driver_id': currentUser.uid,
+            'accepted_at': FieldValue.serverTimestamp(),
+          });
 
           await FirebaseFirestore.instance
               .collection("drivers")
@@ -129,7 +129,17 @@ await FirebaseFirestore.instance.collection('rides').doc(tripId).update({
           cMethods.turnOffLocationUpdatesForHomePage();
 
           if (mounted) {
-           Navigator.pop(context);
+            Navigator.pop(context); // بستن دایالوگ اعلان سفیر
+            
+            // ✅ ۲. هدایت راننده به صفحه سفر جدید (NewTripPage)
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (c) => NewTripPage(
+                  tripDetailsInfo: widget.tripDetailsInfo,
+                ),
+              ),
+            );
           }
         } else if (currentStatus == "accepted") {
           if (mounted) {
