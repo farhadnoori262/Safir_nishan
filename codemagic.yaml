@@ -6,7 +6,7 @@ workflows:
 
     environment:
       groups:
-        - safir_key # اتصال متغیرهای کلید آپلود شده در Codemagic
+        - nishan_k # اتصال متغیرهای کلید آپلود شده در Codemagic
       flutter: 3.29.3
       java: 21
 
