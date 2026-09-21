@@ -68,40 +68,40 @@ class _HomePageState extends State<HomePage> {
   }
 
   void listenForTripRequests() {
-    tripRequestStream?.cancel();
+  tripRequestStream?.cancel();
 
-    tripRequestStream = FirebaseFirestore.instance
-        .collection('rides')
-        .where('status', isEqualTo: TripStatus.searching)
-        .snapshots()
-        .listen(
-      (snapshot) {
-        for (final change in snapshot.docChanges) {
-          if (change.type == DocumentChangeType.added) {
-            final String tripID = change.doc.id;
-            final data = change.doc.data() as Map<String, dynamic>?;
-            if (data == null) continue;
+  debugPrint("🔄 شروع لیسن کردن درخواست‌های جدید مسافران...");
 
-            final dynamic createdAtValue = data['createdAt'];
-            if (createdAtValue is Timestamp) {
-              final DateTime tripTime = createdAtValue.toDate();
-              final DateTime now = DateTime.now();
-              if (now.difference(tripTime).inMinutes > 3) {
-                continue;
-              }
-            }
+  tripRequestStream = FirebaseFirestore.instance
+      .collection('rides')
+      .where('status', isEqualTo: TripStatus.searching) // مطمئن شوید با مسافر یکی است
+      .snapshots()
+      .listen(
+    (snapshot) {
+      debugPrint("📥 دریافت تغییرات در کلکشن rides: ${snapshot.docChanges.length} مورد");
+      
+      for (final change in snapshot.docChanges) {
+        if (change.type == DocumentChangeType.added) {
+          final String tripID = change.doc.id;
+          final data = change.doc.data() as Map<String, dynamic>?;
+          if (data == null) continue;
 
-            if (mounted && isDriverAvailable) {
-              PushNotificationSystem().retrieveTripRequestInfo(tripID, context);
-            }
+          debugPrint("✨ درخواست جدید یافت شد با آیدی: $tripID - وضعیت راننده: $isDriverAvailable");
+
+          if (mounted && isDriverAvailable) {
+            PushNotificationSystem().retrieveTripRequestInfo(tripID, context);
+          } else {
+            debugPrint("⚠️ راننده آنلاین نیست یا صفحه mounted ندارد.");
           }
         }
-      },
-      onError: (error) {
-        debugPrint("Error listening for trip requests: $error");
-      },
-    );
-  }
+      }
+    },
+    onError: (error) {
+      debugPrint("❌ خطا در لیسنر درخواست‌های سفر: $error");
+    },
+  );
+}
+
 
   Future<Position?> getCurrentLiveLocationOfDriver() async {
     try {
