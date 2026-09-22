@@ -9,7 +9,7 @@ import 'package:safir_drivers/utils/app_colors.dart';
 class ChatPage extends StatefulWidget {
   final String tripId;
   final String passengerName;
-  final String passengerPhone; // 📞 اضافه شدن شماره مسافر
+  final String passengerPhone;
 
   const ChatPage({
     super.key,
@@ -24,7 +24,6 @@ class ChatPage extends StatefulWidget {
 
 class _ChatPageState extends State<ChatPage> {
   final TextEditingController _messageController = TextEditingController();
-  final String currentDriverId = FirebaseAuth.instance.currentUser?.uid ?? "";
 
   @override
   void dispose() {
@@ -35,7 +34,7 @@ class _ChatPageState extends State<ChatPage> {
   // 📞 متد تماس مستقیم تلفنی
   Future<void> _makePhoneCall(String phoneNumber) async {
     if (phoneNumber.isEmpty) return;
-    
+
     final Uri launchUri = Uri(
       scheme: 'tel',
       path: phoneNumber,
@@ -47,19 +46,21 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
+  // 🟢 ارسال پیام توسط راننده
   void sendMessage() async {
     String text = _messageController.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty || widget.tripId.isEmpty) return;
 
     _messageController.clear();
+    String currentUserId = FirebaseAuth.instance.currentUser?.uid ?? "";
 
     await FirebaseFirestore.instance
         .collection("rides")
         .doc(widget.tripId)
         .collection("chats")
         .add({
-      "senderId": currentDriverId,
-      "senderType": "driver",
+      "senderId": currentUserId,
+      "senderType": "driver", // شناسایی دقیق ارسال کننده به عنوان راننده
       "message": text,
       "timestamp": FieldValue.serverTimestamp(),
     });
@@ -85,7 +86,9 @@ class _ChatPageState extends State<ChatPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    widget.passengerName,
+                    widget.passengerName.isNotEmpty
+                        ? widget.passengerName
+                        : 'passenger'.tr(),
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -108,7 +111,6 @@ class _ChatPageState extends State<ChatPage> {
           ],
         ),
         actions: [
-          // 📞 دکمه تماس مستقیم در هدر صفحه چت
           IconButton(
             icon: const Icon(Icons.phone_enabled_rounded, color: Colors.white),
             onPressed: () => _makePhoneCall(widget.passengerPhone),
@@ -118,91 +120,106 @@ class _ChatPageState extends State<ChatPage> {
       ),
       body: Column(
         children: [
-          // 📩 لیست پیام‌ها (بروزرسانی زنده)
+          // 📩 لیست پیام‌ها (دریافت زنده و لحظه‌ای)
           Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection("rides")
-                  .doc(widget.tripId)
-                  .collection("chats")
-                  .orderBy("timestamp", descending: true)
-                  .snapshots(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(
-                    child: CircularProgressIndicator(
-                      color: AppColors.primaryBrand,
-                    ),
-                  );
-                }
-
-                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return Center(
+            child: widget.tripId.isEmpty
+                ? Center(
                     child: Text(
                       'no_chat_messages'.tr(),
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 14,
-                      ),
+                      style: const TextStyle(color: AppColors.textSecondary),
                     ),
-                  );
-                }
+                  )
+                : StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection("rides")
+                        .doc(widget.tripId)
+                        .collection("chats")
+                        .orderBy("timestamp", descending: true)
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState ==
+                          ConnectionState.waiting) {
+                        return const Center(
+                          child: CircularProgressIndicator(
+                            color: AppColors.primaryBrand,
+                          ),
+                        );
+                      }
 
-                var docs = snapshot.data!.docs;
+                      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                        return Center(
+                          child: Text(
+                            'no_chat_messages'.tr(),
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 14,
+                            ),
+                          ),
+                        );
+                      }
 
-                return ListView.builder(
-                  reverse: true,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  itemCount: docs.length,
-                  itemBuilder: (context, index) {
-                    var data = docs[index].data() as Map<String, dynamic>;
-                    bool isMe = data["senderId"] == currentDriverId;
+                      var docs = snapshot.data!.docs;
+                      String currentUserId =
+                          FirebaseAuth.instance.currentUser?.uid ?? "";
 
-                    return Align(
-                      alignment:
-                          isMe ? Alignment.centerRight : Alignment.centerLeft,
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(vertical: 4),
+                      return ListView.builder(
+                        reverse: true,
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 10,
+                          horizontal: 16,
+                          vertical: 12,
                         ),
-                        decoration: BoxDecoration(
-                          color: isMe
-                              ? AppColors.primaryBrand
-                              : AppColors.cardBackground,
-                          borderRadius: BorderRadius.only(
-                            topLeft: const Radius.circular(16),
-                            topRight: const Radius.circular(16),
-                            bottomLeft: Radius.circular(isMe ? 16 : 4),
-                            bottomRight: Radius.circular(isMe ? 4 : 16),
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.04),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
-                            )
-                          ],
-                        ),
-                        child: Text(
-                          data["message"] ?? "",
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: isMe
-                                ? AppColors.buttonText
-                                : AppColors.textPrimary,
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
+                        itemCount: docs.length,
+                        itemBuilder: (context, index) {
+                          var data =
+                              docs[index].data() as Map<String, dynamic>;
+
+                          // 🟢 شرط اصلاح‌شده برای تشخیص درست پیام راننده
+                          bool isMe = data["senderType"] == "driver" ||
+                              data["senderId"] == currentUserId;
+
+                          return Align(
+                            alignment: isMe
+                                ? Alignment.centerRight
+                                : Alignment.centerLeft,
+                            child: Container(
+                              margin: const EdgeInsets.symmetric(vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 10,
+                              ),
+                              decoration: BoxDecoration(
+                                color: isMe
+                                    ? AppColors.primaryBrand
+                                    : AppColors.cardBackground,
+                                borderRadius: BorderRadius.only(
+                                  topLeft: const Radius.circular(16),
+                                  topRight: const Radius.circular(16),
+                                  bottomLeft: Radius.circular(isMe ? 16 : 4),
+                                  bottomRight: Radius.circular(isMe ? 4 : 16),
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.04),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  )
+                                ],
+                              ),
+                              child: Text(
+                                data["message"] ?? "",
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: isMe
+                                      ? Colors.white
+                                      : AppColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
           ),
 
           // ✏️ باکس ارسال پیام
