@@ -909,18 +909,40 @@ class _HomePageState extends State<HomePage> {
 
                     // 🔹 فراخوانی خودکار ترسیم خط مسیر بر اساس وضعیت سفر
                     if (activeTripId != tripId || activeTripStatus != status) {
-                      activeTripId = tripId;
-                      activeTripStatus = status;
+  final String? previousTripId = activeTripId;
+  final String? previousStatus = activeTripStatus;
 
-                      if (status == TripStatus.accepted) {
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          _startPickupRoute(tripId, tripData);
-                        });
-                      } else if (status == TripStatus.onTrip) {
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          _startDestinationRoute(tripId, tripData);
-                        });
-                      }
+  activeTripId = tripId;
+  activeTripStatus = status;
+
+  WidgetsBinding.instance.addPostFrameCallback((_) async {
+    if (!mounted) return;
+
+    // اگر سفر قبلی وجود داشت و سفر جدید شد، مسیر قبلی پاک شود.
+    if (previousTripId != null && previousTripId != tripId) {
+      context.read<NavigationController>().stopNavigation();
+
+      if (mapController != null) {
+        await mapController!.clearLines();
+      }
+    }
+
+    // پس از قبول: مسیر راننده تا مبدأ.
+    if (status == TripStatus.accepted) {
+      await _startPickupRoute(tripId, tripData);
+      return;
+    }
+
+    // پس از رسیدن: مسیر قبلی باقی می‌ماند، اما ناوبری مجدد شروع نمی‌شود.
+    if (status == TripStatus.arrived) {
+      return;
+    }
+
+    // پس از شروع سفر: مسیر راننده تا مقصد.
+    if (status == TripStatus.onTrip) {
+      await _startDestinationRoute(tripId, tripData);
+    }
+  });
                     }
 
                     String passengerName = tripData['userName'] ??
