@@ -139,9 +139,12 @@ class PushNotificationSystem {
       // ۱. بررسی وضعیت (بدون حساسیت به فاصله و بزرگ/کوچک بودن)
       final String tripStatus = data["status"]?.toString().trim().toLowerCase() ?? "";
 
-      if (tripStatus != "requested" && tripStatus != "pending" && tripStatus != "waiting") {
-        log("Trip $tripID ignored. Current status: $tripStatus");
-        return;
+      if (tripStatus != 'searching') {
+  log(
+    'Trip $tripID ignored. '
+    'Current status: $tripStatus',
+  );
+  return;
       }
 
       // ۲. بررسی زمان ساخت (پشتیبانی از هم created_at و هم createdAt)
