@@ -396,56 +396,257 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _updateTripStatus(
-      String tripId, String newStatus, Map<String, dynamic> tripData) async {
-    try {
-      await FirebaseFirestore.instance.collection('rides').doc(tripId).update({
-        'status': newStatus,
-        'updated_at': FieldValue.serverTimestamp(),
-      });
+  String tripId,
+  String newStatus,
+  Map<String, dynamic> tripData,
+) async {
+  final User? driver = FirebaseAuth.instance.currentUser;
 
-      if (newStatus == TripStatus.accepted) {
-        await _startPickupRoute(tripId, tripData);
-      } else if (newStatus == TripStatus.arrived) {
+  if (driver == null || tripId.isEmpty) {
+    return;
+  }
+
+  try {
+    final DocumentReference<Map<String, dynamic>> tripRef =
+        FirebaseFirestore.instance.collection('rides').doc(tripId);
+
+    final bool updated =
+        await FirebaseFirestore.instance.runTransaction(
+      (transaction) async {
+        final snapshot = await transaction.get(tripRef);
+
+        if (!snapshot.exists) {
+          return false;
+        }
+
+        final Map<String, dynamic> data = snapshot.data() ?? {};
+
+        final String currentStatus =
+            data['status']?.toString() ?? '';
+
+        final String assignedDriverId =
+            data['driver_id']?.toString() ??
+            data['driverId']?.toString() ??
+            '';
+
+        // فقط همان راننده‌ای که سفر را قبول کرده اجازهٔ تغییر دارد.
+        if (assignedDriverId.isNotEmpty &&
+            assignedDriverId != driver.uid) {
+          return false;
+        }
+
+        // ترتیب وضعیت‌ها باید دقیقاً رعایت شود.
+        final bool canArrive =
+            currentStatus == TripStatus.accepted &&
+            newStatus == TripStatus.arrived;
+
+        final bool canStartTrip =
+            currentStatus == TripStatus.arrived &&
+            newStatus == TripStatus.onTrip;
+
+        final bool canCompleteTrip =
+            currentStatus == TripStatus.onTrip &&
+            newStatus == TripStatus.completed;
+
+        if (!canArrive && !canStartTrip && !canCompleteTrip) {
+          return false;
+        }
+
+        final Map<String, dynamic> updateData = {
+          'status': newStatus,
+          'updated_at': FieldValue.serverTimestamp(),
+        };
+
+        if (newStatus == TripStatus.arrived) {
+          updateData['arrived_at'] = FieldValue.serverTimestamp();
+        }
+
+        if (newStatus == TripStatus.onTrip) {
+          updateData['started_at'] = FieldValue.serverTimestamp();
+        }
+
+        if (newStatus == TripStatus.completed) {
+          updateData['completed_at'] = FieldValue.serverTimestamp();
+        }
+
+        transaction.update(tripRef, updateData);
+
+        return true;
+      },
+    );
+
+    if (!updated) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'عملیات انجام نشد؛ وضعیت سفر قبلاً تغییر کرده یا سفر لغو شده است.',
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
+    if (newStatus == TripStatus.accepted) {
+      await _startPickupRoute(tripId, tripData);
+    } else if (newStatus == TripStatus.arrived) {
+      if (mounted) {
         setState(() {
           activeTripStatus = TripStatus.arrived;
         });
-      } else if (newStatus == TripStatus.onTrip) {
-        await _startDestinationRoute(tripId, tripData);
-      } else if (newStatus == TripStatus.completed) {
-        context.read<NavigationController>().stopNavigation();
-        if (mapController != null) {
-          await mapController!.clearLines();
-        }
+      }
+    } else if (newStatus == TripStatus.onTrip) {
+      await _startDestinationRoute(tripId, tripData);
+    } else if (newStatus == TripStatus.completed) {
+      context.read<NavigationController>().stopNavigation();
+
+      if (mapController != null) {
+        await mapController!.clearLines();
+      }
+
+      final user = FirebaseAuth.instance.currentUser;
+
+      if (user != null) {
+        await FirebaseFirestore.instance
+            .collection('drivers')
+            .doc(user.uid)
+            .set({
+          'newTripStatus': 'waiting',
+          'isOnline': true,
+          'updated_at': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
+
+      if (mounted) {
         setState(() {
           activeTripId = null;
           activeTripStatus = null;
         });
       }
-    } catch (e) {
-      debugPrint("Error updating trip status: $e");
     }
+  } catch (e, stackTrace) {
+    debugPrint('Error updating trip status: $e');
+    debugPrintStack(stackTrace: stackTrace);
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'تغییر وضعیت سفر انجام نشد. دوباره تلاش کنید.',
+        ),
+      ),
+    );
+  }
   }
 
   Future<void> _cancelTrip(String tripId) async {
-    try {
-      context.read<NavigationController>().stopNavigation();
-      if (mapController != null) {
-        await mapController!.clearLines();
+  final User? driver = FirebaseAuth.instance.currentUser;
+
+  if (driver == null || tripId.isEmpty) {
+    return;
+  }
+
+  try {
+    final DocumentReference<Map<String, dynamic>> tripRef =
+        FirebaseFirestore.instance.collection('rides').doc(tripId);
+
+    final bool cancelled =
+        await FirebaseFirestore.instance.runTransaction(
+      (transaction) async {
+        final snapshot = await transaction.get(tripRef);
+
+        if (!snapshot.exists) {
+          return false;
+        }
+
+        final Map<String, dynamic> data = snapshot.data() ?? {};
+        final String currentStatus =
+            data['status']?.toString() ?? '';
+
+        final String assignedDriverId =
+            data['driver_id']?.toString() ??
+            data['driverId']?.toString() ??
+            '';
+
+        if (assignedDriverId.isNotEmpty &&
+            assignedDriverId != driver.uid) {
+          return false;
+        }
+
+        if (currentStatus != TripStatus.accepted &&
+            currentStatus != TripStatus.arrived &&
+            currentStatus != TripStatus.onTrip) {
+          return false;
+        }
+
+        transaction.update(tripRef, {
+          'status': TripStatus.cancelledByDriver,
+          'cancelled_by': 'driver',
+          'cancelled_by_driver_id': driver.uid,
+          'cancelled_at': FieldValue.serverTimestamp(),
+          'updated_at': FieldValue.serverTimestamp(),
+        });
+
+        return true;
+      },
+    );
+
+    if (!cancelled) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'لغو انجام نشد؛ وضعیت سفر قبلاً تغییر کرده است.',
+            ),
+          ),
+        );
       }
-
-      await FirebaseFirestore.instance.collection('rides').doc(tripId).update({
-        'status': TripStatus.cancelledByDriver,
-        'canceled_by': 'driver',
-        'canceled_at': FieldValue.serverTimestamp(),
-      });
-
-      setState(() {
-        activeTripId = null;
-        activeTripStatus = null;
-      });
-    } catch (e) {
-      debugPrint("Error canceling trip: $e");
+      return;
     }
+
+    // فقط پس از ثبت قطعی لغو در Firestore، مسیر را پاک کن.
+    context.read<NavigationController>().stopNavigation();
+
+    if (mapController != null) {
+      await mapController!.clearLines();
+    }
+
+    // راننده دوباره آمادهٔ دریافت درخواست تازه باشد.
+    await FirebaseFirestore.instance
+        .collection('drivers')
+        .doc(driver.uid)
+        .set({
+      'newTripStatus': 'waiting',
+      'isOnline': true,
+      'updated_at': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    if (!mounted) return;
+
+    setState(() {
+      activeTripId = null;
+      activeTripStatus = null;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('سفر لغو شد.'),
+      ),
+    );
+  } catch (e, stackTrace) {
+    debugPrint('Error canceling trip: $e');
+    debugPrintStack(stackTrace: stackTrace);
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('لغو سفر انجام نشد. دوباره تلاش کنید.'),
+      ),
+    );
+  }
   }
 
   @override
