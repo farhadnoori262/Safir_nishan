@@ -70,8 +70,10 @@ class _HomePageState extends State<HomePage> {
   void listenForTripRequests() {
   tripRequestStream?.cancel();
 
-  debugPrint('🔄 Listening for available ride requests...');
-  debugPrint('🟢 Driver online: $isDriverAvailable');
+  debugPrint('════════════════════════════════════');
+  debugPrint('🔄 Firestore ride listener started');
+  debugPrint('🟢 Driver available: $isDriverAvailable');
+  debugPrint('════════════════════════════════════');
 
   tripRequestStream = FirebaseFirestore.instance
       .collection('rides')
@@ -80,12 +82,14 @@ class _HomePageState extends State<HomePage> {
       .listen(
     (QuerySnapshot<Map<String, dynamic>> snapshot) {
       debugPrint(
-        '📥 Available searching rides: ${snapshot.docs.length}',
+        '📥 Active searching rides: ${snapshot.docs.length}',
       );
 
       for (final DocumentChange<Map<String, dynamic>> change
           in snapshot.docChanges) {
-        if (change.type != DocumentChangeType.added) continue;
+        if (change.type != DocumentChangeType.added) {
+          continue;
+        }
 
         final Map<String, dynamic>? tripData = change.doc.data();
         if (tripData == null) continue;
@@ -93,18 +97,17 @@ class _HomePageState extends State<HomePage> {
         final String tripId = change.doc.id;
 
         debugPrint(
-          '🚕 New ride found: $tripId | '
+          '🚕 New ride received: $tripId | '
           'status=${tripData['status']}',
         );
 
         if (!mounted || !isDriverAvailable) {
           debugPrint(
-            '⚠️ Driver is offline or HomePage has been disposed.',
+            '⚠️ Ride ignored: Driver is offline or page is closed.',
           );
           continue;
         }
 
-        // Firestore مستقیم: وقتی اپ راننده باز است.
         PushNotificationSystem().retrieveTripRequestInfo(
           tripId,
           context,
@@ -112,7 +115,7 @@ class _HomePageState extends State<HomePage> {
       }
     },
     onError: (Object error, StackTrace stackTrace) {
-      debugPrint('❌ Ride listener error: $error');
+      debugPrint('❌ Firestore rides listener error: $error');
       debugPrintStack(stackTrace: stackTrace);
     },
   );
