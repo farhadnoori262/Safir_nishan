@@ -1135,13 +1135,31 @@ final String price = rawPrice != null
 
                                 Row(
                                   children: [
-                                    Expanded(child: _buildInfoCard('estimated_time_label'.tr(), '$duration min', Icons.access_time_rounded, Colors.orange)),
+                                    Expanded(
+  child: _buildInfoCard(
+    'estimated_time_label'.tr(),
+    duration == '---' ? '---' : '$duration min',
+    Icons.access_time_rounded,
+    Colors.orange,
+  ),
+),
+                                    Expanded(
+  child: _buildInfoCard(
+    'estimated_distance_label'.tr(),
+    distance == '---' ? '---' : '$distance km',
+    Icons.alt_route_rounded,
+    Colors.blue,
+  ),
+),
                                     const SizedBox(width: 8),
-                                    Expanded(child: _buildInfoCard('estimated_distance_label'.tr(), '$distance km', Icons.alt_route_rounded, Colors.blue)),
-                                    const SizedBox(width: 8),
-                                    Expanded(child: _buildInfoCard('estimated_fare_label'.tr(), '$price AFN', Icons.account_balance_wallet_rounded, Colors.green)),
-                                  ],
-                                ),
+                                    Expanded(
+  child: _buildInfoCard(
+    'estimated_fare_label'.tr(),
+    price == '---' ? '---' : '$price AFN',
+    Icons.account_balance_wallet_rounded,
+    Colors.green,
+  ),
+),
 
                                 const SizedBox(height: 12),
 
