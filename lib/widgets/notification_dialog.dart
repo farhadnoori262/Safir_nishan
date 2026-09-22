@@ -7,7 +7,6 @@ import 'package:safir_drivers/constants/trip_status.dart';
 import '../global/global.dart';
 import '../methods/common_method.dart';
 import '../models/trip_details.dart';
-import '../pages/NewTrip/new_trip_page.dart';
 import 'loading_dialog.dart';
 
 class NotificationDialog extends StatefulWidget {
@@ -129,17 +128,7 @@ class _NotificationDialogState extends State<NotificationDialog> {
           cMethods.turnOffLocationUpdatesForHomePage();
 
           if (mounted) {
-            Navigator.pop(context); // بستن دایالوگ اعلان سفیر
-            
-            // ✅ ۲. هدایت راننده به صفحه سفر جدید (NewTripPage)
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (c) => NewTripPage(
-                  newTripDetailsInfo: widget.tripDetailsInfo,
-                ),
-              ),
-            );
+  Navigator.pop(context);
           }
         } else if (currentStatus == "accepted") {
           if (mounted) {
