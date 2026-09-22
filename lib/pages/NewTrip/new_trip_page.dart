@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:safir_drivers/constants/trip_status.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -111,6 +112,82 @@ class _NewTripPageState extends State<NewTripPage> {
     displayLoadingDialog(finalFareAmount);
     await saveFareAmountToDriverTotalEearning(finalFareAmount);
   }
+  Future<void> _cancelAcceptedTrip() async {
+  final String tripId = widget.newTripDetailsInfo?.tripID ?? '';
+  final User? driver = FirebaseAuth.instance.currentUser;
+
+  if (tripId.isEmpty || driver == null) {
+    debugPrint('❌ Cancel failed: tripId or driver is empty.');
+    return;
+  }
+
+  try {
+    final DocumentReference<Map<String, dynamic>> tripRef =
+        FirebaseFirestore.instance.collection('rides').doc(tripId);
+
+    final DocumentSnapshot<Map<String, dynamic>> snapshot =
+        await tripRef.get();
+
+    if (!snapshot.exists) {
+      debugPrint('❌ Cancel failed: ride does not exist.');
+      return;
+    }
+
+    final Map<String, dynamic> tripData = snapshot.data() ?? {};
+    final String currentStatus =
+        tripData['status']?.toString() ?? '';
+
+    if (currentStatus != TripStatus.accepted &&
+        currentStatus != TripStatus.arrived &&
+        currentStatus != TripStatus.onTrip) {
+      debugPrint(
+        '⚠️ Cancel ignored. Current status: $currentStatus',
+      );
+      return;
+    }
+
+    await tripRef.update({
+      'status': TripStatus.cancelledByDriver,
+      'cancelled_by': 'driver',
+      'cancelled_by_driver_id': driver.uid,
+      'cancelled_at': FieldValue.serverTimestamp(),
+      'updated_at': FieldValue.serverTimestamp(),
+    });
+
+    await positionStreamNewTripPage?.cancel();
+    positionStreamNewTripPage = null;
+
+    await FirebaseFirestore.instance
+        .collection('drivers')
+        .doc(driver.uid)
+        .set({
+      'newTripStatus': 'waiting',
+      'isOnline': true,
+      'updated_at': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    debugPrint('✅ Trip cancelled: $tripId');
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('سفر لغو شد.')),
+    );
+
+    Navigator.of(context).pop();
+  } catch (e, stackTrace) {
+    debugPrint('❌ Trip cancellation error: $e');
+    debugPrintStack(stackTrace: stackTrace);
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('لغو سفر انجام نشد. دوباره تلاش کنید.'),
+      ),
+    );
+  }
+}
 
   displayLoadingDialog(faremmount) {
     showDialog(
