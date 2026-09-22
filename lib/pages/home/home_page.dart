@@ -48,14 +48,21 @@ class _HomePageState extends State<HomePage> {
   }
 
   // 🔹 متد استخراج ایمن LatLng از فایربیس با هر ساختار داده‌ای
-  LatLng? _extractLatLng(Map<String, dynamic> data, List<String> keys, {String? latKey, String? lngKey}) {
+  LatLng? _extractLatLng(
+    Map<String, dynamic> data,
+    List<String> keys, {
+    String? latKey,
+    String? lngKey,
+  }) {
     for (String key in keys) {
       final value = data[key];
       if (value is GeoPoint) {
         return LatLng(value.latitude, value.longitude);
       } else if (value is Map) {
-        final lat = double.tryParse(value['latitude']?.toString() ?? value['lat']?.toString() ?? '');
-        final lng = double.tryParse(value['longitude']?.toString() ?? value['lng']?.toString() ?? '');
+        final lat = double.tryParse(
+            value['latitude']?.toString() ?? value['lat']?.toString() ?? '');
+        final lng = double.tryParse(
+            value['longitude']?.toString() ?? value['lng']?.toString() ?? '');
         if (lat != null && lng != null) return LatLng(lat, lng);
       }
     }
@@ -68,59 +75,58 @@ class _HomePageState extends State<HomePage> {
   }
 
   void listenForTripRequests() {
-  tripRequestStream?.cancel();
+    tripRequestStream?.cancel();
 
-  debugPrint('════════════════════════════════════');
-  debugPrint('🔄 Firestore ride listener started');
-  debugPrint('🟢 Driver available: $isDriverAvailable');
-  debugPrint('════════════════════════════════════');
+    debugPrint('════════════════════════════════════');
+    debugPrint('🔄 Firestore ride listener started');
+    debugPrint('🟢 Driver available: $isDriverAvailable');
+    debugPrint('════════════════════════════════════');
 
-  tripRequestStream = FirebaseFirestore.instance
-      .collection('rides')
-      .where('status', isEqualTo: TripStatus.searching)
-      .snapshots()
-      .listen(
-    (QuerySnapshot<Map<String, dynamic>> snapshot) {
-      debugPrint(
-        '📥 Active searching rides: ${snapshot.docs.length}',
-      );
-
-      for (final DocumentChange<Map<String, dynamic>> change
-          in snapshot.docChanges) {
-        if (change.type != DocumentChangeType.added) {
-          continue;
-        }
-
-        final Map<String, dynamic>? tripData = change.doc.data();
-        if (tripData == null) continue;
-
-        final String tripId = change.doc.id;
-
+    tripRequestStream = FirebaseFirestore.instance
+        .collection('rides')
+        .where('status', isEqualTo: TripStatus.searching)
+        .snapshots()
+        .listen(
+      (QuerySnapshot<Map<String, dynamic>> snapshot) {
         debugPrint(
-          '🚕 New ride received: $tripId | '
-          'status=${tripData['status']}',
+          '📥 Active searching rides: ${snapshot.docs.length}',
         );
 
-        if (!mounted || !isDriverAvailable) {
+        for (final DocumentChange<Map<String, dynamic>> change
+            in snapshot.docChanges) {
+          if (change.type != DocumentChangeType.added) {
+            continue;
+          }
+
+          final Map<String, dynamic>? tripData = change.doc.data();
+          if (tripData == null) continue;
+
+          final String tripId = change.doc.id;
+
           debugPrint(
-            '⚠️ Ride ignored: Driver is offline or page is closed.',
+            '🚕 New ride received: $tripId | '
+            'status=${tripData['status']}',
           );
-          continue;
+
+          if (!mounted || !isDriverAvailable) {
+            debugPrint(
+              '⚠️ Ride ignored: Driver is offline or page is closed.',
+            );
+            continue;
+          }
+
+          PushNotificationSystem().retrieveTripRequestInfo(
+            tripId,
+            context,
+          );
         }
-
-        PushNotificationSystem().retrieveTripRequestInfo(
-          tripId,
-          context,
-        );
-      }
-    },
-    onError: (Object error, StackTrace stackTrace) {
-      debugPrint('❌ Firestore rides listener error: $error');
-      debugPrintStack(stackTrace: stackTrace);
-    },
-  );
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        debugPrint('❌ Firestore rides listener error: $error');
+        debugPrintStack(stackTrace: stackTrace);
+      },
+    );
   }
-
 
   Future<Position?> getCurrentLiveLocationOfDriver() async {
     try {
@@ -139,7 +145,8 @@ class _HomePageState extends State<HomePage> {
 
       if (mounted) {
         setState(() {});
-        _animateMapToPosition(positionOfUser.latitude, positionOfUser.longitude);
+        _animateMapToPosition(
+            positionOfUser.latitude, positionOfUser.longitude);
       }
       return positionOfUser;
     } catch (e) {
@@ -222,7 +229,8 @@ class _HomePageState extends State<HomePage> {
           langCode: context.locale.languageCode,
         );
 
-        if (mapController != null && navController.currentRoutePoints.isNotEmpty) {
+        if (mapController != null &&
+            navController.currentRoutePoints.isNotEmpty) {
           _drawRoutePolyline(navController.currentRoutePoints);
         }
       }
@@ -266,7 +274,10 @@ class _HomePageState extends State<HomePage> {
         debugPrint("Error deleting onlineDriver doc: $e");
       }
       try {
-        await FirebaseFirestore.instance.collection("drivers").doc(uid).update({
+        await FirebaseFirestore.instance
+            .collection("drivers")
+            .doc(uid)
+            .update({
           "newTripStatus": "offline",
           "isOnline": false,
         });
@@ -291,7 +302,8 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _openExternalMap(double lat, double lng) async {
-    final Uri url = Uri.parse('https://www.google.com/maps/search/?api=1&query=$lat,$lng');
+    final Uri url =
+        Uri.parse('https://www.google.com/maps/search/?api=1&query=$lat,$lng');
     if (await canLaunchUrl(url)) {
       await launchUrl(url, mode: LaunchMode.externalApplication);
     }
@@ -316,13 +328,14 @@ class _HomePageState extends State<HomePage> {
   }
 
   // 🔹 رسم مسیر از موتر تا مبدأ مسافر
-  Future<void> _startPickupRoute(String tripId, Map<String, dynamic> tripData) async {
+  Future<void> _startPickupRoute(
+      String tripId, Map<String, dynamic> tripData) async {
     try {
       currentPositionOfDriver ??= await getCurrentLiveLocationOfDriver();
       if (currentPositionOfDriver == null) return;
 
       LatLng? pickupLatLng = _extractLatLng(
-        tripData, 
+        tripData,
         ['originLatLng', 'pickup_location', 'pickupLatLng', 'origin'],
         latKey: 'from_lat',
         lngKey: 'from_lng',
@@ -349,14 +362,20 @@ class _HomePageState extends State<HomePage> {
   }
 
   // 🔹 رسم مسیر از مبدأ تا مقصد مسافر
-  Future<void> _startDestinationRoute(String tripId, Map<String, dynamic> tripData) async {
+  Future<void> _startDestinationRoute(
+      String tripId, Map<String, dynamic> tripData) async {
     try {
       currentPositionOfDriver ??= await getCurrentLiveLocationOfDriver();
       if (currentPositionOfDriver == null) return;
 
       LatLng? dropoffLatLng = _extractLatLng(
-        tripData, 
-        ['destinationLatLng', 'dropoff_location', 'dropoffLatLng', 'destination'],
+        tripData,
+        [
+          'destinationLatLng',
+          'dropoff_location',
+          'dropoffLatLng',
+          'destination'
+        ],
         latKey: 'to_lat',
         lngKey: 'to_lng',
       );
@@ -381,7 +400,8 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> startTripNavigation(LatLng driverPos, LatLng destinationPos) async {
+  Future<void> startTripNavigation(
+      LatLng driverPos, LatLng destinationPos) async {
     final navController = context.read<NavigationController>();
 
     final routePoints = await navController.startNavigation(
@@ -396,257 +416,244 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _updateTripStatus(
-  String tripId,
-  String newStatus,
-  Map<String, dynamic> tripData,
-) async {
-  final User? driver = FirebaseAuth.instance.currentUser;
+    String tripId,
+    String newStatus,
+    Map<String, dynamic> tripData,
+  ) async {
+    final User? driver = FirebaseAuth.instance.currentUser;
 
-  if (driver == null || tripId.isEmpty) {
-    return;
-  }
-
-  try {
-    final DocumentReference<Map<String, dynamic>> tripRef =
-        FirebaseFirestore.instance.collection('rides').doc(tripId);
-
-    final bool updated =
-        await FirebaseFirestore.instance.runTransaction(
-      (transaction) async {
-        final snapshot = await transaction.get(tripRef);
-
-        if (!snapshot.exists) {
-          return false;
-        }
-
-        final Map<String, dynamic> data = snapshot.data() ?? {};
-
-        final String currentStatus =
-            data['status']?.toString() ?? '';
-
-        final String assignedDriverId =
-            data['driver_id']?.toString() ??
-            data['driverId']?.toString() ??
-            '';
-
-        // فقط همان راننده‌ای که سفر را قبول کرده اجازهٔ تغییر دارد.
-        if (assignedDriverId.isNotEmpty &&
-            assignedDriverId != driver.uid) {
-          return false;
-        }
-
-        // ترتیب وضعیت‌ها باید دقیقاً رعایت شود.
-        final bool canArrive =
-            currentStatus == TripStatus.accepted &&
-            newStatus == TripStatus.arrived;
-
-        final bool canStartTrip =
-            currentStatus == TripStatus.arrived &&
-            newStatus == TripStatus.onTrip;
-
-        final bool canCompleteTrip =
-            currentStatus == TripStatus.onTrip &&
-            newStatus == TripStatus.completed;
-
-        if (!canArrive && !canStartTrip && !canCompleteTrip) {
-          return false;
-        }
-
-        final Map<String, dynamic> updateData = {
-          'status': newStatus,
-          'updated_at': FieldValue.serverTimestamp(),
-        };
-
-        if (newStatus == TripStatus.arrived) {
-          updateData['arrived_at'] = FieldValue.serverTimestamp();
-        }
-
-        if (newStatus == TripStatus.onTrip) {
-          updateData['started_at'] = FieldValue.serverTimestamp();
-        }
-
-        if (newStatus == TripStatus.completed) {
-          updateData['completed_at'] = FieldValue.serverTimestamp();
-        }
-
-        transaction.update(tripRef, updateData);
-
-        return true;
-      },
-    );
-
-    if (!updated) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'عملیات انجام نشد؛ وضعیت سفر قبلاً تغییر کرده یا سفر لغو شده است.',
-            ),
-          ),
-        );
-      }
+    if (driver == null || tripId.isEmpty) {
       return;
     }
 
-    if (newStatus == TripStatus.accepted) {
-      await _startPickupRoute(tripId, tripData);
-    } else if (newStatus == TripStatus.arrived) {
-      if (mounted) {
-        setState(() {
-          activeTripStatus = TripStatus.arrived;
-        });
+    try {
+      final DocumentReference<Map<String, dynamic>> tripRef =
+          FirebaseFirestore.instance.collection('rides').doc(tripId);
+
+      final bool updated = await FirebaseFirestore.instance.runTransaction(
+        (transaction) async {
+          final snapshot = await transaction.get(tripRef);
+
+          if (!snapshot.exists) {
+            return false;
+          }
+
+          final Map<String, dynamic> data = snapshot.data() ?? {};
+
+          final String currentStatus = data['status']?.toString() ?? '';
+
+          final String assignedDriverId = data['driver_id']?.toString() ??
+              data['driverId']?.toString() ??
+              '';
+
+          // فقط همان راننده‌ای که سفر را قبول کرده اجازهٔ تغییر دارد.
+          if (assignedDriverId.isNotEmpty && assignedDriverId != driver.uid) {
+            return false;
+          }
+
+          // ترتیب وضعیت‌ها باید دقیقاً رعایت شود.
+          final bool canArrive = currentStatus == TripStatus.accepted &&
+              newStatus == TripStatus.arrived;
+
+          final bool canStartTrip = currentStatus == TripStatus.arrived &&
+              newStatus == TripStatus.onTrip;
+
+          final bool canCompleteTrip = currentStatus == TripStatus.onTrip &&
+              newStatus == TripStatus.completed;
+
+          if (!canArrive && !canStartTrip && !canCompleteTrip) {
+            return false;
+          }
+
+          final Map<String, dynamic> updateData = {
+            'status': newStatus,
+            'updated_at': FieldValue.serverTimestamp(),
+          };
+
+          if (newStatus == TripStatus.arrived) {
+            updateData['arrived_at'] = FieldValue.serverTimestamp();
+          }
+
+          if (newStatus == TripStatus.onTrip) {
+            updateData['started_at'] = FieldValue.serverTimestamp();
+          }
+
+          if (newStatus == TripStatus.completed) {
+            updateData['completed_at'] = FieldValue.serverTimestamp();
+          }
+
+          transaction.update(tripRef, updateData);
+
+          return true;
+        },
+      );
+
+      if (!updated) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'عملیات انجام نشد؛ وضعیت سفر قبلاً تغییر کرده یا سفر لغو شده است.',
+              ),
+            ),
+          );
+        }
+        return;
       }
-    } else if (newStatus == TripStatus.onTrip) {
-      await _startDestinationRoute(tripId, tripData);
-    } else if (newStatus == TripStatus.completed) {
+
+      if (newStatus == TripStatus.accepted) {
+        await _startPickupRoute(tripId, tripData);
+      } else if (newStatus == TripStatus.arrived) {
+        if (mounted) {
+          setState(() {
+            activeTripStatus = TripStatus.arrived;
+          });
+        }
+      } else if (newStatus == TripStatus.onTrip) {
+        await _startDestinationRoute(tripId, tripData);
+      } else if (newStatus == TripStatus.completed) {
+        context.read<NavigationController>().stopNavigation();
+
+        if (mapController != null) {
+          await mapController!.clearLines();
+        }
+
+        final user = FirebaseAuth.instance.currentUser;
+
+        if (user != null) {
+          await FirebaseFirestore.instance
+              .collection('drivers')
+              .doc(user.uid)
+              .set({
+            'newTripStatus': 'waiting',
+            'isOnline': true,
+            'updated_at': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+        }
+
+        if (mounted) {
+          setState(() {
+            activeTripId = null;
+            activeTripStatus = null;
+          });
+        }
+      }
+    } catch (e, stackTrace) {
+      debugPrint('Error updating trip status: $e');
+      debugPrintStack(stackTrace: stackTrace);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'تغییر وضعیت سفر انجام نشد. دوباره تلاش کنید.',
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _cancelTrip(String tripId) async {
+    final User? driver = FirebaseAuth.instance.currentUser;
+
+    if (driver == null || tripId.isEmpty) {
+      return;
+    }
+
+    try {
+      final DocumentReference<Map<String, dynamic>> tripRef =
+          FirebaseFirestore.instance.collection('rides').doc(tripId);
+
+      final bool cancelled = await FirebaseFirestore.instance.runTransaction(
+        (transaction) async {
+          final snapshot = await transaction.get(tripRef);
+
+          if (!snapshot.exists) {
+            return false;
+          }
+
+          final Map<String, dynamic> data = snapshot.data() ?? {};
+          final String currentStatus = data['status']?.toString() ?? '';
+
+          final String assignedDriverId = data['driver_id']?.toString() ??
+              data['driverId']?.toString() ??
+              '';
+
+          if (assignedDriverId.isNotEmpty && assignedDriverId != driver.uid) {
+            return false;
+          }
+
+          if (currentStatus != TripStatus.accepted &&
+              currentStatus != TripStatus.arrived &&
+              currentStatus != TripStatus.onTrip) {
+            return false;
+          }
+
+          transaction.update(tripRef, {
+            'status': TripStatus.cancelledByDriver,
+            'cancelled_by': 'driver',
+            'cancelled_by_driver_id': driver.uid,
+            'cancelled_at': FieldValue.serverTimestamp(),
+            'updated_at': FieldValue.serverTimestamp(),
+          });
+
+          return true;
+        },
+      );
+
+      if (!cancelled) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'لغو انجام نشد؛ وضعیت سفر قبلاً تغییر کرده است.',
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
       context.read<NavigationController>().stopNavigation();
 
       if (mapController != null) {
         await mapController!.clearLines();
       }
 
-      final user = FirebaseAuth.instance.currentUser;
+      await FirebaseFirestore.instance
+          .collection('drivers')
+          .doc(driver.uid)
+          .set({
+        'newTripStatus': 'waiting',
+        'isOnline': true,
+        'updated_at': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
 
-      if (user != null) {
-        await FirebaseFirestore.instance
-            .collection('drivers')
-            .doc(user.uid)
-            .set({
-          'newTripStatus': 'waiting',
-          'isOnline': true,
-          'updated_at': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
-      }
+      if (!mounted) return;
 
-      if (mounted) {
-        setState(() {
-          activeTripId = null;
-          activeTripStatus = null;
-        });
-      }
-    }
-  } catch (e, stackTrace) {
-    debugPrint('Error updating trip status: $e');
-    debugPrintStack(stackTrace: stackTrace);
+      setState(() {
+        activeTripId = null;
+        activeTripStatus = null;
+      });
 
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'تغییر وضعیت سفر انجام نشد. دوباره تلاش کنید.',
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('سفر لغو شد.'),
         ),
-      ),
-    );
-  }
-  }
+      );
+    } catch (e, stackTrace) {
+      debugPrint('Error canceling trip: $e');
+      debugPrintStack(stackTrace: stackTrace);
 
-  Future<void> _cancelTrip(String tripId) async {
-  final User? driver = FirebaseAuth.instance.currentUser;
+      if (!mounted) return;
 
-  if (driver == null || tripId.isEmpty) {
-    return;
-  }
-
-  try {
-    final DocumentReference<Map<String, dynamic>> tripRef =
-        FirebaseFirestore.instance.collection('rides').doc(tripId);
-
-    final bool cancelled =
-        await FirebaseFirestore.instance.runTransaction(
-      (transaction) async {
-        final snapshot = await transaction.get(tripRef);
-
-        if (!snapshot.exists) {
-          return false;
-        }
-
-        final Map<String, dynamic> data = snapshot.data() ?? {};
-        final String currentStatus =
-            data['status']?.toString() ?? '';
-
-        final String assignedDriverId =
-            data['driver_id']?.toString() ??
-            data['driverId']?.toString() ??
-            '';
-
-        if (assignedDriverId.isNotEmpty &&
-            assignedDriverId != driver.uid) {
-          return false;
-        }
-
-        if (currentStatus != TripStatus.accepted &&
-            currentStatus != TripStatus.arrived &&
-            currentStatus != TripStatus.onTrip) {
-          return false;
-        }
-
-        transaction.update(tripRef, {
-          'status': TripStatus.cancelledByDriver,
-          'cancelled_by': 'driver',
-          'cancelled_by_driver_id': driver.uid,
-          'cancelled_at': FieldValue.serverTimestamp(),
-          'updated_at': FieldValue.serverTimestamp(),
-        });
-
-        return true;
-      },
-    );
-
-    if (!cancelled) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'لغو انجام نشد؛ وضعیت سفر قبلاً تغییر کرده است.',
-            ),
-          ),
-        );
-      }
-      return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('لغو سفر انجام نشد. دوباره تلاش کنید.'),
+        ),
+      );
     }
-
-    // فقط پس از ثبت قطعی لغو در Firestore، مسیر را پاک کن.
-    context.read<NavigationController>().stopNavigation();
-
-    if (mapController != null) {
-      await mapController!.clearLines();
-    }
-
-    // راننده دوباره آمادهٔ دریافت درخواست تازه باشد.
-    await FirebaseFirestore.instance
-        .collection('drivers')
-        .doc(driver.uid)
-        .set({
-      'newTripStatus': 'waiting',
-      'isOnline': true,
-      'updated_at': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
-
-    if (!mounted) return;
-
-    setState(() {
-      activeTripId = null;
-      activeTripStatus = null;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('سفر لغو شد.'),
-      ),
-    );
-  } catch (e, stackTrace) {
-    debugPrint('Error canceling trip: $e');
-    debugPrintStack(stackTrace: stackTrace);
-
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('لغو سفر انجام نشد. دوباره تلاش کنید.'),
-      ),
-    );
-  }
   }
 
   @override
@@ -724,7 +731,8 @@ class _HomePageState extends State<HomePage> {
                                   try {
                                     if (!isDriverAvailable) {
                                       if (mounted) {
-                                        setState(() => isDriverAvailable = true);
+                                        setState(
+                                            () => isDriverAvailable = true);
                                       }
 
                                       await _saveDriverStatus(true);
@@ -736,7 +744,8 @@ class _HomePageState extends State<HomePage> {
                                       await _saveDriverStatus(false);
 
                                       if (mounted) {
-                                        setState(() => isDriverAvailable = false);
+                                        setState(
+                                            () => isDriverAvailable = false);
                                       }
                                     }
                                   } finally {
@@ -821,7 +830,6 @@ class _HomePageState extends State<HomePage> {
               myLocationTrackingMode: MyLocationTrackingMode.tracking,
               onMapCreated: _onMapCreated,
             ),
-
             Positioned(
               top: 20,
               right: 16,
@@ -841,11 +849,11 @@ class _HomePageState extends State<HomePage> {
                   elevation: 0,
                   backgroundColor: Colors.white,
                   onPressed: () => getCurrentLiveLocationOfDriver(),
-                  child: const Icon(Icons.my_location_rounded, color: Color(0xFF0F7D55), size: 22),
+                  child: const Icon(Icons.my_location_rounded,
+                      color: Color(0xFF0F7D55), size: 22),
                 ),
               ),
             ),
-
             Positioned(
               top: 20,
               left: 16,
@@ -858,9 +866,12 @@ class _HomePageState extends State<HomePage> {
                   borderRadius: BorderRadius.circular(30),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 300),
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 12),
                     decoration: BoxDecoration(
-                      color: isDriverAvailable ? const Color(0xFFE53935) : const Color(0xFF0F7D55),
+                      color: isDriverAvailable
+                          ? const Color(0xFFE53935)
+                          : const Color(0xFF0F7D55),
                       borderRadius: BorderRadius.circular(30),
                     ),
                     child: Row(
@@ -876,7 +887,9 @@ class _HomePageState extends State<HomePage> {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          isDriverAvailable ? 'go_offline'.tr() : 'go_online'.tr(),
+                          isDriverAvailable
+                              ? 'go_offline'.tr()
+                              : 'go_online'.tr(),
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
@@ -889,7 +902,6 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
             ),
-
             if (currentUser != null && isDriverAvailable)
               StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance
@@ -906,60 +918,61 @@ class _HomePageState extends State<HomePage> {
                     var tripData = activeTripDoc.data() as Map<String, dynamic>;
                     String tripId = activeTripDoc.id;
                     String status = tripData['status'] ?? TripStatus.accepted;
+
                     if (status == TripStatus.cancelledByDriver ||
-    status == TripStatus.cancelledByPassenger) {
-  if (mounted) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      context.read<NavigationController>().stopNavigation();
-      if (mapController != null) {
-        mapController!.clearLines();
-      }
-      setState(() {
-        activeTripId = null;
-        activeTripStatus = null;
-      });
-    });
-  }
-  return const SizedBox.shrink();
+                        status == TripStatus.cancelledByPassenger) {
+                      if (mounted) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (!mounted) return;
+                          context
+                              .read<NavigationController>()
+                              .stopNavigation();
+                          if (mapController != null) {
+                            mapController!.clearLines();
+                          }
+                          setState(() {
+                            activeTripId = null;
+                            activeTripStatus = null;
+                          });
+                        });
+                      }
+                      return const SizedBox.shrink();
                     }
 
                     // 🔹 فراخوانی خودکار ترسیم خط مسیر بر اساس وضعیت سفر
                     if (activeTripId != tripId || activeTripStatus != status) {
-  final String? previousTripId = activeTripId;
-  final String? previousStatus = activeTripStatus;
+                      final String? previousTripId = activeTripId;
 
-  activeTripId = tripId;
-  activeTripStatus = status;
+                      activeTripId = tripId;
+                      activeTripStatus = status;
 
-  WidgetsBinding.instance.addPostFrameCallback((_) async {
-    if (!mounted) return;
+                      WidgetsBinding.instance.addPostFrameCallback((_) async {
+                        if (!mounted) return;
 
-    // اگر سفر قبلی وجود داشت و سفر جدید شد، مسیر قبلی پاک شود.
-    if (previousTripId != null && previousTripId != tripId) {
-      context.read<NavigationController>().stopNavigation();
+                        if (previousTripId != null &&
+                            previousTripId != tripId) {
+                          context
+                              .read<NavigationController>()
+                              .stopNavigation();
 
-      if (mapController != null) {
-        await mapController!.clearLines();
-      }
-    }
+                          if (mapController != null) {
+                            await mapController!.clearLines();
+                          }
+                        }
 
-    // پس از قبول: مسیر راننده تا مبدأ.
-    if (status == TripStatus.accepted) {
-      await _startPickupRoute(tripId, tripData);
-      return;
-    }
+                        if (status == TripStatus.accepted) {
+                          await _startPickupRoute(tripId, tripData);
+                          return;
+                        }
 
-    // پس از رسیدن: مسیر قبلی باقی می‌ماند، اما ناوبری مجدد شروع نمی‌شود.
-    if (status == TripStatus.arrived) {
-      return;
-    }
+                        if (status == TripStatus.arrived) {
+                          return;
+                        }
 
-    // پس از شروع سفر: مسیر راننده تا مقصد.
-    if (status == TripStatus.onTrip) {
-      await _startDestinationRoute(tripId, tripData);
-    }
-  });
+                        if (status == TripStatus.onTrip) {
+                          await _startDestinationRoute(tripId, tripData);
+                        }
+                      });
                     }
 
                     String passengerName = tripData['userName'] ??
@@ -972,35 +985,31 @@ class _HomePageState extends State<HomePage> {
                     String originAddress = tripData['originAddress'] ??
                         tripData['pickup_address'] ??
                         '';
-                    String destinationAddress = tripData['destinationAddress'] ??
-                        tripData['dropoff_address'] ??
-                        '';
-                    final dynamic rawDuration =
-    tripData['duration'] ??
-    tripData['estimatedDuration'] ??
-    tripData['durationMinutes'];
+                    String destinationAddress =
+                        tripData['destinationAddress'] ??
+                            tripData['dropoff_address'] ??
+                            '';
 
-final dynamic rawDistance =
-    tripData['distance'] ??
-    tripData['estimatedDistance'] ??
-    tripData['distanceKm'];
+                    final dynamic rawDuration = tripData['duration'] ??
+                        tripData['estimatedDuration'] ??
+                        tripData['durationMinutes'];
 
-final dynamic rawPrice =
-    tripData['fareAmount'] ??
-    tripData['fare'] ??
-    tripData['price'];
+                    final dynamic rawDistance = tripData['distance'] ??
+                        tripData['estimatedDistance'] ??
+                        tripData['distanceKm'];
 
-final String duration = rawDuration != null
-    ? rawDuration.toString()
-    : '---';
+                    final dynamic rawPrice = tripData['fareAmount'] ??
+                        tripData['fare'] ??
+                        tripData['price'];
 
-final String distance = rawDistance != null
-    ? rawDistance.toString()
-    : '---';
+                    final String duration =
+                        rawDuration != null ? rawDuration.toString() : '---';
 
-final String price = rawPrice != null
-    ? rawPrice.toString()
-    : '---';
+                    final String distance =
+                        rawDistance != null ? rawDistance.toString() : '---';
+
+                    final String price =
+                        rawPrice != null ? rawPrice.toString() : '---';
 
                     return DraggableScrollableSheet(
                       initialChildSize: 0.62,
@@ -1025,7 +1034,8 @@ final String price = rawPrice != null
                           ),
                           child: SingleChildScrollView(
                             controller: scrollController,
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 20, vertical: 12),
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -1040,13 +1050,13 @@ final String price = rawPrice != null
                                     ),
                                   ),
                                 ),
-
                                 Container(
                                   padding: const EdgeInsets.all(14),
                                   decoration: BoxDecoration(
                                     color: Colors.white,
                                     borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(color: Colors.grey.shade200),
+                                    border:
+                                        Border.all(color: Colors.grey.shade200),
                                   ),
                                   child: Row(
                                     children: [
@@ -1054,7 +1064,8 @@ final String price = rawPrice != null
                                         width: 48,
                                         height: 48,
                                         decoration: BoxDecoration(
-                                          color: const Color(0xFF0F7D55).withOpacity(0.12),
+                                          color: const Color(0xFF0F7D55)
+                                              .withOpacity(0.12),
                                           shape: BoxShape.circle,
                                         ),
                                         child: const Icon(
@@ -1066,7 +1077,8 @@ final String price = rawPrice != null
                                       const SizedBox(width: 12),
                                       Expanded(
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
                                             Text(
                                               passengerName,
@@ -1079,7 +1091,10 @@ final String price = rawPrice != null
                                             const SizedBox(height: 4),
                                             Row(
                                               children: [
-                                                const Icon(Icons.star_rounded, color: Colors.amber, size: 16),
+                                                const Icon(
+                                                    Icons.star_rounded,
+                                                    color: Colors.amber,
+                                                    size: 16),
                                                 const SizedBox(width: 4),
                                                 Text(
                                                   passengerRating,
@@ -1106,41 +1121,50 @@ final String price = rawPrice != null
                                         color: const Color(0xFFE8F5E9),
                                         shape: const CircleBorder(),
                                         child: IconButton(
-                                          onPressed: () => _makePhoneCall(passengerPhone),
-                                          icon: const Icon(Icons.phone_in_talk_rounded, color: Color(0xFF2E7D32), size: 22),
+                                          onPressed: () =>
+                                              _makePhoneCall(passengerPhone),
+                                          icon: const Icon(
+                                              Icons.phone_in_talk_rounded,
+                                              color: Color(0xFF2E7D32),
+                                              size: 22),
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
-
                                 const SizedBox(height: 12),
-
                                 Container(
                                   padding: const EdgeInsets.all(16),
                                   decoration: BoxDecoration(
                                     color: Colors.white,
                                     borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(color: Colors.grey.shade200),
+                                    border:
+                                        Border.all(color: Colors.grey.shade200),
                                   ),
                                   child: Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Column(
                                         children: [
-                                          const Icon(Icons.circle, color: Color(0xFF0F7D55), size: 12),
+                                          const Icon(Icons.circle,
+                                              color: Color(0xFF0F7D55),
+                                              size: 12),
                                           Container(
                                             height: 32,
                                             width: 2,
                                             color: Colors.grey.shade300,
                                           ),
-                                          const Icon(Icons.location_on_rounded, color: Color(0xFFE53935), size: 16),
+                                          const Icon(Icons.location_on_rounded,
+                                              color: Color(0xFFE53935),
+                                              size: 16),
                                         ],
                                       ),
                                       const SizedBox(width: 12),
                                       Expanded(
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
                                             Text(
                                               '${'origin_label'.tr()}: $originAddress',
@@ -1169,50 +1193,58 @@ final String price = rawPrice != null
                                     ],
                                   ),
                                 ),
-
                                 const SizedBox(height: 12),
-
                                 Row(
                                   children: [
                                     Expanded(
-  child: _buildInfoCard(
-    'estimated_time_label'.tr(),
-    duration == '---' ? '---' : '$duration min',
-    Icons.access_time_rounded,
-    Colors.orange,
-  ),
-),
-                                    Expanded(
-  child: _buildInfoCard(
-    'estimated_distance_label'.tr(),
-    distance == '---' ? '---' : '$distance km',
-    Icons.alt_route_rounded,
-    Colors.blue,
-  ),
-),
+                                      child: _buildInfoCard(
+                                        'estimated_time_label'.tr(),
+                                        duration == '---'
+                                            ? '---'
+                                            : '$duration min',
+                                        Icons.access_time_rounded,
+                                        Colors.orange,
+                                      ),
+                                    ),
                                     const SizedBox(width: 8),
                                     Expanded(
-  child: _buildInfoCard(
-    'estimated_fare_label'.tr(),
-    price == '---' ? '---' : '$price AFN',
-    Icons.account_balance_wallet_rounded,
-    Colors.green,
-  ),
-),
-
+                                      child: _buildInfoCard(
+                                        'estimated_distance_label'.tr(),
+                                        distance == '---'
+                                            ? '---'
+                                            : '$distance km',
+                                        Icons.alt_route_rounded,
+                                        Colors.blue,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: _buildInfoCard(
+                                        'estimated_fare_label'.tr(),
+                                        price == '---' ? '---' : '$price AFN',
+                                        Icons.account_balance_wallet_rounded,
+                                        Colors.green,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                                 const SizedBox(height: 12),
-
                                 Container(
                                   width: double.infinity,
-                                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 10, horizontal: 14),
                                   decoration: BoxDecoration(
                                     color: const Color(0xFFFFF8E1),
                                     borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: Colors.amber.shade200),
+                                    border:
+                                        Border.all(color: Colors.amber.shade200),
                                   ),
                                   child: Row(
                                     children: [
-                                      const Icon(Icons.notifications_active_outlined, color: Colors.amber, size: 18),
+                                      const Icon(
+                                          Icons.notifications_active_outlined,
+                                          color: Colors.amber,
+                                          size: 18),
                                       const SizedBox(width: 8),
                                       Expanded(
                                         child: Text(
@@ -1227,9 +1259,7 @@ final String price = rawPrice != null
                                     ],
                                   ),
                                 ),
-
                                 const SizedBox(height: 16),
-
                                 SizedBox(
                                   width: double.infinity,
                                   height: 50,
@@ -1243,11 +1273,14 @@ final String price = rawPrice != null
                                     ),
                                     onPressed: () {
                                       if (status == TripStatus.accepted) {
-                                        _updateTripStatus(tripId, TripStatus.arrived, tripData);
+                                        _updateTripStatus(tripId,
+                                            TripStatus.arrived, tripData);
                                       } else if (status == TripStatus.arrived) {
-                                        _updateTripStatus(tripId, TripStatus.onTrip, tripData);
+                                        _updateTripStatus(tripId,
+                                            TripStatus.onTrip, tripData);
                                       } else if (status == TripStatus.onTrip) {
-                                        _updateTripStatus(tripId, TripStatus.completed, tripData);
+                                        _updateTripStatus(tripId,
+                                            TripStatus.completed, tripData);
                                       }
                                     },
                                     child: Text(
@@ -1260,9 +1293,7 @@ final String price = rawPrice != null
                                     ),
                                   ),
                                 ),
-
                                 const SizedBox(height: 10),
-
                                 Row(
                                   children: [
                                     Expanded(
@@ -1270,10 +1301,12 @@ final String price = rawPrice != null
                                         height: 44,
                                         child: ElevatedButton.icon(
                                           style: ElevatedButton.styleFrom(
-                                            backgroundColor: const Color(0xFFE3F2FD),
+                                            backgroundColor:
+                                                const Color(0xFFE3F2FD),
                                             elevation: 0,
                                             shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(12),
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
                                             ),
                                           ),
                                           onPressed: () {
@@ -1283,13 +1316,16 @@ final String price = rawPrice != null
                                                 builder: (context) => ChatPage(
                                                   tripId: tripId,
                                                   passengerName: passengerName,
-                                                  passengerPhone: passengerPhone,
+                                                  passengerPhone:
+                                                      passengerPhone,
                                                 ),
                                               ),
                                             );
                                           },
-                                          icon: const Icon(Icons.chat_bubble_outline_rounded,
-                                              color: Color(0xFF1E88E5), size: 18),
+                                          icon: const Icon(
+                                              Icons.chat_bubble_outline_rounded,
+                                              color: Color(0xFF1E88E5),
+                                              size: 18),
                                           label: Text(
                                             'btn_sms_chat'.tr(),
                                             style: const TextStyle(
@@ -1308,13 +1344,16 @@ final String price = rawPrice != null
                                           height: 44,
                                           child: ElevatedButton(
                                             style: ElevatedButton.styleFrom(
-                                              backgroundColor: const Color(0xFFFFEBEE),
+                                              backgroundColor:
+                                                  const Color(0xFFFFEBEE),
                                               elevation: 0,
                                               shape: RoundedRectangleBorder(
-                                                borderRadius: BorderRadius.circular(12),
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
                                               ),
                                             ),
-                                            onPressed: () => _cancelTrip(tripId),
+                                            onPressed: () =>
+                                                _cancelTrip(tripId),
                                             child: Text(
                                               'btn_cancel_trip'.tr(),
                                               style: const TextStyle(
@@ -1329,9 +1368,7 @@ final String price = rawPrice != null
                                     ],
                                   ],
                                 ),
-
                                 const SizedBox(height: 10),
-
                                 SizedBox(
                                   width: double.infinity,
                                   height: 50,
@@ -1345,28 +1382,43 @@ final String price = rawPrice != null
                                     ),
                                     onPressed: () async {
                                       LatLng? targetPos;
-                                      if (status == TripStatus.accepted || status == TripStatus.arrived) {
+                                      if (status == TripStatus.accepted ||
+                                          status == TripStatus.arrived) {
                                         targetPos = _extractLatLng(
-                                          tripData, 
-                                          ['originLatLng', 'pickup_location', 'pickupLatLng', 'origin'],
+                                          tripData,
+                                          [
+                                            'originLatLng',
+                                            'pickup_location',
+                                            'pickupLatLng',
+                                            'origin'
+                                          ],
                                           latKey: 'from_lat',
                                           lngKey: 'from_lng',
                                         );
                                       } else {
                                         targetPos = _extractLatLng(
-                                          tripData, 
-                                          ['destinationLatLng', 'dropoff_location', 'dropoffLatLng', 'destination'],
+                                          tripData,
+                                          [
+                                            'destinationLatLng',
+                                            'dropoff_location',
+                                            'dropoffLatLng',
+                                            'destination'
+                                          ],
                                           latKey: 'to_lat',
                                           lngKey: 'to_lng',
                                         );
                                       }
 
                                       if (targetPos != null) {
-                                        await _openExternalMap(targetPos.latitude, targetPos.longitude);
+                                        await _openExternalMap(
+                                            targetPos.latitude,
+                                            targetPos.longitude);
                                       } else if (mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
                                           const SnackBar(
-                                            content: Text('مختصات مبدأ یا مقصد این سفر پیدا نشد.'),
+                                            content: Text(
+                                                'مختصات مبدأ یا مقصد این سفر پیدا نشد.'),
                                           ),
                                         );
                                       }
@@ -1374,9 +1426,12 @@ final String price = rawPrice != null
                                     icon: const Icon(Icons.near_me_rounded,
                                         color: Colors.white, size: 20),
                                     label: Text(
-                                      (status == TripStatus.accepted || status == TripStatus.arrived)
-                                          ? 'btn_external_navigation_origin'.tr()
-                                          : 'btn_external_navigation_destination'.tr(),
+                                      (status == TripStatus.accepted ||
+                                              status == TripStatus.arrived)
+                                          ? 'btn_external_navigation_origin'
+                                              .tr()
+                                          : 'btn_external_navigation_destination'
+                                              .tr(),
                                       style: const TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.bold,
@@ -1412,7 +1467,8 @@ final String price = rawPrice != null
     return 'btn_arrived_pickup'.tr();
   }
 
-  Widget _buildInfoCard(String label, String value, IconData icon, Color color) {
+  Widget _buildInfoCard(
+      String label, String value, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
       decoration: BoxDecoration(
