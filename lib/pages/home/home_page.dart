@@ -936,10 +936,32 @@ class _HomePageState extends State<HomePage> {
                     String destinationAddress = tripData['destinationAddress'] ??
                         tripData['dropoff_address'] ??
                         '';
-                    String duration = '${tripData['duration'] ?? '15'}';
-                    String distance = '${tripData['distance'] ?? '5.2'}';
-                    String price =
-                        '${tripData['fareAmount'] ?? tripData['price'] ?? '120'}';
+                    final dynamic rawDuration =
+    tripData['duration'] ??
+    tripData['estimatedDuration'] ??
+    tripData['durationMinutes'];
+
+final dynamic rawDistance =
+    tripData['distance'] ??
+    tripData['estimatedDistance'] ??
+    tripData['distanceKm'];
+
+final dynamic rawPrice =
+    tripData['fareAmount'] ??
+    tripData['fare'] ??
+    tripData['price'];
+
+final String duration = rawDuration != null
+    ? rawDuration.toString()
+    : '---';
+
+final String distance = rawDistance != null
+    ? rawDistance.toString()
+    : '---';
+
+final String price = rawPrice != null
+    ? rawPrice.toString()
+    : '---';
 
                     return DraggableScrollableSheet(
                       initialChildSize: 0.62,
