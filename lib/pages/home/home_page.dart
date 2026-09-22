@@ -3,6 +3,7 @@ import 'dart:developer';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
@@ -327,10 +328,96 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  // 🟢 ذخیره کامل مشخصات راننده و پلاک خودرو در سند سفر
+  Future<void> _saveDriverDataToTripInfo(String tripId) async {
+    final User? currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null || tripId.isEmpty) return;
+
+    try {
+      final DatabaseReference driverRef = FirebaseDatabase.instance
+          .ref()
+          .child('drivers')
+          .child(currentUser.uid);
+
+      final DataSnapshot snapshot = await driverRef.get();
+
+      String realDriverName = '';
+      String realDriverPhone = '';
+      String realDriverPhoto = '';
+      String fullCarPlate = '';
+      String carModelName = '';
+      String carColorName = '';
+
+      if (snapshot.exists && snapshot.value is Map) {
+        final Map<dynamic, dynamic> data =
+            snapshot.value as Map<dynamic, dynamic>;
+
+        final String firstName = data['firstName']?.toString() ?? '';
+        final String secondName = data['secondName']?.toString() ?? '';
+        realDriverName = '$firstName $secondName'.trim();
+        realDriverPhone = data['phoneNumber']?.toString() ?? '';
+        realDriverPhoto = data['profilePicture']?.toString() ?? '';
+
+        final dynamic vehicle = data['vehicleInfo'];
+        if (vehicle is Map) {
+          carModelName = vehicle['brand']?.toString() ?? '';
+          carColorName = vehicle['color']?.toString() ?? '';
+
+          final String rawPlate =
+              vehicle['registrationPlateNumber']?.toString() ?? '';
+          final String province = vehicle['plateProvince']?.toString() ?? '';
+          final String category = vehicle['plateCategory']?.toString() ?? '';
+          final String type = vehicle['plateType']?.toString() ?? '';
+
+          if (province.isNotEmpty && rawPlate.isNotEmpty) {
+            fullCarPlate = '$province - $category $rawPlate ($type)';
+          } else {
+            fullCarPlate = rawPlate;
+          }
+        }
+      }
+
+      final Map<String, dynamic> driverDataMap = {
+        'driverId': currentUser.uid,
+        'driver_id': currentUser.uid,
+        'driverName': realDriverName,
+        'driver_name': realDriverName,
+        'driverPhone': realDriverPhone,
+        'driver_phone': realDriverPhone,
+        'driverPhoto': realDriverPhoto,
+        'driver_photo': realDriverPhoto,
+        'carDetails': '$carModelName - $fullCarPlate - $carColorName',
+        'car_details': '$carModelName - $fullCarPlate - $carColorName',
+        'carNumber': fullCarPlate,
+        'car_number': fullCarPlate,
+        'updated_at': FieldValue.serverTimestamp(),
+      };
+
+      if (currentPositionOfDriver != null) {
+        driverDataMap['driverLocation'] = {
+          'latitude': currentPositionOfDriver!.latitude,
+          'longitude': currentPositionOfDriver!.longitude,
+        };
+        driverDataMap['driver_lat'] = currentPositionOfDriver!.latitude;
+        driverDataMap['driver_lng'] = currentPositionOfDriver!.longitude;
+      }
+
+      await FirebaseFirestore.instance
+          .collection('rides')
+          .doc(tripId)
+          .update(driverDataMap);
+    } catch (e) {
+      debugPrint('Error saving driver data to trip: $e');
+    }
+  }
+
   // 🔹 رسم مسیر از موتر تا مبدأ مسافر
   Future<void> _startPickupRoute(
       String tripId, Map<String, dynamic> tripData) async {
     try {
+      // 🟢 ذخیره اطلاعات راننده و پلاک خودرو برای مسافر
+      await _saveDriverDataToTripInfo(tripId);
+
       currentPositionOfDriver ??= await getCurrentLiveLocationOfDriver();
       if (currentPositionOfDriver == null) return;
 
@@ -990,26 +1077,47 @@ class _HomePageState extends State<HomePage> {
                             tripData['dropoff_address'] ??
                             '';
 
+                    // 🟢 ۱. گرد کردن زمان (بدون اعشار)
                     final dynamic rawDuration = tripData['duration'] ??
                         tripData['estimatedDuration'] ??
                         tripData['durationMinutes'];
+                    String duration = '---';
+                    if (rawDuration != null) {
+                      double? parsed = double.tryParse(rawDuration
+                          .toString()
+                          .replaceAll(RegExp(r'[^\d.]'), ''));
+                      duration = parsed != null
+                          ? parsed.toStringAsFixed(0)
+                          : rawDuration.toString();
+                    }
 
+                    // 🟢 ۲. گرد کردن مسافت (تا ۱ رقم اعشار)
                     final dynamic rawDistance = tripData['distance'] ??
                         tripData['estimatedDistance'] ??
                         tripData['distanceKm'];
+                    String distance = '---';
+                    if (rawDistance != null) {
+                      double? parsed = double.tryParse(rawDistance
+                          .toString()
+                          .replaceAll(RegExp(r'[^\d.]'), ''));
+                      distance = parsed != null
+                          ? parsed.toStringAsFixed(1)
+                          : rawDistance.toString();
+                    }
 
+                    // 🟢 ۳. گرد کردن کرایه (بدون اعشار)
                     final dynamic rawPrice = tripData['fareAmount'] ??
                         tripData['fare'] ??
                         tripData['price'];
-
-                    final String duration =
-                        rawDuration != null ? rawDuration.toString() : '---';
-
-                    final String distance =
-                        rawDistance != null ? rawDistance.toString() : '---';
-
-                    final String price =
-                        rawPrice != null ? rawPrice.toString() : '---';
+                    String price = '---';
+                    if (rawPrice != null) {
+                      double? parsed = double.tryParse(rawPrice
+                          .toString()
+                          .replaceAll(RegExp(r'[^\d.]'), ''));
+                      price = parsed != null
+                          ? parsed.toStringAsFixed(0)
+                          : rawPrice.toString();
+                    }
 
                     return DraggableScrollableSheet(
                       initialChildSize: 0.62,
