@@ -224,15 +224,25 @@ String? _shownTripId;
       tripDetailsInfo.tripID = tripID;
 
       // 🔔 باز کردن دیالوگ درخواست
-      showDialog(
-        context: currentContext,
-        barrierDismissible: false,
-        builder: (BuildContext dialogContext) => NotificationDialog(
-          tripDetailsInfo: tripDetailsInfo,
-          bidAmount: bidAmount,
-          fareAmount: fareAmount,
-        ),
+      _isTripDialogOpen = true;
+_shownTripId = tripID;
+
+try {
+  await showDialog(
+    context: currentContext,
+    barrierDismissible: false,
+    builder: (BuildContext dialogContext) {
+      return NotificationDialog(
+        tripDetailsInfo: tripDetailsInfo,
+        bidAmount: bidAmount,
+        fareAmount: fareAmount,
       );
+    },
+  );
+} finally {
+  _isTripDialogOpen = false;
+  _shownTripId = null;
+}
     } catch (e, stackTrace) {
       log("Error parsing trip request info from Firestore: $e\n$stackTrace");
     }
