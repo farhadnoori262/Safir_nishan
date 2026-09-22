@@ -111,7 +111,7 @@ class _NotificationDialogState extends State<NotificationDialog> {
 
         String currentStatus = data?["status"]?.toString() ?? "";
 
-        if (currentStatus == "requested" || currentStatus == "waiting") {
+        if (currentStatus == TripStatus.searching) {
           // ✅ ۱. اصلاح متغیر tripID (رفع خطای اصلی کامپایل)
           await tripRef.update({
             'status': TripStatus.accepted,
