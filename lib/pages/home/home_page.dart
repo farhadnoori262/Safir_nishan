@@ -68,54 +68,53 @@ class _HomePageState extends State<HomePage> {
   }
 
   void listenForTripRequests() {
-  debugPrint('══════════════════════════════════════');
-  debugPrint('🔄 listenForTripRequests اجرا شد');
-  debugPrint('👤 راننده آنلاین است: $isDriverAvailable');
-  debugPrint(
-    '🔥 Firebase project: '
-    '${FirebaseFirestore.instance.app.options.projectId}',
-  );
-  debugPrint('══════════════════════════════════════');
-
   tripRequestStream?.cancel();
 
-  // فعلاً where را حذف می‌کنیم تا مطمئن شویم
-  // اپ راننده اصلاً به کالکشن rides دسترسی دارد.
+  debugPrint('🔄 Listening for available ride requests...');
+  debugPrint('🟢 Driver online: $isDriverAvailable');
+
   tripRequestStream = FirebaseFirestore.instance
       .collection('rides')
-      .snapshots(includeMetadataChanges: true)
+      .where('status', isEqualTo: TripStatus.searching)
+      .snapshots()
       .listen(
     (QuerySnapshot<Map<String, dynamic>> snapshot) {
-      debugPrint('✅ snapshot رسید');
-      debugPrint('📦 تعداد کل rides: ${snapshot.docs.length}');
-      debugPrint('🌐 از cache است؟ ${snapshot.metadata.isFromCache}');
-      debugPrint('🔄 تعداد تغییرات: ${snapshot.docChanges.length}');
-
-      for (final QueryDocumentSnapshot<Map<String, dynamic>> doc
-          in snapshot.docs) {
-        debugPrint('--------------------------------------');
-        debugPrint('🧾 ID: ${doc.id}');
-        debugPrint('📌 status: ${doc.data()['status']}');
-        debugPrint('📄 data: ${doc.data()}');
-      }
+      debugPrint(
+        '📥 Available searching rides: ${snapshot.docs.length}',
+      );
 
       for (final DocumentChange<Map<String, dynamic>> change
           in snapshot.docChanges) {
+        if (change.type != DocumentChangeType.added) continue;
+
+        final Map<String, dynamic>? tripData = change.doc.data();
+        if (tripData == null) continue;
+
+        final String tripId = change.doc.id;
+
         debugPrint(
-          '🔔 تغییر: ${change.type.name} | '
-          'tripId: ${change.doc.id} | '
-          'status: ${change.doc.data()?['status']}',
+          '🚕 New ride found: $tripId | '
+          'status=${tripData['status']}',
+        );
+
+        if (!mounted || !isDriverAvailable) {
+          debugPrint(
+            '⚠️ Driver is offline or HomePage has been disposed.',
+          );
+          continue;
+        }
+
+        // Firestore مستقیم: وقتی اپ راننده باز است.
+        PushNotificationSystem().retrieveTripRequestInfo(
+          tripId,
+          context,
         );
       }
     },
     onError: (Object error, StackTrace stackTrace) {
-      debugPrint('❌ خطای واقعی Firestore listener: $error');
+      debugPrint('❌ Ride listener error: $error');
       debugPrintStack(stackTrace: stackTrace);
     },
-    onDone: () {
-      debugPrint('⚠️ Firestore listener بسته شد.');
-    },
-    cancelOnError: false,
   );
   }
 
