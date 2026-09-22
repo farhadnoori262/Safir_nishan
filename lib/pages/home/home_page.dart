@@ -906,6 +906,23 @@ class _HomePageState extends State<HomePage> {
                     var tripData = activeTripDoc.data() as Map<String, dynamic>;
                     String tripId = activeTripDoc.id;
                     String status = tripData['status'] ?? TripStatus.accepted;
+                    if (status == TripStatus.cancelledByDriver ||
+    status == TripStatus.cancelledByPassenger) {
+  if (mounted) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<NavigationController>().stopNavigation();
+      if (mapController != null) {
+        mapController!.clearLines();
+      }
+      setState(() {
+        activeTripId = null;
+        activeTripStatus = null;
+      });
+    });
+  }
+  return const SizedBox.shrink();
+                    }
 
                     // 🔹 فراخوانی خودکار ترسیم خط مسیر بر اساس وضعیت سفر
                     if (activeTripId != tripId || activeTripStatus != status) {
