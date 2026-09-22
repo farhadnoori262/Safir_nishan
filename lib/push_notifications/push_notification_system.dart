@@ -15,7 +15,9 @@ import 'package:safir_drivers/widgets/notification_dialog.dart';
 
 class PushNotificationSystem {
   FirebaseMessaging firebaseCloudMessaging = FirebaseMessaging.instance;
-  final AudioPlayer _audioPlayer = AudioPlayer();
+  final AudioPlayer _audioPlayer = AudioPlayer(); 
+  bool _isTripDialogOpen = false;
+String? _shownTripId;
 
   Future<String?> generateDeviceRegistrationToken() async {
     final NotificationSettings settings =
@@ -121,6 +123,10 @@ class PushNotificationSystem {
 
   retrieveTripRequestInfo(String tripID, BuildContext context) async {
     final currentContext = navigatorKey.currentContext ?? context;
+    if (_isTripDialogOpen && _shownTripId == tripID) {
+  log('Trip dialog is already open: $tripID');
+  return;
+    }
 
     try {
       DocumentSnapshot tripSnapshot = await FirebaseFirestore.instance
