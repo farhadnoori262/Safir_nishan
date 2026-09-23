@@ -1251,53 +1251,65 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildActiveTripSheet({
-    required String tripId,
-    required String status,
-    required Map<String, dynamic> tripData,
-  }) {
-    final String passengerName = tripData['passenger_name']?.toString() ??
-    tripData['userName']?.toString() ??
-    tripData['full_name']?.toString() ??
-    'passenger'.tr();
+  required String tripId,
+  required String status,
+  required Map<String, dynamic> tripData,
+}) {
+  final String passengerName = tripData['passenger_name']?.toString() ??
+      tripData['userName']?.toString() ??
+      tripData['full_name']?.toString() ??
+      'passenger'.tr();
 
-final String passengerPhone = tripData['passenger_phone']?.toString() ??
-    tripData['userPhone']?.toString() ??
-    tripData['phone']?.toString() ??
-    '';
+  final String passengerPhone = tripData['passenger_phone']?.toString() ??
+      tripData['userPhone']?.toString() ??
+      tripData['phone']?.toString() ??
+      '';
 
+  final String passengerRating =
+      '${tripData['userRating'] ?? tripData['rating'] ?? '4.8'}';
 
-    final String passengerRating =
-        '${tripData['userRating'] ?? tripData['rating'] ?? '4.8'}';
+  final String originAddress = tripData['origin_address']?.toString() ??
+      tripData['originAddress']?.toString() ??
+      tripData['pickup_address']?.toString() ??
+      '';
 
-    final String originAddress = tripData['origin_address']?.toString() ??
-    tripData['originAddress']?.toString() ??
-    tripData['pickup_address']?.toString() ??
-    '';
+  final String destinationAddress =
+      tripData['destination_address']?.toString() ??
+          tripData['destinationAddress']?.toString() ??
+          tripData['dropoff_address']?.toString() ??
+          '';
 
-final String destinationAddress = tripData['destination_address']?.toString() ??
-    tripData['destinationAddress']?.toString() ??
-    tripData['dropoff_address']?.toString() ??
-    '';
+  final String duration = _formatNumber(
+    tripData['trip_duration'] ??
+        tripData['duration'] ??
+        tripData['estimatedDuration'] ??
+        tripData['durationMinutes'],
+    decimals: 0,
+  );
 
+  final String distance = _formatNumber(
+    tripData['distance'] ??
+        tripData['estimatedDistance'] ??
+        tripData['distanceKm'],
+    decimals: 1,
+  );
 
-    final String duration = _formatNumber(
+  final String price = _formatNumber(
+    tripData['fare_amount'] ??
+        tripData['fareAmount'] ??
+        tripData['fare'] ??
+        tripData['price'],
+    decimals: 0,
+  );
+  // ادامه بقیه بخش‌های ویجت بدون تغییر...
+final String duration = _formatNumber(
+  tripData['trip_duration'] ??
       tripData['duration'] ??
-          tripData['estimatedDuration'] ??
-          tripData['durationMinutes'],
-      decimals: 0,
-    );
+      tripData['estimatedDuration'] ??
+      tripData['durationMinutes'],
+  decimals: 0,
+);
 
-    final String distance = _formatNumber(
-      tripData['distance'] ??
-          tripData['estimatedDistance'] ??
-          tripData['distanceKm'],
-      decimals: 1,
-    );
-
-    final String price = _formatNumber(
-      tripData['fareAmount'] ?? tripData['fare'] ?? tripData['price'],
-      decimals: 0,
-    );
 
     return DraggableScrollableSheet(
       initialChildSize: 0.62,
@@ -1762,31 +1774,32 @@ final String destinationAddress = tripData['destination_address']?.toString() ??
   }
 
   LatLng? _getNavigationTarget(
-    String status,
-    Map<String, dynamic> tripData,
-  ) {
-    final bool goingToPickup = status == TripStatus.accepted ||
-        status == TripStatus.arrived;
+  String status,
+  Map<String, dynamic> tripData,
+) {
+  final bool goingToPickup = status == TripStatus.accepted ||
+      status == TripStatus.arrived;
 
-    return _extractLatLng(
-      tripData,
-      goingToPickup
-          ? [
-              'originLatLng',
-              'pickup_location',
-              'pickupLatLng',
-              'origin',
-            ]
-          : [
-              'destinationLatLng',
-              'dropoff_location',
-              'dropoffLatLng',
-              'destination',
-            ],
-      latKey: goingToPickup ? 'from_lat' : 'to_lat',
-      lngKey: goingToPickup ? 'from_lng' : 'to_lng',
-    );
-  }
+  return _extractLatLng(
+    tripData,
+    goingToPickup
+        ? [
+            'origin',
+            'originLatLng',
+            'pickup_location',
+            'pickupLatLng',
+          ]
+        : [
+            'destination',
+            'destinationLatLng',
+            'dropoff_location',
+            'dropoffLatLng',
+          ],
+    latKey: goingToPickup ? 'from_lat' : 'to_lat',
+    lngKey: goingToPickup ? 'from_lng' : 'to_lng',
+  );
+}
+
 
   String _formatNumber(dynamic value, {required int decimals}) {
     if (value == null) return '---';
