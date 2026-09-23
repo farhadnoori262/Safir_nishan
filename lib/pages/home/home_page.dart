@@ -40,6 +40,7 @@ class _HomePageState extends State<HomePage> {
   bool _isTripCleanupRunning = false;
   DateTime? _lastTripLocationUpdate;
   bool _isTripLocationUpdateRunning = false;
+  bool _isTripLocationUpdateRunning = false;
 
   void _onMapCreated(MapLibreMapController controller) {
     mapController = controller;
