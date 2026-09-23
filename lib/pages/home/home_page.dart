@@ -37,6 +37,7 @@ class _HomePageState extends State<HomePage> {
   StreamSubscription? tripRequestStream;
   String? activeTripId;
   String? activeTripStatus;
+  bool _isTripCleanupRunning = false;
 
   void _onMapCreated(MapLibreMapController controller) {
     mapController = controller;
@@ -742,6 +743,39 @@ class _HomePageState extends State<HomePage> {
       );
     }
   }
+  Future<void> _clearActiveTripUi() async {
+  if (_isTripCleanupRunning) {
+    return;
+  }
+
+  // اگر هیچ سفر فعالی نداریم، چیزی برای پاک‌کردن نیست.
+  if (activeTripId == null && activeTripStatus == null) {
+    return;
+  }
+
+  _isTripCleanupRunning = true;
+
+  try {
+    context.read<NavigationController>().stopNavigation();
+
+    if (mapController != null) {
+      await mapController!.clearLines();
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      activeTripId = null;
+      activeTripStatus = null;
+    });
+  } catch (e) {
+    debugPrint('Error clearing active trip UI: $e');
+  } finally {
+    _isTripCleanupRunning = false;
+  }
+  }
 
   @override
   void initState() {
@@ -1000,31 +1034,25 @@ class _HomePageState extends State<HomePage> {
                   TripStatus.onTrip,
                 ]).snapshots(),
                 builder: (context, snapshot) {
-                  if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
+  if (!snapshot.hasData) {
+    return const SizedBox.shrink();
+  }
+
+  if (snapshot.data!.docs.isEmpty) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _clearActiveTripUi();
+      }
+    });
+
+    return const SizedBox.shrink();
+  }
+
+  if (snapshot.data!.docs.isNotEmpty) {
                     var activeTripDoc = snapshot.data!.docs.first;
                     var tripData = activeTripDoc.data() as Map<String, dynamic>;
                     String tripId = activeTripDoc.id;
                     String status = tripData['status'] ?? TripStatus.accepted;
-
-                    if (status == TripStatus.cancelledByDriver ||
-                        status == TripStatus.cancelledByPassenger) {
-                      if (mounted) {
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          if (!mounted) return;
-                          context
-                              .read<NavigationController>()
-                              .stopNavigation();
-                          if (mapController != null) {
-                            mapController!.clearLines();
-                          }
-                          setState(() {
-                            activeTripId = null;
-                            activeTripStatus = null;
-                          });
-                        });
-                      }
-                      return const SizedBox.shrink();
-                    }
 
                     // 🔹 فراخوانی خودکار ترسیم خط مسیر بر اساس وضعیت سفر
                     if (activeTripId != tripId || activeTripStatus != status) {
