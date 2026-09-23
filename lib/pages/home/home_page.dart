@@ -38,6 +38,8 @@ class _HomePageState extends State<HomePage> {
   String? activeTripId;
   String? activeTripStatus;
   bool _isTripCleanupRunning = false;
+  DateTime? _lastTripLocationUpdate;
+  bool _isTripLocationUpdateRunning = false;
 
   void _onMapCreated(MapLibreMapController controller) {
     mapController = controller;
@@ -209,6 +211,53 @@ class _HomePageState extends State<HomePage> {
     }
     await updateDriverStatus(uid);
   }
+  Future<void> _updateDriverLocationInActiveTrip(
+  Position position,
+) async {
+  final String? tripId = activeTripId;
+
+  if (tripId == null || tripId.isEmpty) {
+    return;
+  }
+
+  try {
+    final DocumentSnapshot<Map<String, dynamic>> tripSnapshot =
+        await FirebaseFirestore.instance
+            .collection('rides')
+            .doc(tripId)
+            .get();
+
+    if (!tripSnapshot.exists) {
+      return;
+    }
+
+    final Map<String, dynamic> tripData =
+        tripSnapshot.data() ?? {};
+
+    final String status = tripData['status']?.toString() ?? '';
+
+    if (status != TripStatus.accepted &&
+        status != TripStatus.arrived &&
+        status != TripStatus.onTrip) {
+      return;
+    }
+
+    await FirebaseFirestore.instance
+        .collection('rides')
+        .doc(tripId)
+        .update({
+      'driverLocation': {
+        'latitude': position.latitude,
+        'longitude': position.longitude,
+      },
+      'driver_lat': position.latitude,
+      'driver_lng': position.longitude,
+      'driver_location_updated_at': FieldValue.serverTimestamp(),
+    });
+  } catch (e) {
+    debugPrint('Error updating active trip driver location: $e');
+  }
+}
 
   void setAndGetLocationUpdates() {
     positionStreamHomePage?.cancel();
@@ -219,6 +268,7 @@ class _HomePageState extends State<HomePage> {
       ),
     ).listen((Position position) {
       currentPositionOfDriver = position;
+      _updateDriverLocationInActiveTrip(position);
 
       if (!mounted) return;
 
