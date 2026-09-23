@@ -35,10 +35,8 @@ class _HomePageState extends State<HomePage> {
   String? activeTripStatus;
 
   DateTime? driverOnlineTimestamp;
-  DateTime? _lastTripLocationUpdate;
 
   bool _isTripActionLoading = false;
-  bool _isTripLocationUpdateRunning = false;
   bool _isStartingRoute = false;
   bool _isDisposing = false;
 
@@ -234,25 +232,38 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  /// به‌روزرسانی اختصاصی موقعیت مکانی زنده راننده در کالکشن driver_locations
+  Future<void> _updateDriverLiveLocation(Position position) async {
+    final User? user = FirebaseAuth.instance.currentUser;
+    if (user == null || !isDriverAvailable) return;
+
+    try {
+      await _firestore.collection('driver_locations').doc(user.uid).set(
+        {
+          'driver_id': user.uid,
+          'latitude': position.latitude,
+          'longitude': position.longitude,
+          'heading': position.heading,
+          'is_online': true,
+          'active_trip_id': activeTripId,
+          'updated_at': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
+    } catch (e) {
+      debugPrint('Error updating driver live location: $e');
+    }
+  }
+
   Future<void> goOnlineNow() async {
     final User? user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
     driverOnlineTimestamp = DateTime.now();
-
     currentPositionOfDriver ??= await getCurrentLiveLocationOfDriver();
 
     if (currentPositionOfDriver != null) {
-      await _firestore.collection('onlineDrivers').doc(user.uid).set(
-        {
-          'driverId': user.uid,
-          'latitude': currentPositionOfDriver!.latitude,
-          'longitude': currentPositionOfDriver!.longitude,
-          'last_active': FieldValue.serverTimestamp(),
-          'status': 'idle',
-        },
-        SetOptions(merge: true),
-      );
+      await _updateDriverLiveLocation(currentPositionOfDriver!);
     }
 
     await _setDriverStatus(status: 'waiting', isOnline: true);
@@ -274,9 +285,15 @@ class _HomePageState extends State<HomePage> {
     if (user == null) return;
 
     try {
-      await _firestore.collection('onlineDrivers').doc(user.uid).delete();
+      await _firestore.collection('driver_locations').doc(user.uid).set(
+        {
+          'is_online': false,
+          'updated_at': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
     } catch (e) {
-      debugPrint('Error deleting online driver: $e');
+      debugPrint('Error setting driver offline location: $e');
     }
 
     try {
@@ -304,6 +321,10 @@ class _HomePageState extends State<HomePage> {
 
         _animateMapToPosition(position.latitude, position.longitude);
 
+        // ۱. به‌روزرسانی موقعیت مکانی زنده در کالکشن اختصاصی driver_locations
+        await _updateDriverLiveLocation(position);
+
+        // ۲. به‌روزرسانی مسیریاب در برنامه
         final NavigationController navController =
             context.read<NavigationController>();
 
@@ -318,69 +339,11 @@ class _HomePageState extends State<HomePage> {
             await _drawRoutePolyline(navController.currentRoutePoints);
           }
         }
-
-        final User? user = FirebaseAuth.instance.currentUser;
-
-        if (isDriverAvailable && user != null) {
-          _firestore.collection('onlineDrivers').doc(user.uid).set(
-            {
-              'driverId': user.uid,
-              'latitude': position.latitude,
-              'longitude': position.longitude,
-              'last_active': FieldValue.serverTimestamp(),
-            },
-            SetOptions(merge: true),
-          ).catchError(
-            (Object error) =>
-                debugPrint('Error updating online driver location: $error'),
-          );
-        }
-
-        await _updateDriverLocationInActiveTrip(position);
       },
       onError: (Object error) {
         debugPrint('Location stream error: $error');
       },
     );
-  }
-
-  Future<void> _updateDriverLocationInActiveTrip(Position position) async {
-    final String? tripId = activeTripId;
-
-    if (tripId == null ||
-        tripId.isEmpty ||
-        !_isActiveTripStatus(activeTripStatus) ||
-        _isTripLocationUpdateRunning) {
-      return;
-    }
-
-    final DateTime now = DateTime.now();
-
-    if (_lastTripLocationUpdate != null &&
-        now.difference(_lastTripLocationUpdate!).inSeconds < 5) {
-      return;
-    }
-
-    _isTripLocationUpdateRunning = true;
-    _lastTripLocationUpdate = now;
-
-    try {
-      await _firestore.collection('rides').doc(tripId).update(
-        {
-          'driverLocation': {
-            'latitude': position.latitude,
-            'longitude': position.longitude,
-          },
-          'driver_lat': position.latitude,
-          'driver_lng': position.longitude,
-          'driver_location_updated_at': FieldValue.serverTimestamp(),
-        },
-      );
-    } catch (e) {
-      debugPrint('Error updating active trip driver location: $e');
-    } finally {
-      _isTripLocationUpdateRunning = false;
-    }
   }
 
   void listenForTripRequests() {
@@ -502,110 +465,18 @@ class _HomePageState extends State<HomePage> {
     if (currentUser == null || tripId.isEmpty) return;
 
     try {
-      final DatabaseReference driverRef =
-          FirebaseDatabase.instance.ref('drivers/${currentUser.uid}');
-
-      final DataSnapshot snapshot = await driverRef.get();
-
-      String driverName = '';
-      String driverPhone = '';
-      String driverPhoto = '';
-      String carModel = '';
-      String carColor = '';
-      String rawPlate = '';
-      String province = '';
-      String category = '';
-      String type = '';
-
-      if (snapshot.exists && snapshot.value is Map) {
-        final Map<dynamic, dynamic> data =
-            Map<dynamic, dynamic>.from(snapshot.value as Map);
-
-        final String firstName = data['firstName']?.toString() ?? '';
-        final String secondName = data['secondName']?.toString() ?? '';
-
-        driverName = '$firstName $secondName'.trim();
-        driverPhone = data['phoneNumber']?.toString() ?? '';
-        driverPhoto = data['profilePicture']?.toString() ?? '';
-
-        final dynamic vehicle = data['vehicleInfo'];
-
-        if (vehicle is Map) {
-          final Map<dynamic, dynamic> vehicleInfo =
-              Map<dynamic, dynamic>.from(vehicle);
-
-          carModel = vehicleInfo['brand']?.toString() ??
-              vehicleInfo['model']?.toString() ??
-              '';
-
-          carColor = vehicleInfo['color']?.toString() ?? '';
-
-          rawPlate = vehicleInfo['registrationPlateNumber']?.toString() ??
-              vehicleInfo['plateNumber']?.toString() ??
-              '';
-
-          province = vehicleInfo['plateProvince']?.toString() ?? '';
-          category = vehicleInfo['plateCategory']?.toString() ?? '';
-          type = vehicleInfo['plateType']?.toString() ?? '';
-        }
-      }
-
-      final List<String> plateParts = [
-        province,
-        category,
-        rawPlate,
-        type,
-      ].where((String value) => value.trim().isNotEmpty).toList();
-
-      final String fullCarPlate = plateParts.join(' - ');
-      final String carDetails = [
-        carModel,
-        carColor,
-        fullCarPlate,
-      ].where((String value) => value.trim().isNotEmpty).join(' - ');
-
       final Map<String, dynamic> driverData = {
-        'driverId': currentUser.uid,
         'driver_id': currentUser.uid,
-        'driverName': driverName,
-        'driver_name': driverName,
-        'driverPhone': driverPhone,
-        'driver_phone': driverPhone,
-        'driverPhoto': driverPhoto,
-        'driver_photo': driverPhoto,
-        'carModel': carModel,
-        'car_model': carModel,
-        'carColor': carColor,
-        'car_color': carColor,
-        'carNumber': fullCarPlate,
-        'car_number': fullCarPlate,
-        'plateNumber': rawPlate,
-        'plate_number': rawPlate,
-        'carDetails': carDetails,
-        'car_details': carDetails,
+        'driverId': currentUser.uid,
         'driver_data_updated_at': FieldValue.serverTimestamp(),
       };
-
-      if (currentPositionOfDriver != null) {
-        driverData.addAll(
-          {
-            'driverLocation': {
-              'latitude': currentPositionOfDriver!.latitude,
-              'longitude': currentPositionOfDriver!.longitude,
-            },
-            'driver_lat': currentPositionOfDriver!.latitude,
-            'driver_lng': currentPositionOfDriver!.longitude,
-            'driver_location_updated_at': FieldValue.serverTimestamp(),
-          },
-        );
-      }
 
       await _firestore.collection('rides').doc(tripId).set(
         driverData,
         SetOptions(merge: true),
       );
     } catch (e) {
-      debugPrint('Error saving driver and car data into trip: $e');
+      debugPrint('Error saving driver data into trip: $e');
     }
   }
 
@@ -820,7 +691,6 @@ class _HomePageState extends State<HomePage> {
           setState(() {
             activeTripId = null;
             activeTripStatus = null;
-            _lastTripLocationUpdate = null;
           });
         }
 
@@ -905,7 +775,6 @@ class _HomePageState extends State<HomePage> {
         setState(() {
           activeTripId = null;
           activeTripStatus = null;
-          _lastTripLocationUpdate = null;
         });
       }
 
@@ -932,7 +801,6 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       activeTripId = null;
       activeTripStatus = null;
-      _lastTripLocationUpdate = null;
     });
   }
 
@@ -1251,65 +1119,56 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildActiveTripSheet({
-  required String tripId,
-  required String status,
-  required Map<String, dynamic> tripData,
-}) {
-  final String passengerName = tripData['passenger_name']?.toString() ??
-      tripData['userName']?.toString() ??
-      tripData['full_name']?.toString() ??
-      'passenger'.tr();
+    required String tripId,
+    required String status,
+    required Map<String, dynamic> tripData,
+  }) {
+    final String passengerName = tripData['passenger_name']?.toString() ??
+        tripData['userName']?.toString() ??
+        tripData['full_name']?.toString() ??
+        'passenger'.tr();
 
-  final String passengerPhone = tripData['passenger_phone']?.toString() ??
-      tripData['userPhone']?.toString() ??
-      tripData['phone']?.toString() ??
-      '';
+    final String passengerPhone = tripData['passenger_phone']?.toString() ??
+        tripData['userPhone']?.toString() ??
+        tripData['phone']?.toString() ??
+        '';
 
-  final String passengerRating =
-      '${tripData['userRating'] ?? tripData['rating'] ?? '4.8'}';
+    final String passengerRating =
+        '${tripData['userRating'] ?? tripData['rating'] ?? '4.8'}';
 
-  final String originAddress = tripData['origin_address']?.toString() ??
-      tripData['originAddress']?.toString() ??
-      tripData['pickup_address']?.toString() ??
-      '';
+    final String originAddress = tripData['origin_address']?.toString() ??
+        tripData['originAddress']?.toString() ??
+        tripData['pickup_address']?.toString() ??
+        '';
 
-  final String destinationAddress =
-      tripData['destination_address']?.toString() ??
-          tripData['destinationAddress']?.toString() ??
-          tripData['dropoff_address']?.toString() ??
-          '';
+    final String destinationAddress =
+        tripData['destination_address']?.toString() ??
+            tripData['destinationAddress']?.toString() ??
+            tripData['dropoff_address']?.toString() ??
+            '';
 
-  final String duration = _formatNumber(
-    tripData['trip_duration'] ??
-        tripData['duration'] ??
-        tripData['estimatedDuration'] ??
-        tripData['durationMinutes'],
-    decimals: 0,
-  );
+    final String duration = _formatNumber(
+      tripData['trip_duration'] ??
+          tripData['duration'] ??
+          tripData['estimatedDuration'] ??
+          tripData['durationMinutes'],
+      decimals: 0,
+    );
 
-  final String distance = _formatNumber(
-    tripData['distance'] ??
-        tripData['estimatedDistance'] ??
-        tripData['distanceKm'],
-    decimals: 1,
-  );
+    final String distance = _formatNumber(
+      tripData['distance'] ??
+          tripData['estimatedDistance'] ??
+          tripData['distanceKm'],
+      decimals: 1,
+    );
 
-  final String price = _formatNumber(
-    tripData['fare_amount'] ??
-        tripData['fareAmount'] ??
-        tripData['fare'] ??
-        tripData['price'],
-    decimals: 0,
-  );
-  // ادامه بقیه بخش‌های ویجت بدون تغییر...
-final String duration = _formatNumber(
-  tripData['trip_duration'] ??
-      tripData['duration'] ??
-      tripData['estimatedDuration'] ??
-      tripData['durationMinutes'],
-  decimals: 0,
-);
-
+    final String price = _formatNumber(
+      tripData['fare_amount'] ??
+          tripData['fareAmount'] ??
+          tripData['fare'] ??
+          tripData['price'],
+      decimals: 0,
+    );
 
     return DraggableScrollableSheet(
       initialChildSize: 0.62,
@@ -1774,38 +1633,36 @@ final String duration = _formatNumber(
   }
 
   LatLng? _getNavigationTarget(
-  String status,
-  Map<String, dynamic> tripData,
-) {
-  final bool goingToPickup = status == TripStatus.accepted ||
-      status == TripStatus.arrived;
+    String status,
+    Map<String, dynamic> tripData,
+  ) {
+    final bool goingToPickup = status == TripStatus.accepted ||
+        status == TripStatus.arrived;
 
-  return _extractLatLng(
-    tripData,
-    goingToPickup
-        ? [
-            'origin',
-            'originLatLng',
-            'pickup_location',
-            'pickupLatLng',
-          ]
-        : [
-            'destination',
-            'destinationLatLng',
-            'dropoff_location',
-            'dropoffLatLng',
-          ],
-    latKey: goingToPickup ? 'from_lat' : 'to_lat',
-    lngKey: goingToPickup ? 'from_lng' : 'to_lng',
-  );
-}
-
+    return _extractLatLng(
+      tripData,
+      goingToPickup
+          ? [
+              'origin',
+              'originLatLng',
+              'pickup_location',
+              'pickupLatLng',
+            ]
+          : [
+              'destination',
+              'destinationLatLng',
+              'dropoff_location',
+              'dropoffLatLng',
+            ],
+      latKey: goingToPickup ? 'from_lat' : 'to_lat',
+      lngKey: goingToPickup ? 'from_lng' : 'to_lng',
+    );
+  }
 
   String _formatNumber(dynamic value, {required int decimals}) {
     if (value == null) return '---';
 
     final String raw = value.toString();
-    // اصلاح‌شده: استفاده درست از \d جهت شناسایی ارقام
     final String cleaned = raw.replaceAll(RegExp(r'[^\d.]'), '');
 
     final double? number = double.tryParse(cleaned);
