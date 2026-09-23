@@ -460,25 +460,109 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+    // 🟢 ذخیره کامل مشخصات راننده و پلاک خودرو در سند سفر
+  // منبع داده: Firestore -> collection('drivers').doc(uid)
+  // ساختار دقیقاً مطابق RegistrationProvider.saveUserData / Driver.toMap()
   Future<void> _saveDriverDataToTripInfo(String tripId) async {
     final User? currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null || tripId.isEmpty) return;
 
     try {
-      final Map<String, dynamic> driverData = {
+      final DocumentSnapshot<Map<String, dynamic>> driverDoc =
+          await _firestore.collection('drivers').doc(currentUser.uid).get();
+
+      String realDriverName = '';
+      String realDriverPhone = '';
+      String realDriverPhoto = '';
+      String carModelName = '';
+      String carColorName = '';
+      String rawPlateNumber = '';
+      String plateProvince = '';
+      String plateCategory = '';
+      String plateType = '';
+
+      if (driverDoc.exists && driverDoc.data() != null) {
+        final Map<String, dynamic> data = driverDoc.data()!;
+
+        final String firstName = data['firstName']?.toString() ?? '';
+        final String secondName = data['secondName']?.toString() ?? '';
+        realDriverName = '$firstName $secondName'.trim();
+        realDriverPhone = data['phoneNumber']?.toString() ?? '';
+        // عکس پروفایل از Cloudinary آپلود و لینکش همین‌جا ذخیره شده
+        realDriverPhoto = data['profilePicture']?.toString() ?? '';
+
+        final dynamic vehicle = data['vehicleInfo'];
+        if (vehicle is Map) {
+          carModelName = vehicle['brand']?.toString() ?? '';
+          carColorName = vehicle['color']?.toString() ?? '';
+          rawPlateNumber = vehicle['registrationPlateNumber']?.toString() ?? '';
+          plateProvince = vehicle['plateProvince']?.toString() ?? '';
+          plateCategory = vehicle['plateCategory']?.toString() ?? '';
+          plateType = vehicle['plateType']?.toString() ?? '';
+        }
+      } else {
+        debugPrint(
+          '⚠️ Driver document not found in Firestore for uid: ${currentUser.uid}',
+        );
+      }
+
+      final String fullCarPlate = (plateProvince.isNotEmpty && rawPlateNumber.isNotEmpty)
+          ? '$plateProvince - $plateCategory $rawPlateNumber ($plateType)'
+          : rawPlateNumber;
+
+      final Map<String, dynamic> driverDataMap = {
         'driver_id': currentUser.uid,
         'driverId': currentUser.uid,
+
+        'driver_name': realDriverName,
+        'driverName': realDriverName,
+        'driver_phone': realDriverPhone,
+        'driverPhone': realDriverPhone,
+        'driver_photo': realDriverPhoto,
+        'driverPhoto': realDriverPhoto,
+
+        'car_details': '$carModelName - $fullCarPlate - $carColorName',
+        'carDetails': '$carModelName - $fullCarPlate - $carColorName',
+        'car_color': carColorName,
+        'carColor': carColorName,
+        'car_number': fullCarPlate,
+        'carNumber': fullCarPlate,
+
+        // فیلدهای جدا برای ویجت پلیت در اپ مسافر
+        'plate_province': plateProvince,
+        'plate_category': plateCategory,
+        'plate_num': rawPlateNumber,
+        // ⚠️ فیلد جدای «شماره پلیت به فارسی/دری» توی ثبت‌نام راننده وجود ندارد؛
+        // فعلاً همان شماره‌ی معمولی را برمی‌گردانیم تا UI خالی نماند.
+        // اگر لازم است این عدد جدا نمایش داده شود، باید فیلد مخصوصش
+        // به فرم ثبت‌نام راننده (numberPlateController) اضافه شود.
+        'plate_farsi_num': rawPlateNumber,
+        // ⚠️ فیلد «پلیت موقت» هم در ثبت‌نام راننده ذخیره نمی‌شود.
+        // فعلاً همیشه false می‌فرستیم؛ اگر واقعاً لازم است، باید یک
+        // چک‌باکس در فرم وسیله اضافه شود و این مقدار از همان‌جا بیاید.
+        'is_temp_plate': false,
+
         'driver_data_updated_at': FieldValue.serverTimestamp(),
       };
 
+      if (currentPositionOfDriver != null) {
+        driverDataMap['driverLocation'] = {
+          'latitude': currentPositionOfDriver!.latitude,
+          'longitude': currentPositionOfDriver!.longitude,
+        };
+        driverDataMap['driver_lat'] = currentPositionOfDriver!.latitude;
+        driverDataMap['driver_lng'] = currentPositionOfDriver!.longitude;
+      }
+
       await _firestore.collection('rides').doc(tripId).set(
-        driverData,
-        SetOptions(merge: true),
-      );
+            driverDataMap,
+            SetOptions(merge: true),
+          );
     } catch (e) {
       debugPrint('Error saving driver data into trip: $e');
     }
   }
+
 
   Future<void> _startPickupRoute(
     String tripId,
