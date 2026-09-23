@@ -1255,25 +1255,30 @@ class _HomePageState extends State<HomePage> {
     required String status,
     required Map<String, dynamic> tripData,
   }) {
-    final String passengerName = tripData['userName']?.toString() ??
-        tripData['full_name']?.toString() ??
-        'passenger'.tr();
+    final String passengerName = tripData['passenger_name']?.toString() ??
+    tripData['userName']?.toString() ??
+    tripData['full_name']?.toString() ??
+    'passenger'.tr();
 
-    final String passengerPhone = tripData['userPhone']?.toString() ??
-        tripData['phone']?.toString() ??
-        '';
+final String passengerPhone = tripData['passenger_phone']?.toString() ??
+    tripData['userPhone']?.toString() ??
+    tripData['phone']?.toString() ??
+    '';
+
 
     final String passengerRating =
         '${tripData['userRating'] ?? tripData['rating'] ?? '4.8'}';
 
-    final String originAddress = tripData['originAddress']?.toString() ??
-        tripData['pickup_address']?.toString() ??
-        '';
+    final String originAddress = tripData['origin_address']?.toString() ??
+    tripData['originAddress']?.toString() ??
+    tripData['pickup_address']?.toString() ??
+    '';
 
-    final String destinationAddress =
-        tripData['destinationAddress']?.toString() ??
-            tripData['dropoff_address']?.toString() ??
-            '';
+final String destinationAddress = tripData['destination_address']?.toString() ??
+    tripData['destinationAddress']?.toString() ??
+    tripData['dropoff_address']?.toString() ??
+    '';
+
 
     final String duration = _formatNumber(
       tripData['duration'] ??
