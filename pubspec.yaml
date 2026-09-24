@@ -11,25 +11,19 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # پکیج مدیریت چندزبانه و ترجمه
   easy_localization: ^3.0.7
 
-  # سیستم چندزبانه داخلی فلاتر
   flutter_localizations:
     sdk: flutter
 
   audioplayers: ^6.0.0
 
-  # نقشه و محاسبات جغرافیایی
   maplibre_gl: ^0.26.2
   latlong2: ^0.9.1
 
-  # موقعیت مکانی GPS
   geolocator: ^12.0.0
-
   connectivity_plus: ^6.0.4
 
-  # فایربیس
   firebase_core: ^3.3.0
   firebase_auth: ^5.1.2
   cloud_firestore: ^5.1.0
@@ -41,10 +35,8 @@ dependencies:
   image_picker: ^1.1.2
   image_cropper: ^8.0.0
 
-  # پکیج Geofire
   flutter_geofire: ^2.0.7
 
-  # اعلان‌ها و نوتیفیکیشن
   flutter_notification_channel: ^3.1.0
 
   http: ^1.2.2
@@ -52,7 +44,6 @@ dependencies:
   cupertino_icons: ^1.0.6
   restart_app: ^1.2.1
   country_picker: ^2.0.24
-
   rounded_loading_button_plus: ^3.0.1
 
   google_sign_in: ^6.2.1
@@ -62,7 +53,6 @@ dependencies:
   cached_network_image: ^3.3.1
   shared_preferences: ^2.2.3
 
-  # گوینده صوتی
   flutter_tts: ^4.0.2
 
 dev_dependencies:
@@ -73,7 +63,6 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
-  # 👈 معرفی فونت ایران یکان با وزن‌های مختلف
   fonts:
     - family: IranYekan
       fonts:
@@ -82,10 +71,10 @@ flutter:
         - asset: assets/fonts/iranyekanwebbold.ttf
           weight: 700
 
-  # 👈 معرفی تمامی پوشه‌ها و فایل‌های مورد نیاز
   assets:
     - assets/translations/
     - assets/audio/fa/
+    - assets/audio/fa/alert-sound.mp3
     - assets/fonts/
     - assets/images/
     - assets/map/style.json
