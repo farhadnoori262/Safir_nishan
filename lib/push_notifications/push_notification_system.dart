@@ -299,30 +299,30 @@ class PushNotificationSystem {
 
       await _startTripAlertSound();
 
-      try {
-        await showDialog(
-          context: currentContext,
-          barrierDismissible: false,
-          builder: (BuildContext dialogContext) {
-            return NotificationDialog(
-              tripDetailsInfo: tripDetailsInfo,
-              bidAmount: bidAmount,
-              fareAmount: fareAmount,
-            );
-          },
-        );
-      } finally {
-        await _stopTripAlertSound();
-        _isTripDialogOpen = false;
-        _shownTripId = null;
-      }
-    } catch (e, stackTrace) {
-      await _stopTripAlertSound();
-      _isTripDialogOpen = false;
-      _shownTripId = null;
+try {
+  await showDialog(
+    context: currentContext,
+    barrierDismissible: false,
+    builder: (BuildContext dialogContext) {
+      return NotificationDialog(
+        tripDetailsInfo: tripDetailsInfo,
+        bidAmount: bidAmount,
+        fareAmount: fareAmount,
+      );
+    },
+  );
+} finally {
+  await _stopTripAlertSound();
+  _isTripDialogOpen = false;
+  _shownTripId = null;
+}
+} catch (e, stackTrace) {
+  await _stopTripAlertSound();
+  _isTripDialogOpen = false;
+  _shownTripId = null;
 
-      log('Error parsing trip request info from Firestore: $e
+  log('Error parsing trip request info from Firestore: $e
 $stackTrace');
-    }
-  }
+}
+}
 }
