@@ -316,13 +316,12 @@ try {
   _isTripDialogOpen = false;
   _shownTripId = null;
 }
-} catch (e, stackTrace) {
+} catch (e) {
   await _stopTripAlertSound();
   _isTripDialogOpen = false;
   _shownTripId = null;
 
-  log('Error parsing trip request info from Firestore: $e
-$stackTrace');
+  log('Error parsing trip request info from Firestore: $e');
 }
 }
 }
