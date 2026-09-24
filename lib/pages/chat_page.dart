@@ -46,25 +46,40 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
-  // 🟢 ارسال پیام توسط راننده
-  void sendMessage() async {
-    String text = _messageController.text.trim();
-    if (text.isEmpty || widget.tripId.isEmpty) return;
+  // این فقط برای فایل chat_page.dart سمت راننده (پروژه‌ی safir_drivers) است.
+// تابع sendMessage قبلی را با همین جایگزین کن.
+// کالکشن از قبل درست بود ("rides")؛ فقط try/catch و ترتیب clear() اصلاح شد.
 
-    _messageController.clear();
-    String currentUserId = FirebaseAuth.instance.currentUser?.uid ?? "";
+void sendMessage() async {
+  final String text = _messageController.text.trim();
+  if (text.isEmpty || widget.tripId.isEmpty) return;
 
+  final String currentUserId = FirebaseAuth.instance.currentUser?.uid ?? "";
+
+  try {
     await FirebaseFirestore.instance
         .collection("rides")
         .doc(widget.tripId)
         .collection("chats")
         .add({
       "senderId": currentUserId,
-      "senderType": "driver", // شناسایی دقیق ارسال کننده به عنوان راننده
+      "senderType": "driver",
       "message": text,
       "timestamp": FieldValue.serverTimestamp(),
     });
+
+    // فقط بعد از موفقیت پاک می‌شود
+    if (mounted) _messageController.clear();
+  } catch (e) {
+    debugPrint("Error sending message: $e");
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('ارسال پیام انجام نشد. دوباره تلاش کنید.')),
+      );
+    }
   }
+}
+
 
   @override
   Widget build(BuildContext context) {
