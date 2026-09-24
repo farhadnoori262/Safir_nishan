@@ -460,7 +460,7 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-    // 🟢 ذخیره کامل مشخصات راننده و پلاک خودرو در سند سفر
+      // 🟢 ذخیره کامل مشخصات راننده و پلاک خودرو در سند سفر
   // منبع داده: Firestore -> collection('drivers').doc(uid)
   // ساختار دقیقاً مطابق RegistrationProvider.saveUserData / Driver.toMap()
   Future<void> _saveDriverDataToTripInfo(String tripId) async {
@@ -521,8 +521,9 @@ class _HomePageState extends State<HomePage> {
         'driver_photo': realDriverPhoto,
         'driverPhoto': realDriverPhoto,
 
-        'car_details': '$carModelName - $fullCarPlate - $carColorName',
-        'carDetails': '$carModelName - $fullCarPlate - $carColorName',
+        // فقط مدل + رنگ در عنوان؛ جزئیات کامل پلاک جدا در باکس پلاک نمایش داده می‌شود
+        'car_details': '$carModelName - $carColorName',
+        'carDetails': '$carModelName - $carColorName',
         'car_color': carColorName,
         'carColor': carColorName,
         'car_number': fullCarPlate,
@@ -562,6 +563,7 @@ class _HomePageState extends State<HomePage> {
       debugPrint('Error saving driver data into trip: $e');
     }
   }
+
 
 
   Future<void> _startPickupRoute(
