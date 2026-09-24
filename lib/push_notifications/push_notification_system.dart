@@ -168,10 +168,14 @@ String? _shownTripId;
 
       // ۳. پخش صدای زنگ
       try {
-        await _audioPlayer.stop();
-        await _audioPlayer.play(AssetSource('audio/alert-sound.mp3'));
-      } catch (e) {
-        log("Audio error: $e");
+  await _audioPlayer.stop();
+  await _audioPlayer.setReleaseMode(ReleaseMode.loop);
+  await _audioPlayer.play(
+    AssetSource('audio/alert-sound.mp3'),
+    volume: 1.0,
+  );
+} catch (e) {
+  log('Audio error: $e');
       }
 
       TripDetails tripDetailsInfo = TripDetails();
@@ -240,6 +244,9 @@ try {
     },
   );
 } finally {
+  await _audioPlayer.stop();
+  await _audioPlayer.setReleaseMode(ReleaseMode.stop);
+
   _isTripDialogOpen = false;
   _shownTripId = null;
 }
