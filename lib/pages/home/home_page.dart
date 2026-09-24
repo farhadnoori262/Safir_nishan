@@ -880,12 +880,22 @@ class _HomePageState extends State<HomePage> {
   Future<void> _handleRemoteTripEnd() async {
     await _clearRouteAndNavigation();
 
+    // ✅ بدون این خط، وضعیت راننده در Firestore همچنان "مشغول" می‌ماند
+    // و سفرهای جدید بهش نمی‌رسد، حتی اگه مسافر سفر را لغو کرده باشد.
+    try {
+      await _setDriverStatus(status: 'waiting', isOnline: true);
+    } catch (e) {
+      debugPrint('Error resetting driver status after remote trip end: $e');
+    }
+
     if (!mounted) return;
 
     setState(() {
       activeTripId = null;
       activeTripStatus = null;
     });
+
+    await _showMessage('سفر توسط مسافر لغو شد.');
   }
 
   void _showStatusChangeModal() {
