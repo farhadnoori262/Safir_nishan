@@ -103,6 +103,23 @@ class NavigationController extends ChangeNotifier {
 
   List<LatLng> get currentRoutePoints =>
       List.unmodifiable(routePoints);
+  List<LatLng> get remainingRoutePoints {
+  if (routePoints.length < 2) {
+    return List.unmodifiable(routePoints);
+  }
+
+  final int startIndex = _lastMatchedSegmentIndex.clamp(
+    0,
+    routePoints.length - 2,
+  );
+
+  final List<LatLng> remainingPoints = [
+    if (snappedDriverLocation != null) snappedDriverLocation!,
+    ...routePoints.sublist(startIndex + 1),
+  ];
+
+  return List.unmodifiable(remainingPoints);
+  }
 
   List<StepInstruction> get routeSteps =>
       List.unmodifiable(_steps);
