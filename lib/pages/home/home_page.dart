@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:typed_data';
+import 'package:flutter/services.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:easy_localization/easy_localization.dart';
@@ -79,12 +79,38 @@ bool _isMapStyleReady = false;
     mapController = controller;
   }
 
-  void _animateMapToPosition(double lat, double lng) {
-    if (mapController == null) return;
+  Future<void> _centerMapOnDriver() async {
+  if (mapController == null) return;
 
-    mapController!.animateCamera(
-      CameraUpdate.newLatLng(LatLng(lat, lng)),
-    );
+  final Position? livePosition = await getCurrentLiveLocationOfDriver();
+  if (livePosition == null || mapController == null) return;
+
+  LatLng target = LatLng(
+    livePosition.latitude,
+    livePosition.longitude,
+  );
+
+  if (mounted) {
+    final NavigationController navController =
+        context.read<NavigationController>();
+
+    if (navController.isNavigating &&
+        navController.snappedDriverLocation != null) {
+      target = navController.snappedDriverLocation!;
+      await _updateDriverNavigationArrow(navController);
+    }
+  }
+
+  await mapController!.animateCamera(
+    CameraUpdate.newCameraPosition(
+      CameraPosition(
+        target: target,
+        zoom: 17,
+        bearing: 0,
+        tilt: 0,
+      ),
+    ),
+  );
   }
 
   bool _isActiveTripStatus(String? status) {
@@ -146,31 +172,21 @@ bool _isMapStyleReady = false;
   Future<void> _prepareDriverNavigationArrow() async {
   if (mapController == null || _isDriverArrowImageAdded) return;
 
-  const String arrowSvg = '''
-<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80">
-  <path d="M40 4 L67 70 L40 58 L13 70 Z"
-        fill="#1565C0"
-        stroke="#FFFFFF"
-        stroke-width="5"
-        stroke-linejoin="round"/>
-</svg>
-''';
-
   try {
-    final Uint8List imageBytes = Uint8List.fromList(
-      arrowSvg.codeUnits,
+    final ByteData imageData = await rootBundle.load(
+      'assets/images/driver_navigation_arrow.png',
     );
 
     await mapController!.addImage(
       'driver_navigation_arrow',
-      imageBytes,
+      imageData.buffer.asUint8List(),
     );
 
     _isDriverArrowImageAdded = true;
   } catch (e) {
     debugPrint('Error preparing driver navigation arrow: $e');
   }
-}
+  }
 
 Future<void> _updateDriverNavigationArrow(
   NavigationController navController,
@@ -242,7 +258,6 @@ Future<void> _updateDriverNavigationArrow(
 
       if (mounted) {
         setState(() {});
-        _animateMapToPosition(position.latitude, position.longitude);
       }
 
       return position;
@@ -520,6 +535,10 @@ Future<void> _updateDriverNavigationArrow(
 
       if (mapController != null) {
         await mapController!.clearLines();
+        if (mapController != null && _driverNavigationSymbol != null) {
+  await mapController!.removeSymbol(_driverNavigationSymbol!);
+  _driverNavigationSymbol = null;
+        }
       }
     } catch (e) {
       debugPrint('Error clearing route: $e');
@@ -1158,7 +1177,7 @@ Future<void> _updateDriverNavigationArrow(
                 heroTag: 'recenter_btn',
                 elevation: 1,
                 backgroundColor: Colors.white,
-                onPressed: () => getCurrentLiveLocationOfDriver(),
+                onPressed: _centerMapOnDriver,
                 child: const Icon(
                   Icons.my_location_rounded,
                   color: Color(0xFF0F7D55),
