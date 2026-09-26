@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:easy_localization/easy_localization.dart';
@@ -26,6 +27,9 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   MapLibreMapController? mapController;
+  Symbol? _driverNavigationSymbol;
+bool _isDriverArrowImageAdded = false;
+bool _isMapStyleReady = false;
   Position? currentPositionOfDriver;
 
   bool isDriverAvailable = false;
@@ -139,6 +143,66 @@ class _HomePageState extends State<HomePage> {
 
     return null;
   }
+  Future<void> _prepareDriverNavigationArrow() async {
+  if (mapController == null || _isDriverArrowImageAdded) return;
+
+  const String arrowSvg = '''
+<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80">
+  <path d="M40 4 L67 70 L40 58 L13 70 Z"
+        fill="#1565C0"
+        stroke="#FFFFFF"
+        stroke-width="5"
+        stroke-linejoin="round"/>
+</svg>
+''';
+
+  try {
+    final Uint8List imageBytes = Uint8List.fromList(
+      arrowSvg.codeUnits,
+    );
+
+    await mapController!.addImage(
+      'driver_navigation_arrow',
+      imageBytes,
+    );
+
+    _isDriverArrowImageAdded = true;
+  } catch (e) {
+    debugPrint('Error preparing driver navigation arrow: $e');
+  }
+}
+
+Future<void> _updateDriverNavigationArrow(
+  NavigationController navController,
+) async {
+  if (mapController == null || !_isMapStyleReady) return;
+
+  final LatLng? snappedPosition = navController.snappedDriverLocation;
+  if (snappedPosition == null || !navController.isNavigating) return;
+
+  await _prepareDriverNavigationArrow();
+
+  try {
+    final SymbolOptions options = SymbolOptions(
+      geometry: snappedPosition,
+      iconImage: 'driver_navigation_arrow',
+      iconSize: 0.55,
+      iconRotate: navController.driverRouteBearing,
+      iconAnchor: 'center',
+    );
+
+    if (_driverNavigationSymbol == null) {
+      _driverNavigationSymbol = await mapController!.addSymbol(options);
+    } else {
+      await mapController!.updateSymbol(
+        _driverNavigationSymbol!,
+        options,
+      );
+    }
+  } catch (e) {
+    debugPrint('Error updating driver navigation arrow: $e');
+  }
+}
 
   Future<void> _showMessage(String message) async {
     if (!mounted) return;
@@ -319,7 +383,7 @@ class _HomePageState extends State<HomePage> {
 
         if (!mounted) return;
 
-        _animateMapToPosition(position.latitude, position.longitude);
+        //_animateMapToPosition(position.latitude, position.longitude);
 
         // ۱. به‌روزرسانی موقعیت مکانی زنده در کالکشن اختصاصی driver_locations
         await _updateDriverLiveLocation(position);
@@ -329,15 +393,17 @@ class _HomePageState extends State<HomePage> {
             context.read<NavigationController>();
 
         if (navController.isNavigating) {
-          navController.updateDriverPosition(
-            LatLng(position.latitude, position.longitude),
-            langCode: context.locale.languageCode,
-          );
+  navController.updateDriverPosition(
+    LatLng(position.latitude, position.longitude),
+    langCode: context.locale.languageCode,
+  );
 
-          if (mapController != null &&
-              navController.currentRoutePoints.isNotEmpty) {
-            await _drawRoutePolyline(navController.currentRoutePoints);
-          }
+  await _updateDriverNavigationArrow(navController);
+
+  if (mapController != null &&
+      navController.remainingRoutePoints.length > 1) {
+    await _drawRoutePolyline(navController.remainingRoutePoints);
+  }
         }
       },
       onError: (Object error) {
@@ -1070,9 +1136,20 @@ class _HomePageState extends State<HomePage> {
                 zoom: 15,
               ),
               styleString: 'assets/map/style.json',
-              myLocationEnabled: true,
-              myLocationTrackingMode: MyLocationTrackingMode.tracking,
+
+           // راننده فقط بتواند نقشه را جابه‌جا و zoom کند.
+             rotateGesturesEnabled: false,
+             tiltGesturesEnabled: false,
+
+          // دایرهٔ GPS نمایش داده می‌شود، اما GPS نقشه را خودکار حرکت یا rotate نمی‌دهد.
+             myLocationEnabled: true,
+             myLocationTrackingMode: MyLocationTrackingMode.none,
+
               onMapCreated: _onMapCreated,
+              onStyleLoadedCallback: () async {
+             _isMapStyleReady = true;
+             await _prepareDriverNavigationArrow();
+            },
             ),
             Positioned(
               top: 20,
