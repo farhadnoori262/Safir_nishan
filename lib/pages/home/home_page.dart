@@ -184,19 +184,35 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  /// 🔧 FIX: this now accepts a fallback position and no longer silently
+  /// no-ops when [NavigationController.snappedDriverLocation] hasn't been
+  /// computed yet (which happens right after navigation starts, before the
+  /// first GPS tick is snapped to the route). Without the fallback, the
+  /// arrow symbol was never created until the driver physically moved,
+  /// which is why it appeared "missing" right after accepting a trip.
   Future<void> _updateDriverNavigationArrow(
-    NavigationController navController,
-  ) async {
+    NavigationController navController, {
+    LatLng? fallbackPosition,
+  }) async {
     if (mapController == null || !_isMapStyleReady) return;
+    if (!navController.isNavigating) return;
 
-    final LatLng? snappedPosition = navController.snappedDriverLocation;
-    if (snappedPosition == null || !navController.isNavigating) return;
+    final LatLng? position = navController.snappedDriverLocation ??
+        fallbackPosition ??
+        (currentPositionOfDriver != null
+            ? LatLng(
+                currentPositionOfDriver!.latitude,
+                currentPositionOfDriver!.longitude,
+              )
+            : null);
+
+    if (position == null) return;
 
     await _prepareDriverNavigationArrow();
 
     try {
       final SymbolOptions options = SymbolOptions(
-        geometry: snappedPosition,
+        geometry: position,
         iconImage: 'driver_navigation_arrow',
         iconSize: 0.55,
         iconRotate: navController.driverRouteBearing,
@@ -271,6 +287,9 @@ class _HomePageState extends State<HomePage> {
 
       if (!mounted) return;
 
+      // 🔧 FIX: flip the flag BEFORE calling goOnlineNow(), since
+      // goOnlineNow() -> _updateDriverLiveLocation() checks isDriverAvailable
+      // and silently skips the Firestore write if it's still false.
       setState(() {
         isDriverAvailable = savedStatus;
       });
@@ -404,7 +423,10 @@ class _HomePageState extends State<HomePage> {
             langCode: context.locale.languageCode,
           );
 
-          await _updateDriverNavigationArrow(navController);
+          await _updateDriverNavigationArrow(
+            navController,
+            fallbackPosition: LatLng(position.latitude, position.longitude),
+          );
 
           if (mapController != null &&
               navController.remainingRoutePoints.length > 1) {
@@ -741,6 +763,15 @@ class _HomePageState extends State<HomePage> {
     if (routePoints.isNotEmpty) {
       await _drawRoutePolyline(routePoints);
     }
+
+    // 🔧 FIX: place/refresh the navigation arrow immediately instead of
+    // waiting for the next GPS tick from setAndGetLocationUpdates(). Without
+    // this, the arrow was invisible from the moment a trip was accepted
+    // until the driver's GPS registered a >=4m move.
+    await _updateDriverNavigationArrow(
+      navController,
+      fallbackPosition: driverPos,
+    );
   }
 
   Future<void> _updateTripStatus(
@@ -1051,25 +1082,36 @@ class _HomePageState extends State<HomePage> {
 
                                   try {
                                     if (!isDriverAvailable) {
-                                      await goOnlineNow();
-                                      setAndGetLocationUpdates();
-                                      listenForTripRequests();
-                                      await _saveDriverStatus(true);
-
+                                      // 🔧 FIX: flip the flag to true FIRST
+                                      // (before goOnlineNow), otherwise
+                                      // _updateDriverLiveLocation() silently
+                                      // skips writing the driver's real
+                                      // coordinates to Firestore, leaving
+                                      // driver_locations pointing at stale
+                                      // data until the next 4m+ GPS move.
                                       if (mounted) {
                                         setState(() {
                                           isDriverAvailable = true;
                                         });
+                                      } else {
+                                        isDriverAvailable = true;
                                       }
-                                    } else {
-                                      await goOfflineNow();
-                                      await _saveDriverStatus(false);
 
+                                      await goOnlineNow();
+                                      setAndGetLocationUpdates();
+                                      listenForTripRequests();
+                                      await _saveDriverStatus(true);
+                                    } else {
                                       if (mounted) {
                                         setState(() {
                                           isDriverAvailable = false;
                                         });
+                                      } else {
+                                        isDriverAvailable = false;
                                       }
+
+                                      await goOfflineNow();
+                                      await _saveDriverStatus(false);
                                     }
                                   } catch (e) {
                                     debugPrint('Status update error: $e');
