@@ -17,6 +17,7 @@ import 'package:safir_drivers/pages/chat_page.dart';
 import 'package:safir_drivers/providers/registration_provider.dart';
 import 'package:safir_drivers/utils/app_colors.dart';
 import '../../push_notifications/push_notification_system.dart';
+import 'active_trip_sheet.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -28,8 +29,8 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   MapLibreMapController? mapController;
   Symbol? _driverNavigationSymbol;
-bool _isDriverArrowImageAdded = false;
-bool _isMapStyleReady = false;
+  bool _isDriverArrowImageAdded = false;
+  bool _isMapStyleReady = false;
   Position? currentPositionOfDriver;
 
   bool isDriverAvailable = false;
@@ -80,43 +81,37 @@ bool _isMapStyleReady = false;
   }
 
   Future<void> _centerMapOnDriver() async {
-  if (mapController == null) return;
+    if (mapController == null) return;
 
-  final Position? livePosition = await getCurrentLiveLocationOfDriver();
-  if (livePosition == null || mapController == null) return;
+    final Position? livePosition = await getCurrentLiveLocationOfDriver();
+    if (livePosition == null || mapController == null) return;
 
-  LatLng target = LatLng(
-    livePosition.latitude,
-    livePosition.longitude,
-  );
+    LatLng target = LatLng(
+      livePosition.latitude,
+      livePosition.longitude,
+    );
 
-  if (mounted) {
-    final NavigationController navController =
-        context.read<NavigationController>();
+    if (mounted) {
+      final NavigationController navController =
+          context.read<NavigationController>();
 
-    if (navController.isNavigating &&
-        navController.snappedDriverLocation != null) {
-      target = navController.snappedDriverLocation!;
-      await _updateDriverNavigationArrow(navController);
+      if (navController.isNavigating &&
+          navController.snappedDriverLocation != null) {
+        target = navController.snappedDriverLocation!;
+        await _updateDriverNavigationArrow(navController);
+      }
     }
-  }
 
-  await mapController!.animateCamera(
-    CameraUpdate.newCameraPosition(
-      CameraPosition(
-        target: target,
-        zoom: 17,
-        bearing: 0,
-        tilt: 0,
+    await mapController!.animateCamera(
+      CameraUpdate.newCameraPosition(
+        CameraPosition(
+          target: target,
+          zoom: 17,
+          bearing: 0,
+          tilt: 0,
+        ),
       ),
-    ),
-  );
-  }
-
-  bool _isActiveTripStatus(String? status) {
-    return status == TripStatus.accepted ||
-        status == TripStatus.arrived ||
-        status == TripStatus.onTrip;
+    );
   }
 
   bool _isTripOwnedByCurrentDriver(Map<String, dynamic> tripData) {
@@ -169,56 +164,57 @@ bool _isMapStyleReady = false;
 
     return null;
   }
+
   Future<void> _prepareDriverNavigationArrow() async {
-  if (mapController == null || _isDriverArrowImageAdded) return;
+    if (mapController == null || _isDriverArrowImageAdded) return;
 
-  try {
-    final ByteData imageData = await rootBundle.load(
-      'assets/images/driver_navigation_arrow.png',
-    );
-
-    await mapController!.addImage(
-      'driver_navigation_arrow',
-      imageData.buffer.asUint8List(),
-    );
-
-    _isDriverArrowImageAdded = true;
-  } catch (e) {
-    debugPrint('Error preparing driver navigation arrow: $e');
-  }
-  }
-
-Future<void> _updateDriverNavigationArrow(
-  NavigationController navController,
-) async {
-  if (mapController == null || !_isMapStyleReady) return;
-
-  final LatLng? snappedPosition = navController.snappedDriverLocation;
-  if (snappedPosition == null || !navController.isNavigating) return;
-
-  await _prepareDriverNavigationArrow();
-
-  try {
-    final SymbolOptions options = SymbolOptions(
-      geometry: snappedPosition,
-      iconImage: 'driver_navigation_arrow',
-      iconSize: 0.55,
-      iconRotate: navController.driverRouteBearing,
-      iconAnchor: 'center',
-    );
-
-    if (_driverNavigationSymbol == null) {
-      _driverNavigationSymbol = await mapController!.addSymbol(options);
-    } else {
-      await mapController!.updateSymbol(
-        _driverNavigationSymbol!,
-        options,
+    try {
+      final ByteData imageData = await rootBundle.load(
+        'assets/images/driver_navigation_arrow.png',
       );
+
+      await mapController!.addImage(
+        'driver_navigation_arrow',
+        imageData.buffer.asUint8List(),
+      );
+
+      _isDriverArrowImageAdded = true;
+    } catch (e) {
+      debugPrint('Error preparing driver navigation arrow: $e');
     }
-  } catch (e) {
-    debugPrint('Error updating driver navigation arrow: $e');
   }
-}
+
+  Future<void> _updateDriverNavigationArrow(
+    NavigationController navController,
+  ) async {
+    if (mapController == null || !_isMapStyleReady) return;
+
+    final LatLng? snappedPosition = navController.snappedDriverLocation;
+    if (snappedPosition == null || !navController.isNavigating) return;
+
+    await _prepareDriverNavigationArrow();
+
+    try {
+      final SymbolOptions options = SymbolOptions(
+        geometry: snappedPosition,
+        iconImage: 'driver_navigation_arrow',
+        iconSize: 0.55,
+        iconRotate: navController.driverRouteBearing,
+        iconAnchor: 'center',
+      );
+
+      if (_driverNavigationSymbol == null) {
+        _driverNavigationSymbol = await mapController!.addSymbol(options);
+      } else {
+        await mapController!.updateSymbol(
+          _driverNavigationSymbol!,
+          options,
+        );
+      }
+    } catch (e) {
+      debugPrint('Error updating driver navigation arrow: $e');
+    }
+  }
 
   Future<void> _showMessage(String message) async {
     if (!mounted) return;
@@ -311,7 +307,6 @@ Future<void> _updateDriverNavigationArrow(
     );
   }
 
-  /// به‌روزرسانی اختصاصی موقعیت مکانی زنده راننده در کالکشن driver_locations
   Future<void> _updateDriverLiveLocation(Position position) async {
     final User? user = FirebaseAuth.instance.currentUser;
     if (user == null || !isDriverAvailable) return;
@@ -398,27 +393,23 @@ Future<void> _updateDriverNavigationArrow(
 
         if (!mounted) return;
 
-        //_animateMapToPosition(position.latitude, position.longitude);
-
-        // ۱. به‌روزرسانی موقعیت مکانی زنده در کالکشن اختصاصی driver_locations
         await _updateDriverLiveLocation(position);
 
-        // ۲. به‌روزرسانی مسیریاب در برنامه
         final NavigationController navController =
             context.read<NavigationController>();
 
         if (navController.isNavigating) {
-  navController.updateDriverPosition(
-    LatLng(position.latitude, position.longitude),
-    langCode: context.locale.languageCode,
-  );
+          navController.updateDriverPosition(
+            LatLng(position.latitude, position.longitude),
+            langCode: context.locale.languageCode,
+          );
 
-  await _updateDriverNavigationArrow(navController);
+          await _updateDriverNavigationArrow(navController);
 
-  if (mapController != null &&
-      navController.remainingRoutePoints.length > 1) {
-    await _drawRoutePolyline(navController.remainingRoutePoints);
-  }
+          if (mapController != null &&
+              navController.remainingRoutePoints.length > 1) {
+            await _drawRoutePolyline(navController.remainingRoutePoints);
+          }
         }
       },
       onError: (Object error) {
@@ -536,8 +527,8 @@ Future<void> _updateDriverNavigationArrow(
       if (mapController != null) {
         await mapController!.clearLines();
         if (mapController != null && _driverNavigationSymbol != null) {
-  await mapController!.removeSymbol(_driverNavigationSymbol!);
-  _driverNavigationSymbol = null;
+          await mapController!.removeSymbol(_driverNavigationSymbol!);
+          _driverNavigationSymbol = null;
         }
       }
     } catch (e) {
@@ -545,9 +536,6 @@ Future<void> _updateDriverNavigationArrow(
     }
   }
 
-      // 🟢 ذخیره کامل مشخصات راننده و پلاک خودرو در سند سفر
-  // منبع داده: Firestore -> collection('drivers').doc(uid)
-  // ساختار دقیقاً مطابق RegistrationProvider.saveUserData / Driver.toMap()
   Future<void> _saveDriverDataToTripInfo(String tripId) async {
     final User? currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null || tripId.isEmpty) return;
@@ -573,7 +561,6 @@ Future<void> _updateDriverNavigationArrow(
         final String secondName = data['secondName']?.toString() ?? '';
         realDriverName = '$firstName $secondName'.trim();
         realDriverPhone = data['phoneNumber']?.toString() ?? '';
-        // عکس پروفایل از Cloudinary آپلود و لینکش همین‌جا ذخیره شده
         realDriverPhoto = data['profilePicture']?.toString() ?? '';
 
         final dynamic vehicle = data['vehicleInfo'];
@@ -606,7 +593,6 @@ Future<void> _updateDriverNavigationArrow(
         'driver_photo': realDriverPhoto,
         'driverPhoto': realDriverPhoto,
 
-        // فقط مدل + رنگ در عنوان؛ جزئیات کامل پلاک جدا در باکس پلاک نمایش داده می‌شود
         'car_details': '$carModelName - $carColorName',
         'carDetails': '$carModelName - $carColorName',
         'car_color': carColorName,
@@ -614,18 +600,10 @@ Future<void> _updateDriverNavigationArrow(
         'car_number': fullCarPlate,
         'carNumber': fullCarPlate,
 
-        // فیلدهای جدا برای ویجت پلیت در اپ مسافر
         'plate_province': plateProvince,
         'plate_category': plateCategory,
         'plate_num': rawPlateNumber,
-        // ⚠️ فیلد جدای «شماره پلیت به فارسی/دری» توی ثبت‌نام راننده وجود ندارد؛
-        // فعلاً همان شماره‌ی معمولی را برمی‌گردانیم تا UI خالی نماند.
-        // اگر لازم است این عدد جدا نمایش داده شود، باید فیلد مخصوصش
-        // به فرم ثبت‌نام راننده (numberPlateController) اضافه شود.
         'plate_farsi_num': rawPlateNumber,
-        // ⚠️ فیلد «پلیت موقت» هم در ثبت‌نام راننده ذخیره نمی‌شود.
-        // فعلاً همیشه false می‌فرستیم؛ اگر واقعاً لازم است، باید یک
-        // چک‌باکس در فرم وسیله اضافه شود و این مقدار از همان‌جا بیاید.
         'is_temp_plate': false,
 
         'driver_data_updated_at': FieldValue.serverTimestamp(),
@@ -648,8 +626,6 @@ Future<void> _updateDriverNavigationArrow(
       debugPrint('Error saving driver data into trip: $e');
     }
   }
-
-
 
   Future<void> _startPickupRoute(
     String tripId,
@@ -967,8 +943,6 @@ Future<void> _updateDriverNavigationArrow(
   Future<void> _handleRemoteTripEnd() async {
     await _clearRouteAndNavigation();
 
-    // ✅ بدون این خط، وضعیت راننده در Firestore همچنان "مشغول" می‌ماند
-    // و سفرهای جدید بهش نمی‌رسد، حتی اگه مسافر سفر را لغو کرده باشد.
     try {
       await _setDriverStatus(status: 'waiting', isOnline: true);
     } catch (e) {
@@ -983,6 +957,33 @@ Future<void> _updateDriverNavigationArrow(
     });
 
     await _showMessage('سفر توسط مسافر لغو شد.');
+  }
+
+  LatLng? _getNavigationTarget(
+    String status,
+    Map<String, dynamic> tripData,
+  ) {
+    final bool goingToPickup = status == TripStatus.accepted ||
+        status == TripStatus.arrived;
+
+    return _extractLatLng(
+      tripData,
+      goingToPickup
+          ? [
+              'origin',
+              'originLatLng',
+              'pickup_location',
+              'pickupLatLng',
+            ]
+          : [
+              'destination',
+              'destinationLatLng',
+              'dropoff_location',
+              'dropoffLatLng',
+            ],
+      latKey: goingToPickup ? 'from_lat' : 'to_lat',
+      lngKey: goingToPickup ? 'from_lng' : 'to_lng',
+    );
   }
 
   void _showStatusChangeModal() {
@@ -1155,20 +1156,15 @@ Future<void> _updateDriverNavigationArrow(
                 zoom: 15,
               ),
               styleString: 'assets/map/style.json',
-
-           // راننده فقط بتواند نقشه را جابه‌جا و zoom کند.
-             rotateGesturesEnabled: false,
-             tiltGesturesEnabled: false,
-
-          // دایرهٔ GPS نمایش داده می‌شود، اما GPS نقشه را خودکار حرکت یا rotate نمی‌دهد.
-             myLocationEnabled: true,
-             myLocationTrackingMode: MyLocationTrackingMode.none,
-
+              rotateGesturesEnabled: false,
+              tiltGesturesEnabled: false,
+              myLocationEnabled: true,
+              myLocationTrackingMode: MyLocationTrackingMode.none,
               onMapCreated: _onMapCreated,
               onStyleLoadedCallback: () async {
-             _isMapStyleReady = true;
-             await _prepareDriverNavigationArrow();
-            },
+                _isMapStyleReady = true;
+                await _prepareDriverNavigationArrow();
+              },
             ),
             Positioned(
               top: 20,
@@ -1297,624 +1293,25 @@ Future<void> _updateDriverNavigationArrow(
                     });
                   }
 
-                  return _buildActiveTripSheet(
+                  return ActiveTripSheet(
                     tripId: tripId,
                     status: status,
                     tripData: tripData,
+                    isTripActionLoading: _isTripActionLoading,
+                    onUpdateTripStatus: (tId, newStatus) {
+                      _updateTripStatus(tId, newStatus, tripData);
+                    },
+                    onCancelTrip: _cancelTrip,
+                    onMakePhoneCall: _makePhoneCall,
+                    onOpenExternalMap: (lat, lng) =>
+                        _openExternalMap(lat, lng),
+                    getNavigationTarget: () =>
+                        _getNavigationTarget(status, tripData),
                   );
                 },
               ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildActiveTripSheet({
-    required String tripId,
-    required String status,
-    required Map<String, dynamic> tripData,
-  }) {
-    final String passengerName = tripData['passenger_name']?.toString() ??
-        tripData['userName']?.toString() ??
-        tripData['full_name']?.toString() ??
-        'passenger'.tr();
-
-    final String passengerPhone = tripData['passenger_phone']?.toString() ??
-        tripData['userPhone']?.toString() ??
-        tripData['phone']?.toString() ??
-        '';
-
-    final String passengerRating =
-        '${tripData['userRating'] ?? tripData['rating'] ?? '4.8'}';
-
-    final String originAddress = tripData['origin_address']?.toString() ??
-        tripData['originAddress']?.toString() ??
-        tripData['pickup_address']?.toString() ??
-        '';
-
-    final String destinationAddress =
-        tripData['destination_address']?.toString() ??
-            tripData['destinationAddress']?.toString() ??
-            tripData['dropoff_address']?.toString() ??
-            '';
-
-    final String duration = _formatNumber(
-      tripData['trip_duration'] ??
-          tripData['duration'] ??
-          tripData['estimatedDuration'] ??
-          tripData['durationMinutes'],
-      decimals: 0,
-    );
-
-    final String distance = _formatNumber(
-      tripData['distance'] ??
-          tripData['estimatedDistance'] ??
-          tripData['distanceKm'],
-      decimals: 1,
-    );
-
-    final String price = _formatNumber(
-      tripData['fare_amount'] ??
-          tripData['fareAmount'] ??
-          tripData['fare'] ??
-          tripData['price'],
-      decimals: 0,
-    );
-
-    return DraggableScrollableSheet(
-      initialChildSize: 0.62,
-      minChildSize: 0.22,
-      maxChildSize: 0.90,
-      snap: true,
-      snapSizes: const [0.22, 0.62, 0.90],
-      builder: (BuildContext context, ScrollController scrollController) {
-        return Container(
-          decoration: BoxDecoration(
-            color: const Color(0xFFF8FAFC),
-            borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(28),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.08),
-                blurRadius: 20,
-                offset: const Offset(0, -6),
-              ),
-            ],
-          ),
-          child: SingleChildScrollView(
-            controller: scrollController,
-            padding: const EdgeInsets.symmetric(
-              horizontal: 20,
-              vertical: 12,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 44,
-                  height: 5,
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                _buildPassengerCard(
-                  passengerName: passengerName,
-                  passengerPhone: passengerPhone,
-                  passengerRating: passengerRating,
-                ),
-                const SizedBox(height: 12),
-                _buildAddressCard(
-                  originAddress: originAddress,
-                  destinationAddress: destinationAddress,
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildInfoCard(
-                        'estimated_time_label'.tr(),
-                        duration == '---' ? '---' : '$duration min',
-                        Icons.access_time_rounded,
-                        Colors.orange,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _buildInfoCard(
-                        'estimated_distance_label'.tr(),
-                        distance == '---' ? '---' : '$distance km',
-                        Icons.alt_route_rounded,
-                        Colors.blue,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _buildInfoCard(
-                        'estimated_fare_label'.tr(),
-                        price == '---' ? '---' : '$price AFN',
-                        Icons.account_balance_wallet_rounded,
-                        Colors.green,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                _buildNavigationNotice(),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton(
-                    onPressed: _isTripActionLoading
-                        ? null
-                        : () {
-                            if (status == TripStatus.accepted) {
-                              _updateTripStatus(
-                                tripId,
-                                TripStatus.arrived,
-                                tripData,
-                              );
-                            } else if (status == TripStatus.arrived) {
-                              _updateTripStatus(
-                                tripId,
-                                TripStatus.onTrip,
-                                tripData,
-                              );
-                            } else if (status == TripStatus.onTrip) {
-                              _updateTripStatus(
-                                tripId,
-                                TripStatus.completed,
-                                tripData,
-                              );
-                            }
-                          },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0F7D55),
-                      disabledBackgroundColor: const Color(0xFF0F7D55)
-                          .withOpacity(0.45),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    child: _isTripActionLoading
-                        ? const SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.5,
-                              color: Colors.white,
-                            ),
-                          )
-                        : Text(
-                            _getActionButtonTitle(status),
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: SizedBox(
-                        height: 44,
-                        child: ElevatedButton.icon(
-                          onPressed: _isTripActionLoading
-                              ? null
-                              : () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => ChatPage(
-                                        tripId: tripId,
-                                        passengerName: passengerName,
-                                        passengerPhone: passengerPhone,
-                                      ),
-                                    ),
-                                  );
-                                },
-                          icon: const Icon(
-                            Icons.chat_bubble_outline_rounded,
-                            color: Color(0xFF1E88E5),
-                            size: 18,
-                          ),
-                          label: Text(
-                            'btn_sms_chat'.tr(),
-                            style: const TextStyle(
-                              color: Color(0xFF1E88E5),
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFE3F2FD),
-                            disabledBackgroundColor:
-                                const Color(0xFFE3F2FD).withOpacity(0.5),
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    if (status != TripStatus.onTrip) ...[
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: SizedBox(
-                          height: 44,
-                          child: ElevatedButton(
-                            onPressed: _isTripActionLoading
-                                ? null
-                                : () => _cancelTrip(tripId),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFFFEBEE),
-                              disabledBackgroundColor:
-                                  const Color(0xFFFFEBEE).withOpacity(0.5),
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: Text(
-                              'btn_cancel_trip'.tr(),
-                              style: const TextStyle(
-                                color: Color(0xFFE53935),
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton.icon(
-                    onPressed: _isTripActionLoading
-                        ? null
-                        : () async {
-                            final LatLng? targetPosition =
-                                _getNavigationTarget(status, tripData);
-
-                            if (targetPosition == null) {
-                              await _showMessage(
-                                'مختصات مبدأ یا مقصد این سفر پیدا نشد.',
-                              );
-                              return;
-                            }
-
-                            await _openExternalMap(
-                              targetPosition.latitude,
-                              targetPosition.longitude,
-                            );
-                          },
-                    icon: const Icon(
-                      Icons.near_me_rounded,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                    label: Text(
-                      (status == TripStatus.accepted ||
-                              status == TripStatus.arrived)
-                          ? 'btn_external_navigation_origin'.tr()
-                          : 'btn_external_navigation_destination'.tr(),
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF1565C0),
-                      disabledBackgroundColor:
-                          const Color(0xFF1565C0).withOpacity(0.45),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildPassengerCard({
-    required String passengerName,
-    required String passengerPhone,
-    required String passengerRating,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: const Color(0xFF0F7D55).withOpacity(0.12),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.person_rounded,
-              color: Color(0xFF0F7D55),
-              size: 28,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  passengerName,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.star_rounded,
-                      color: Colors.amber,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      passengerRating,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        passengerPhone,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          Material(
-            color: const Color(0xFFE8F5E9),
-            shape: const CircleBorder(),
-            child: IconButton(
-              onPressed: () => _makePhoneCall(passengerPhone),
-              icon: const Icon(
-                Icons.phone_in_talk_rounded,
-                color: Color(0xFF2E7D32),
-                size: 22,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAddressCard({
-    required String originAddress,
-    required String destinationAddress,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Column(
-            children: [
-              const Icon(
-                Icons.circle,
-                color: Color(0xFF0F7D55),
-                size: 12,
-              ),
-              Container(
-                width: 2,
-                height: 32,
-                color: Colors.grey.shade300,
-              ),
-              const Icon(
-                Icons.location_on_rounded,
-                color: Color(0xFFE53935),
-                size: 16,
-              ),
-            ],
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${'origin_label'.tr()}: $originAddress',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  '${'destination_label'.tr()}: $destinationAddress',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNavigationNotice() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFF8E1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.amber.shade200),
-      ),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.notifications_active_outlined,
-            color: Colors.amber,
-            size: 18,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'msg_follow_navigation'.tr(),
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF795548),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  LatLng? _getNavigationTarget(
-    String status,
-    Map<String, dynamic> tripData,
-  ) {
-    final bool goingToPickup = status == TripStatus.accepted ||
-        status == TripStatus.arrived;
-
-    return _extractLatLng(
-      tripData,
-      goingToPickup
-          ? [
-              'origin',
-              'originLatLng',
-              'pickup_location',
-              'pickupLatLng',
-            ]
-          : [
-              'destination',
-              'destinationLatLng',
-              'dropoff_location',
-              'dropoffLatLng',
-            ],
-      latKey: goingToPickup ? 'from_lat' : 'to_lat',
-      lngKey: goingToPickup ? 'from_lng' : 'to_lng',
-    );
-  }
-
-  String _formatNumber(dynamic value, {required int decimals}) {
-    if (value == null) return '---';
-
-    final String raw = value.toString();
-    final String cleaned = raw.replaceAll(RegExp(r'[^\d.]'), '');
-
-    final double? number = double.tryParse(cleaned);
-    if (number == null) return raw;
-
-    return number.toStringAsFixed(decimals);
-  }
-
-  String _getActionButtonTitle(String status) {
-    if (status == TripStatus.accepted) {
-      return 'btn_arrived_pickup'.tr();
-    }
-
-    if (status == TripStatus.arrived) {
-      return 'btn_start_trip'.tr();
-    }
-
-    if (status == TripStatus.onTrip) {
-      return 'btn_end_trip'.tr();
-    }
-
-    return 'btn_arrived_pickup'.tr();
-  }
-
-  Widget _buildInfoCard(
-    String label,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, size: 18, color: color),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 12,
-              color: Colors.black87,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: Colors.grey.shade600,
-              fontSize: 10,
-            ),
-          ),
-        ],
       ),
     );
   }
