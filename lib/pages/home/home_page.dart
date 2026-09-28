@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/services.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -26,12 +27,46 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   MapLibreMapController? mapController;
   Symbol? _driverNavigationSymbol;
   bool _isDriverArrowImageAdded = false;
   bool _isMapStyleReady = false;
+  bool _isNavArrowVisible = false;
   Position? currentPositionOfDriver;
+
+  // ───────── حرکت آیکن روی مسیر (منطق MapScreenRoute) ─────────
+  late AnimationController _arrowAnimationController;
+  List<LatLng> _navRoutePoints = <LatLng>[];
+  LatLng? _navDestination;
+  int _navProgressIndex = 0; // پیشرفت روی مسیر (فقط به جلو)
+  int _navOffRouteCount = 0;
+  int _navLastRenderedSegment = -1;
+  LatLng? _navLastRenderedPoint;
+  bool _isReroutingNav = false;
+  DateTime? _lastNavRerouteAt;
+  Line? _navRemainingLine; // خط سبز (باقی‌ماندهٔ مسیر)
+  Line? _navTraveledLine; // خط خاکستری (طی‌شده)
+
+  Position? _pendingNavPosition;
+  bool _isProcessingNavUpdate = false;
+
+  LatLng? _arrowAnimStart;
+  LatLng? _arrowAnimEnd;
+  LatLng? _arrowDisplayLatLng; // موقعیت لحظه‌ایِ آیکن (وسط انیمیشن)
+  LatLng? _arrowLastTarget;
+  double _arrowAnimStartBearing = 0.0;
+  double _arrowAnimEndBearing = 0.0;
+  double _arrowDisplayBearing = 0.0;
+  DateTime? _lastArrowUpdateAt;
+
+  static const double _offRouteThresholdMeters = 50.0;
+
+  // نوشتن لوکیشن در Firestore حداکثر هر ۲ ثانیه (با ارسال آخرین مقدار)
+  static const Duration _locationWriteInterval = Duration(seconds: 2);
+  DateTime? _lastLocationWriteAt;
+  Timer? _locationWriteTimer;
+  Position? _queuedLocation;
 
   bool isDriverAvailable = false;
   bool isLoading = false;
@@ -53,6 +88,10 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    _arrowAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    )..addListener(_animateNavArrow);
     _loadDriverStatus();
     initializePushNotificationSystem();
 
@@ -73,6 +112,8 @@ class _HomePageState extends State<HomePage> {
     _isDisposing = true;
     positionStreamHomePage?.cancel();
     tripRequestStream?.cancel();
+    _locationWriteTimer?.cancel();
+    _arrowAnimationController.dispose();
     super.dispose();
   }
 
@@ -95,10 +136,8 @@ class _HomePageState extends State<HomePage> {
       final NavigationController navController =
           context.read<NavigationController>();
 
-      if (navController.isNavigating &&
-          navController.snappedDriverLocation != null) {
-        target = navController.snappedDriverLocation!;
-        await _updateDriverNavigationArrow(navController);
+      if (navController.isNavigating && _arrowLastTarget != null) {
+        target = _arrowLastTarget!;
       }
     }
 
@@ -184,52 +223,422 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  /// 🔧 FIX: this now accepts a fallback position and no longer silently
-  /// no-ops when [NavigationController.snappedDriverLocation] hasn't been
-  /// computed yet (which happens right after navigation starts, before the
-  /// first GPS tick is snapped to the route). Without the fallback, the
-  /// arrow symbol was never created until the driver physically moved,
-  /// which is why it appeared "missing" right after accepting a trip.
-  Future<void> _updateDriverNavigationArrow(
-    NavigationController navController, {
-    LatLng? fallbackPosition,
-  }) async {
+  // ════════════════════════════════════════════════════════════
+  //  🧭 حرکت آیکن راننده روی مسیر (منطق MapScreenRoute تست‌شده)
+  //   • چسباندن به مسیر (≤ ۵۰ متر) و پیشروی فقط «به جلو»
+  //   • حرکت خطی با مدتی برابر فاصلهٔ واقعی بین دو GPS
+  //   • انیمیشن از موقعیت لحظه‌ایِ آیکن شروع می‌شود
+  //   • زاویه از جهت حرکت (بیش از ۳ متر جابه‌جایی)
+  //   • مسیر به طی‌شده (خاکستری) و باقی‌مانده (سبز) تقسیم می‌شود
+  //   • مسیریابی مجدد بعد از ۲ خوانش پیاپی خارج از مسیر
+  // ════════════════════════════════════════════════════════════
+
+  Future<void> _animateNavArrow() async {
+    if (!mounted ||
+        mapController == null ||
+        _driverNavigationSymbol == null ||
+        _arrowAnimStart == null ||
+        _arrowAnimEnd == null) {
+      return;
+    }
+
+    // حرکت خطی، بدون easing
+    final double t = _arrowAnimationController.value;
+
+    final double latitude = _arrowAnimStart!.latitude +
+        (_arrowAnimEnd!.latitude - _arrowAnimStart!.latitude) * t;
+    final double longitude = _arrowAnimStart!.longitude +
+        (_arrowAnimEnd!.longitude - _arrowAnimStart!.longitude) * t;
+
+    double diff = _arrowAnimEndBearing - _arrowAnimStartBearing;
+    if (diff.abs() > 180) diff -= 360 * diff.sign;
+    final double bearing = (_arrowAnimStartBearing + diff * t + 360) % 360;
+
+    _arrowDisplayLatLng = LatLng(latitude, longitude);
+    _arrowDisplayBearing = bearing;
+
+    try {
+      await mapController!.updateSymbol(
+        _driverNavigationSymbol!,
+        SymbolOptions(
+          geometry: LatLng(latitude, longitude),
+          iconRotate: bearing,
+          iconAnchor: 'center',
+        ),
+      );
+    } catch (e) {
+      debugPrint('Nav arrow animation error: $e');
+    }
+  }
+
+  /// فقط «آخرین» موقعیت پردازش می‌شود و پردازش‌ها پشت‌سرهم اجرا می‌شوند
+  Future<void> _processPendingNavPosition() async {
+    if (_isProcessingNavUpdate) return;
+    _isProcessingNavUpdate = true;
+
+    try {
+      while (_pendingNavPosition != null && mounted) {
+        final Position p = _pendingNavPosition!;
+        _pendingNavPosition = null;
+
+        await _updateNavArrow(LatLng(p.latitude, p.longitude), p.heading);
+      }
+    } finally {
+      _isProcessingNavUpdate = false;
+    }
+  }
+
+  Future<void> _updateNavArrow(LatLng rawPosition, double rawHeading) async {
     if (mapController == null || !_isMapStyleReady) return;
-    if (!navController.isNavigating) return;
 
-    final LatLng? position = navController.snappedDriverLocation ??
-        fallbackPosition ??
-        (currentPositionOfDriver != null
-            ? LatLng(
-                currentPositionOfDriver!.latitude,
-                currentPositionOfDriver!.longitude,
-              )
-            : null);
+    final List<LatLng> route = _navRoutePoints;
 
-    if (position == null) return;
+    LatLng target = rawPosition;
+    _NavSnap? onRouteSnap;
+
+    if (route.length >= 2) {
+      final _NavSnap? snap = _snapToNavRoute(
+        rawPosition,
+        route,
+        startIndex: _navProgressIndex,
+      );
+
+      if (snap != null && snap.distance <= _offRouteThresholdMeters) {
+        onRouteSnap = snap;
+        target = snap.point;
+        _navProgressIndex = max(_navProgressIndex, snap.segmentIndex);
+        _navOffRouteCount = 0;
+      } else {
+        _navOffRouteCount++;
+        if (_navOffRouteCount >= 2) {
+          unawaited(_rerouteNavigation(rawPosition));
+        }
+      }
+    }
 
     await _prepareDriverNavigationArrow();
 
+    if (mapController != null && _isDriverArrowImageAdded) {
+      try {
+        final LatLng? previousTarget = _arrowLastTarget;
+
+        // ───── زاویه ─────
+        double bearing = _arrowAnimEndBearing;
+
+        if (_driverNavigationSymbol == null) {
+          if (onRouteSnap != null) {
+            bearing = _calculateBearing(
+              route[onRouteSnap.segmentIndex],
+              route[onRouteSnap.segmentIndex + 1],
+            );
+          } else if (rawHeading >= 0) {
+            bearing = rawHeading;
+          }
+        } else if (previousTarget != null &&
+            Geolocator.distanceBetween(
+                  previousTarget.latitude,
+                  previousTarget.longitude,
+                  target.latitude,
+                  target.longitude,
+                ) >
+                3) {
+          bearing = _calculateBearing(previousTarget, target);
+        }
+
+        // ───── مدت انیمیشن = فاصلهٔ واقعی بین دو آپدیت ─────
+        final DateTime now = DateTime.now();
+        final int dtMs = _lastArrowUpdateAt == null
+            ? 1000
+            : now.difference(_lastArrowUpdateAt!).inMilliseconds;
+        _lastArrowUpdateAt = now;
+
+        if (_driverNavigationSymbol == null) {
+          _driverNavigationSymbol = await mapController!.addSymbol(
+            SymbolOptions(
+              geometry: target,
+              iconImage: 'driver_navigation_arrow',
+              iconSize: 0.55,
+              iconRotate: bearing,
+              iconAnchor: 'center',
+            ),
+          );
+
+          _arrowLastTarget = target;
+          _arrowDisplayLatLng = target;
+          _arrowDisplayBearing = bearing;
+          _arrowAnimStartBearing = bearing;
+          _arrowAnimEndBearing = bearing;
+
+          // نقطهٔ آبی GPS خام دیگر لازم نیست؛ فقط فلش روی مسیر دیده شود
+          if (mounted && !_isNavArrowVisible) {
+            setState(() {
+              _isNavArrowVisible = true;
+            });
+          }
+        } else {
+          _arrowAnimStart = _arrowDisplayLatLng ?? previousTarget ?? target;
+          _arrowAnimEnd = target;
+          _arrowAnimStartBearing = _arrowDisplayBearing;
+          _arrowAnimEndBearing = bearing;
+
+          _arrowAnimationController.stop();
+          _arrowAnimationController.duration = Duration(
+            milliseconds: dtMs.clamp(400, 2500).toInt(),
+          );
+          _arrowAnimationController.forward(from: 0.0);
+
+          _arrowLastTarget = target;
+        }
+      } catch (e) {
+        debugPrint('Error updating driver navigation arrow: $e');
+      }
+    } else if (!_isDriverArrowImageAdded) {
+      debugPrint('Driver navigation arrow image is not loaded.');
+    }
+
+    if (onRouteSnap != null) {
+      await _renderNavProgress(onRouteSnap, route);
+    }
+  }
+
+  Future<void> _rerouteNavigation(LatLng from) async {
+    if (_isReroutingNav || _navDestination == null || !mounted) return;
+
+    final DateTime now = DateTime.now();
+    if (_lastNavRerouteAt != null &&
+        now.difference(_lastNavRerouteAt!).inSeconds < 5) {
+      return;
+    }
+
+    _isReroutingNav = true;
+    _lastNavRerouteAt = now;
+    _navOffRouteCount = 0;
+
     try {
-      final SymbolOptions options = SymbolOptions(
-        geometry: position,
-        iconImage: 'driver_navigation_arrow',
-        iconSize: 0.55,
-        iconRotate: navController.driverRouteBearing,
-        iconAnchor: 'center',
+      final NavigationController navController =
+          context.read<NavigationController>();
+
+      final List<LatLng> points = await navController.startNavigation(
+        from,
+        _navDestination!,
+        context.locale.languageCode,
       );
 
-      if (_driverNavigationSymbol == null) {
-        _driverNavigationSymbol = await mapController!.addSymbol(options);
-      } else {
-        await mapController!.updateSymbol(
-          _driverNavigationSymbol!,
-          options,
+      if (!mounted) return;
+
+      if (points.length >= 2) {
+        _navRoutePoints = List<LatLng>.of(points);
+        _navProgressIndex = 0;
+        _navLastRenderedSegment = -1;
+        _navLastRenderedPoint = null;
+
+        await _renderNavLines(
+          traveled: <LatLng>[],
+          remaining: _navRoutePoints,
         );
       }
     } catch (e) {
-      debugPrint('Error updating driver navigation arrow: $e');
+      debugPrint('Error rerouting navigation: $e');
+    } finally {
+      _isReroutingNav = false;
     }
+  }
+
+  /// مسیر را به دو بخش تقسیم می‌کند: طی‌شده (خاکستری) و باقی‌مانده (سبز)
+  Future<void> _renderNavProgress(_NavSnap snap, List<LatLng> route) async {
+    if (mapController == null || _isReroutingNav) return;
+    if (!identical(route, _navRoutePoints)) return;
+    if (snap.segmentIndex + 1 >= route.length) return;
+
+    final LatLng? lastPoint = _navLastRenderedPoint;
+    if (snap.segmentIndex == _navLastRenderedSegment &&
+        lastPoint != null &&
+        Geolocator.distanceBetween(
+              lastPoint.latitude,
+              lastPoint.longitude,
+              snap.point.latitude,
+              snap.point.longitude,
+            ) <
+            3) {
+      return;
+    }
+
+    _navLastRenderedSegment = snap.segmentIndex;
+    _navLastRenderedPoint = snap.point;
+
+    final List<LatLng> traveled = <LatLng>[
+      for (int i = 0; i <= snap.segmentIndex; i++) route[i],
+      snap.point,
+    ];
+    final List<LatLng> remaining = <LatLng>[
+      snap.point,
+      for (int i = snap.segmentIndex + 1; i < route.length; i++) route[i],
+    ];
+
+    await _renderNavLines(traveled: traveled, remaining: remaining);
+  }
+
+  Future<void> _renderNavLines({
+    required List<LatLng> traveled,
+    required List<LatLng> remaining,
+  }) async {
+    if (mapController == null || remaining.isEmpty) return;
+
+    // یک خط با دو نقطهٔ یکسان روی نقشه دیده نمی‌شود
+    final List<LatLng> grey = traveled.length >= 2
+        ? traveled
+        : <LatLng>[remaining.first, remaining.first];
+
+    try {
+      if (_navRemainingLine != null && _navTraveledLine != null) {
+        await mapController!.updateLine(
+          _navTraveledLine!,
+          LineOptions(geometry: grey),
+        );
+        await mapController!.updateLine(
+          _navRemainingLine!,
+          LineOptions(geometry: remaining),
+        );
+        return;
+      }
+    } catch (_) {
+      // خط‌ها پاک شده‌اند؛ پایین‌تر دوباره اضافه می‌شوند
+      _navRemainingLine = null;
+      _navTraveledLine = null;
+    }
+
+    try {
+      await mapController!.clearLines();
+
+      _navTraveledLine = await mapController!.addLine(
+        LineOptions(
+          geometry: grey,
+          lineColor: '#B0B7C3',
+          lineWidth: 6.0,
+          lineJoin: 'round',
+        ),
+      );
+
+      _navRemainingLine = await mapController!.addLine(
+        LineOptions(
+          geometry: remaining,
+          lineColor: '#0F7D55',
+          lineWidth: 6.0,
+          lineOpacity: 0.85,
+          lineJoin: 'round',
+        ),
+      );
+    } catch (e) {
+      debugPrint('Error rendering navigation lines: $e');
+    }
+  }
+
+  /// نزدیک‌ترین نقطه روی مسیر؛ فقط «به جلو» از نقطهٔ پیشرفت جست‌وجو می‌کند
+  /// (جلوی پرش به سمت برگشتِ مسیر در دور برگردان‌ها را می‌گیرد).
+  _NavSnap? _snapToNavRoute(
+    LatLng gpsPoint,
+    List<LatLng> polyline, {
+    int startIndex = 0,
+    double maxAheadMeters = 600,
+  }) {
+    if (polyline.length < 2) return null;
+
+    final int from = max(0, min(startIndex - 1, polyline.length - 2));
+
+    double minDistance = double.infinity;
+    LatLng closestPoint = polyline[from];
+    int bestIndex = from;
+    double travelled = 0;
+
+    for (int i = from; i < polyline.length - 1; i++) {
+      final LatLng a = polyline[i];
+      final LatLng b = polyline[i + 1];
+
+      final LatLng projected = _getClosestPointOnSegment(gpsPoint, a, b);
+
+      final double distance = Geolocator.distanceBetween(
+        gpsPoint.latitude,
+        gpsPoint.longitude,
+        projected.latitude,
+        projected.longitude,
+      );
+
+      if (distance < minDistance) {
+        minDistance = distance;
+        closestPoint = projected;
+        bestIndex = i;
+      }
+
+      travelled += Geolocator.distanceBetween(
+        a.latitude,
+        a.longitude,
+        b.latitude,
+        b.longitude,
+      );
+      if (travelled > maxAheadMeters) break;
+    }
+
+    return _NavSnap(closestPoint, minDistance, bestIndex);
+  }
+
+  LatLng _getClosestPointOnSegment(LatLng p, LatLng a, LatLng b) {
+    final double x = p.longitude, y = p.latitude;
+    final double x1 = a.longitude, y1 = a.latitude;
+    final double x2 = b.longitude, y2 = b.latitude;
+
+    final double dx = x2 - x1;
+    final double dy = y2 - y1;
+
+    if (dx == 0 && dy == 0) return a;
+
+    double t = ((x - x1) * dx + (y - y1) * dy) / (dx * dx + dy * dy);
+    t = t.clamp(0.0, 1.0).toDouble();
+
+    return LatLng(y1 + t * dy, x1 + t * dx);
+  }
+
+  double _calculateBearing(LatLng start, LatLng end) {
+    final double startLatRad = start.latitude * pi / 180;
+    final double startLngRad = start.longitude * pi / 180;
+    final double endLatRad = end.latitude * pi / 180;
+    final double endLngRad = end.longitude * pi / 180;
+
+    final double dLng = endLngRad - startLngRad;
+
+    final double y = sin(dLng) * cos(endLatRad);
+    final double x = cos(startLatRad) * sin(endLatRad) -
+        sin(startLatRad) * cos(endLatRad) * cos(dLng);
+
+    return (atan2(y, x) * 180 / pi + 360) % 360;
+  }
+
+  /// نوشتن لوکیشن راننده در Firestore: حداکثر هر ۲ ثانیه، و همیشه آخرین مقدار
+  void _queueDriverLocationWrite(Position position) {
+    final DateTime now = DateTime.now();
+    final DateTime? last = _lastLocationWriteAt;
+
+    if (last == null || now.difference(last) >= _locationWriteInterval) {
+      _lastLocationWriteAt = now;
+      _queuedLocation = null;
+      unawaited(_updateDriverLiveLocation(position));
+      return;
+    }
+
+    _queuedLocation = position;
+
+    _locationWriteTimer ??= Timer(
+      _locationWriteInterval - now.difference(last),
+      () {
+        _locationWriteTimer = null;
+        final Position? queued = _queuedLocation;
+        _queuedLocation = null;
+
+        if (queued != null && mounted && isDriverAvailable) {
+          _lastLocationWriteAt = DateTime.now();
+          unawaited(_updateDriverLiveLocation(queued));
+        }
+      },
+    );
   }
 
   Future<void> _showMessage(String message) async {
@@ -374,6 +783,10 @@ class _HomePageState extends State<HomePage> {
     await tripRequestStream?.cancel();
     tripRequestStream = null;
 
+    _locationWriteTimer?.cancel();
+    _locationWriteTimer = null;
+    _queuedLocation = null;
+
     final User? user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
@@ -400,19 +813,21 @@ class _HomePageState extends State<HomePage> {
     positionStreamHomePage?.cancel();
 
     positionStreamHomePage = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
+      locationSettings: AndroidSettings(
         accuracy: LocationAccuracy.bestForNavigation,
-        distanceFilter: 4,
+        distanceFilter: 1,
+        intervalDuration: const Duration(seconds: 1),
       ),
     ).listen(
-      (Position position) async {
+      (Position position) {
         if (_isDisposing) return;
 
         currentPositionOfDriver = position;
 
         if (!mounted) return;
 
-        await _updateDriverLiveLocation(position);
+        // نوشتن در Firestore منتظر نمی‌ماند تا حرکت آیکن کند نشود
+        _queueDriverLocationWrite(position);
 
         final NavigationController navController =
             context.read<NavigationController>();
@@ -423,15 +838,8 @@ class _HomePageState extends State<HomePage> {
             langCode: context.locale.languageCode,
           );
 
-          await _updateDriverNavigationArrow(
-            navController,
-            fallbackPosition: LatLng(position.latitude, position.longitude),
-          );
-
-          if (mapController != null &&
-              navController.remainingRoutePoints.length > 1) {
-            await _drawRoutePolyline(navController.remainingRoutePoints);
-          }
+          _pendingNavPosition = position;
+          unawaited(_processPendingNavPosition());
         }
       },
       onError: (Object error) {
@@ -520,31 +928,29 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _drawRoutePolyline(List<LatLng> points) async {
-    if (mapController == null || points.isEmpty) return;
-
-    try {
-      await mapController!.clearLines();
-
-      await mapController!.addLine(
-        LineOptions(
-          geometry: points,
-          lineColor: '#0F7D55',
-          lineWidth: 6.0,
-          lineOpacity: 0.85,
-          lineJoin: 'round',
-        ),
-      );
-    } catch (e) {
-      debugPrint('Error drawing route polyline: $e');
-    }
-  }
-
   Future<void> _clearRouteAndNavigation() async {
     try {
       if (mounted) {
         context.read<NavigationController>().stopNavigation();
       }
+
+      _arrowAnimationController.stop();
+      _pendingNavPosition = null;
+      _navRoutePoints = <LatLng>[];
+      _navDestination = null;
+      _navProgressIndex = 0;
+      _navOffRouteCount = 0;
+      _navLastRenderedSegment = -1;
+      _navLastRenderedPoint = null;
+      _navRemainingLine = null;
+      _navTraveledLine = null;
+      _arrowAnimStart = null;
+      _arrowAnimEnd = null;
+      _arrowDisplayLatLng = null;
+      _arrowLastTarget = null;
+      _lastArrowUpdateAt = null;
+      _arrowAnimEndBearing = 0.0;
+      _arrowDisplayBearing = 0.0;
 
       if (mapController != null) {
         await mapController!.clearLines();
@@ -552,6 +958,12 @@ class _HomePageState extends State<HomePage> {
           await mapController!.removeSymbol(_driverNavigationSymbol!);
           _driverNavigationSymbol = null;
         }
+      }
+
+      if (mounted && _isNavArrowVisible) {
+        setState(() {
+          _isNavArrowVisible = false;
+        });
       }
     } catch (e) {
       debugPrint('Error clearing route: $e');
@@ -760,18 +1172,28 @@ class _HomePageState extends State<HomePage> {
       context.locale.languageCode,
     );
 
-    if (routePoints.isNotEmpty) {
-      await _drawRoutePolyline(routePoints);
+    if (!mounted) return;
+
+    _navDestination = destinationPos;
+    _navRoutePoints = List<LatLng>.of(routePoints);
+    _navProgressIndex = 0;
+    _navOffRouteCount = 0;
+    _navLastRenderedSegment = -1;
+    _navLastRenderedPoint = null;
+    _lastNavRerouteAt = DateTime.now();
+
+    if (_navRoutePoints.length >= 2) {
+      await _renderNavLines(
+        traveled: <LatLng>[],
+        remaining: _navRoutePoints,
+      );
     }
 
-    // 🔧 FIX: place/refresh the navigation arrow immediately instead of
-    // waiting for the next GPS tick from setAndGetLocationUpdates(). Without
-    // this, the arrow was invisible from the moment a trip was accepted
-    // until the driver's GPS registered a >=4m move.
-    await _updateDriverNavigationArrow(
-      navController,
-      fallbackPosition: driverPos,
-    );
+    // آیکن را همان لحظه روی مسیر بگذار (بدون انتظار برای GPS بعدی)
+    if (currentPositionOfDriver != null) {
+      _pendingNavPosition = currentPositionOfDriver;
+      await _processPendingNavPosition();
+    }
   }
 
   Future<void> _updateTripStatus(
@@ -1088,7 +1510,7 @@ class _HomePageState extends State<HomePage> {
                                       // skips writing the driver's real
                                       // coordinates to Firestore, leaving
                                       // driver_locations pointing at stale
-                                      // data until the next 4m+ GPS move.
+                                      // data until the next GPS move.
                                       if (mounted) {
                                         setState(() {
                                           isDriverAvailable = true;
@@ -1200,11 +1622,12 @@ class _HomePageState extends State<HomePage> {
               styleString: 'assets/map/style.json',
               rotateGesturesEnabled: false,
               tiltGesturesEnabled: false,
-              myLocationEnabled: true,
+              myLocationEnabled: !_isNavArrowVisible,
               myLocationTrackingMode: MyLocationTrackingMode.none,
               onMapCreated: _onMapCreated,
               onStyleLoadedCallback: () async {
                 _isMapStyleReady = true;
+                _isDriverArrowImageAdded = false;
                 await _prepareDriverNavigationArrow();
               },
             ),
@@ -1357,4 +1780,13 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
+}
+
+/// نتیجهٔ چسباندن یک نقطهٔ GPS به مسیر
+class _NavSnap {
+  final LatLng point;
+  final double distance;
+  final int segmentIndex;
+
+  const _NavSnap(this.point, this.distance, this.segmentIndex);
 }
