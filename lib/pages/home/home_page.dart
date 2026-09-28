@@ -38,13 +38,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   // ───────── حرکت آیکن روی مسیر (منطق MapScreenRoute) ─────────
   late AnimationController _arrowAnimationController;
   List<LatLng> _navRoutePoints = <LatLng>[];
-  LatLng? _navDestination;
+  int _lastSyncedRouteVersion = -1; // نسخهٔ مسیرِ NavigationController
   int _navProgressIndex = 0; // پیشرفت روی مسیر (فقط به جلو)
-  int _navOffRouteCount = 0;
   int _navLastRenderedSegment = -1;
   LatLng? _navLastRenderedPoint;
-  bool _isReroutingNav = false;
-  DateTime? _lastNavRerouteAt;
   Line? _navRemainingLine; // خط سبز (باقی‌ماندهٔ مسیر)
   Line? _navTraveledLine; // خط خاکستری (طی‌شده)
 
@@ -230,7 +227,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   //   • انیمیشن از موقعیت لحظه‌ایِ آیکن شروع می‌شود
   //   • زاویه از جهت حرکت (بیش از ۳ متر جابه‌جایی)
   //   • مسیر به طی‌شده (خاکستری) و باقی‌مانده (سبز) تقسیم می‌شود
-  //   • مسیریابی مجدد بعد از ۲ خوانش پیاپی خارج از مسیر
+  //   • مسیریابی مجدد را خودِ NavigationController انجام می‌دهد و خط با آن هماهنگ می‌شود
   // ════════════════════════════════════════════════════════════
 
   Future<void> _animateNavArrow() async {
@@ -291,6 +288,28 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   Future<void> _updateNavArrow(LatLng rawPosition, double rawHeading) async {
     if (mapController == null || !_isMapStyleReady) return;
 
+    if (!mounted) return;
+
+    // 🔧 مسیر فقط یک مالک دارد: NavigationController. هر بار که مسیر عوض شد
+    // (شروع سفر یا مسیریابی مجدد خودکار) نسخهٔ جدید را می‌گیریم و خط را
+    // دوباره می‌کشیم. به این ترتیب خط روی نقشه همیشه با دستورهای پیچ یکی است.
+    final NavigationController navController =
+        context.read<NavigationController>();
+
+    if (navController.routeVersion != _lastSyncedRouteVersion &&
+        navController.routePoints.length >= 2) {
+      _lastSyncedRouteVersion = navController.routeVersion;
+      _navRoutePoints = List<LatLng>.of(navController.routePoints);
+      _navProgressIndex = 0;
+      _navLastRenderedSegment = -1;
+      _navLastRenderedPoint = null;
+
+      await _renderNavLines(
+        traveled: <LatLng>[],
+        remaining: _navRoutePoints,
+      );
+    }
+
     final List<LatLng> route = _navRoutePoints;
 
     LatLng target = rawPosition;
@@ -307,12 +326,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         onRouteSnap = snap;
         target = snap.point;
         _navProgressIndex = max(_navProgressIndex, snap.segmentIndex);
-        _navOffRouteCount = 0;
-      } else {
-        _navOffRouteCount++;
-        if (_navOffRouteCount >= 2) {
-          unawaited(_rerouteNavigation(rawPosition));
-        }
       }
     }
 
@@ -401,52 +414,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     }
   }
 
-  Future<void> _rerouteNavigation(LatLng from) async {
-    if (_isReroutingNav || _navDestination == null || !mounted) return;
-
-    final DateTime now = DateTime.now();
-    if (_lastNavRerouteAt != null &&
-        now.difference(_lastNavRerouteAt!).inSeconds < 5) {
-      return;
-    }
-
-    _isReroutingNav = true;
-    _lastNavRerouteAt = now;
-    _navOffRouteCount = 0;
-
-    try {
-      final NavigationController navController =
-          context.read<NavigationController>();
-
-      final List<LatLng> points = await navController.startNavigation(
-        from,
-        _navDestination!,
-        context.locale.languageCode,
-      );
-
-      if (!mounted) return;
-
-      if (points.length >= 2) {
-        _navRoutePoints = List<LatLng>.of(points);
-        _navProgressIndex = 0;
-        _navLastRenderedSegment = -1;
-        _navLastRenderedPoint = null;
-
-        await _renderNavLines(
-          traveled: <LatLng>[],
-          remaining: _navRoutePoints,
-        );
-      }
-    } catch (e) {
-      debugPrint('Error rerouting navigation: $e');
-    } finally {
-      _isReroutingNav = false;
-    }
-  }
-
   /// مسیر را به دو بخش تقسیم می‌کند: طی‌شده (خاکستری) و باقی‌مانده (سبز)
   Future<void> _renderNavProgress(_NavSnap snap, List<LatLng> route) async {
-    if (mapController == null || _isReroutingNav) return;
+    if (mapController == null) return;
     if (!identical(route, _navRoutePoints)) return;
     if (snap.segmentIndex + 1 >= route.length) return;
 
@@ -937,9 +907,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       _arrowAnimationController.stop();
       _pendingNavPosition = null;
       _navRoutePoints = <LatLng>[];
-      _navDestination = null;
+      _lastSyncedRouteVersion = -1;
       _navProgressIndex = 0;
-      _navOffRouteCount = 0;
       _navLastRenderedSegment = -1;
       _navLastRenderedPoint = null;
       _navRemainingLine = null;
@@ -1174,13 +1143,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
     if (!mounted) return;
 
-    _navDestination = destinationPos;
+    _lastSyncedRouteVersion = navController.routeVersion;
     _navRoutePoints = List<LatLng>.of(routePoints);
     _navProgressIndex = 0;
-    _navOffRouteCount = 0;
     _navLastRenderedSegment = -1;
     _navLastRenderedPoint = null;
-    _lastNavRerouteAt = DateTime.now();
 
     if (_navRoutePoints.length >= 2) {
       await _renderNavLines(
