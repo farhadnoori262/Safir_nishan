@@ -8,6 +8,13 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
+    <!-- 🔧 FIX: این دو مجوز برای فعال بودن Foreground Service موقعیت مکانی
+         لازم است (همانی که در driver_home_page.dart با
+         foregroundNotificationConfig فعال شده). بدون این‌ها، اندروید
+         سرویس پس‌زمینهٔ موقعیت را رد می‌کند یا در اندروید ۱۴+ کرش می‌دهد. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+
     <application
         android:label="Safir Driver"
         android:icon="@mipmap/ic_launcher"
