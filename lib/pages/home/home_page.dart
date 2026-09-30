@@ -611,6 +611,31 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     );
   }
 
+  bool _hasWarnedBackgroundLocation = false;
+
+  /// 🔧 راهنمای فعال‌سازی «همیشه اجازه بده» — بدون این، ردیابی به‌محض
+  /// قفل شدن صفحه یا رفتن اپ به پس‌زمینه متوقف می‌شود.
+  Future<void> _promptEnableBackgroundLocation() async {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        duration: const Duration(seconds: 8),
+        content: const Text(
+          'برای ادامهٔ ارسال موقعیت حتی وقتی صفحه قفل است، از تنظیمات '
+          'گوشی روی مجوز موقعیت این اپ بزنید «همیشه اجازه بده».',
+        ),
+        action: SnackBarAction(
+          label: 'تنظیمات',
+          onPressed: () {
+            unawaited(Geolocator.openAppSettings());
+          },
+        ),
+      ),
+    );
+  }
+
   Future<void> _showMessage(String message) async {
     if (!mounted) return;
 
@@ -639,6 +664,15 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           permission == LocationPermission.deniedForever) {
         await _showMessage('اجازهٔ دسترسی به موقعیت مکانی داده نشده است.');
         return null;
+      }
+
+      // 🔧 FIX: مجوز عادی («فقط حین استفاده») برای وقتی که اپ باز است کافی‌ست،
+      // ولی اگر راننده صفحه را قفل کند یا اپ پس‌زمینه برود، اندروید ۱۰ به بعد
+      // بدون مجوز «همیشه اجازه بده» ارسال موقعیت را قطع می‌کند. این مجوز را
+      // نمی‌شود با یک دیالوگ عادی گرفت؛ کاربر باید از تنظیمات سیستم فعالش کند.
+      if (permission == LocationPermission.whileInUse && !_hasWarnedBackgroundLocation) {
+        _hasWarnedBackgroundLocation = true;
+        unawaited(_promptEnableBackgroundLocation());
       }
 
       final Position position = await Geolocator.getCurrentPosition(
@@ -787,6 +821,20 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         accuracy: LocationAccuracy.bestForNavigation,
         distanceFilter: 1,
         intervalDuration: const Duration(seconds: 1),
+        // 🔧 FIX: بدون این، اندروید به‌محض اینکه اپ پس‌زمینه بره یا صفحه
+        // قفل بشه، این استریم رو متوقف می‌کنه — دقیقاً همون رفتاری که
+        // باعث «یک آپدیت میاد، بعد هیچی» می‌شد. با این نوتیفیکیشن،
+        // اندروید یک Foreground Service می‌سازه و ادامه می‌ده به فرستادن
+        // موقعیت حتی وقتی اپ پس‌زمینه‌ست.
+        foregroundNotificationConfig: const ForegroundNotificationConfig(
+          notificationTitle: 'سفیر — سفر فعال',
+          notificationText: 'در حال ارسال موقعیت مکانی شما به مسافر است.',
+          enableWakeLock: true,
+          notificationIcon: AndroidResource(
+            name: 'ic_launcher',
+            defType: 'mipmap',
+          ),
+        ),
       ),
     ).listen(
       (Position position) {
