@@ -57,7 +57,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   double _arrowDisplayBearing = 0.0;
   DateTime? _lastArrowUpdateAt;
 
-  static const double _offRouteThresholdMeters = 50.0;
+  // 🔧 FIX: قبلاً ۵۰ متر بود؛ این هم‌ارز همان باگی بود که در فایل مسافر
+  // اصلاح شد — یک کوچهٔ نزدیک همچنان «روی مسیر» حساب می‌شد و فلش به نقطهٔ
+  // (تقریباً ثابتِ) روی خط قدیمی می‌چسبید به‌جای موقعیت واقعی راننده.
+  static const double _offRouteThresholdMeters = 25.0;
 
   // نوشتن لوکیشن در Firestore حداکثر هر ۲ ثانیه (با ارسال آخرین مقدار)
   static const Duration _locationWriteInterval = Duration(seconds: 2);
@@ -509,7 +512,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     LatLng gpsPoint,
     List<LatLng> polyline, {
     int startIndex = 0,
-    double maxAheadMeters = 600,
+    // 🔧 FIX: قبلاً ۶۰۰ متر بود — همان باگ فایل مسافر. اگر مسیر قدیمی خیلی
+    // جلوتر دوباره از نزدیکی راننده رد می‌شد، اشتباهاً «روی مسیر» حساب
+    // می‌شد و off-route هرگز تشخیص داده نمی‌شد.
+    double maxAheadMeters = 150,
   }) {
     if (polyline.length < 2) return null;
 
